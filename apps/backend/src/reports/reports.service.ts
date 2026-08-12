@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
-import { AssignmentStatus, Role } from "@prisma/client";
+import { AssignmentStatus, LeadStatus, OpportunityStatus, Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AttendanceService } from "../attendance/attendance.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
@@ -110,6 +110,90 @@ export class ReportsService {
         canceled: byStatus[AssignmentStatus.CANCELED] ?? 0,
       },
       trainingAcknowledged: trainingAck,
+    };
+  }
+
+  /** Sales dashboard: pipeline value by stage, lead funnel, forecast rollup, overdue leads. */
+  async salesDashboard(actor: AuthenticatedEmployee) {
+    if (!MANAGER_RANK.includes(actor.role)) {
+      throw new ForbiddenException("Sales dashboard is restricted to managers and above");
+    }
+
+    const orgId = actor.organizationId;
+
+    const [pipeline, openOpportunities, leadsByStatus, overdueLeads, wonCount, lostCount] = await Promise.all([
+      this.prisma.pipeline.findFirst({
+        where: { organizationId: orgId, isDefault: true },
+        include: { stages: { orderBy: { sortOrder: "asc" } } },
+      }),
+      this.prisma.opportunity.findMany({
+        where: { organizationId: orgId, status: OpportunityStatus.OPEN },
+        include: {
+          stage: { select: { id: true, name: true, sortOrder: true, probability: true } },
+          owner: { select: { id: true, fullName: true } },
+        },
+      }),
+      this.prisma.lead.groupBy({
+        by: ["status"],
+        where: { organizationId: orgId },
+        _count: { _all: true },
+      }),
+      this.prisma.lead.count({
+        where: {
+          organizationId: orgId,
+          respondBySlaAt: { lt: new Date() },
+          firstRespondedAt: null,
+          status: { in: [LeadStatus.NEW, LeadStatus.CONTACTED] },
+        },
+      }),
+      this.prisma.opportunity.count({ where: { organizationId: orgId, status: OpportunityStatus.WON } }),
+      this.prisma.opportunity.count({ where: { organizationId: orgId, status: OpportunityStatus.LOST } }),
+    ]);
+
+    const stageBreakdown = (pipeline?.stages ?? []).map((stage) => {
+      const inStage = openOpportunities.filter((o) => o.stageId === stage.id);
+      return {
+        stageId: stage.id,
+        stageName: stage.name,
+        count: inStage.length,
+        valueMinor: inStage.reduce((sum, o) => sum + o.amountMinor, 0),
+      };
+    });
+
+    const totalPipelineValueMinor = openOpportunities.reduce((sum, o) => sum + o.amountMinor, 0);
+    const weightedForecastMinor = openOpportunities.reduce(
+      (sum, o) => sum + Math.round((o.amountMinor * o.stage.probability) / 100),
+      0,
+    );
+
+    const forecastByCategory: Record<string, number> = {};
+    for (const o of openOpportunities) {
+      forecastByCategory[o.forecastCategory] = (forecastByCategory[o.forecastCategory] ?? 0) + o.amountMinor;
+    }
+
+    const byOwnerMap = new Map<string, { ownerId: string; ownerName: string; valueMinor: number; count: number }>();
+    for (const o of openOpportunities) {
+      if (!o.owner) continue;
+      const existing = byOwnerMap.get(o.owner.id) ?? {
+        ownerId: o.owner.id,
+        ownerName: o.owner.fullName,
+        valueMinor: 0,
+        count: 0,
+      };
+      existing.valueMinor += o.amountMinor;
+      existing.count += 1;
+      byOwnerMap.set(o.owner.id, existing);
+    }
+
+    return {
+      generatedAt: new Date().toISOString(),
+      pipelineValue: { totalMinor: totalPipelineValueMinor, weightedForecastMinor },
+      stageBreakdown,
+      forecastByCategory,
+      byOwner: Array.from(byOwnerMap.values()),
+      leadFunnel: Object.fromEntries(leadsByStatus.map((row) => [row.status, row._count._all])),
+      overdueLeads,
+      winLoss: { won: wonCount, lost: lostCount },
     };
   }
 }

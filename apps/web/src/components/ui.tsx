@@ -6,7 +6,10 @@ import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, SelectH
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={clsx("rounded-xl border border-border bg-surface p-5 shadow-sm", className)}
+      className={clsx(
+        "rounded-xl border border-border bg-surface p-5 shadow-[0_1px_2px_rgba(16,38,53,0.04),0_1px_1px_rgba(16,38,53,0.03)]",
+        className,
+      )}
       {...props}
     />
   );
@@ -20,10 +23,10 @@ export function Button({
   return (
     <button
       className={clsx(
-        "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
-        variant === "primary" && "bg-emerald text-white hover:bg-emerald-dark",
+        "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100",
+        variant === "primary" && "bg-emerald text-white shadow-sm shadow-emerald/20 hover:bg-emerald-dark",
         variant === "secondary" && "border border-border bg-surface text-ink hover:bg-canvas",
-        variant === "danger" && "bg-coral text-white hover:opacity-90",
+        variant === "danger" && "bg-coral text-white shadow-sm shadow-coral/20 hover:opacity-90",
         className,
       )}
       {...props}
@@ -63,7 +66,7 @@ export function Badge({
   children: React.ReactNode;
 }) {
   const tones: Record<string, string> = {
-    neutral: "bg-slate-100 text-slate-700",
+    neutral: "bg-canvas text-muted",
     success: "bg-emerald/10 text-emerald-dark",
     warning: "bg-amber/10 text-amber",
     danger: "bg-coral/10 text-coral",

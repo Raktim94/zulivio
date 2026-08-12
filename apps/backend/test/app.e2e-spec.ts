@@ -331,6 +331,151 @@ describe("Zulivio (e2e)", () => {
     });
   });
 
+  describe("sales CRM", () => {
+    let ownerAgent: ReturnType<typeof request.agent>;
+    let repAgent: ReturnType<typeof request.agent>;
+    let repId: string;
+    let leadId: string;
+    let opportunityId: string;
+    let stages: { id: string; name: string; isWon: boolean; isLost: boolean }[];
+
+    beforeAll(async () => {
+      ownerAgent = request.agent(server());
+      await ownerAgent.post("/api/v1/auth/sessions").send({ email: orgEmail, password: orgPassword });
+
+      const email = `rep-${Date.now()}@e2e.local`;
+      const created = await ownerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Sales Rep", email, role: "EMPLOYEE" });
+      repId = created.body.id;
+
+      repAgent = request.agent(server());
+      await repAgent.post("/api/v1/auth/sessions").send({ email, password: created.body.temporaryPassword });
+
+      const pipelines = await ownerAgent.get("/api/v1/pipelines");
+      stages = pipelines.body[0].stages;
+    });
+
+    it("creates an assignment rule and auto-assigns a lead round-robin", async () => {
+      await ownerAgent
+        .post("/api/v1/assignment-rules")
+        .send({ name: "Default rotation", memberIds: [repId], slaMinutes: 30 })
+        .expect(201);
+
+      const res = await ownerAgent
+        .post("/api/v1/leads")
+        .send({ fullName: "Aditi Sharma", email: "aditi@example.com", autoAssign: true })
+        .expect(201);
+
+      leadId = res.body.id;
+      expect(res.body.ownerId).toBe(repId);
+      expect(res.body.respondBySlaAt).not.toBeNull();
+    });
+
+    it("blocks an employee from viewing a lead they don't own or didn't create", async () => {
+      const otherEmail = `other-${Date.now()}@e2e.local`;
+      const otherCreated = await ownerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Other Employee", email: otherEmail, role: "EMPLOYEE" });
+      const otherAgent = request.agent(server());
+      await otherAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email: otherEmail, password: otherCreated.body.temporaryPassword });
+
+      await otherAgent.get(`/api/v1/leads/${leadId}`).expect(403);
+    });
+
+    it("lets the assigned rep move the lead through valid status transitions", async () => {
+      await repAgent.patch(`/api/v1/leads/${leadId}`).send({ status: "CONTACTED" }).expect(200);
+      const res = await repAgent.patch(`/api/v1/leads/${leadId}`).send({ status: "QUALIFIED" }).expect(200);
+      expect(res.body.status).toBe("QUALIFIED");
+    });
+
+    it("rejects an invalid lead status transition", async () => {
+      // QUALIFIED can only go to DISQUALIFIED, not back to NEW.
+      await repAgent.patch(`/api/v1/leads/${leadId}`).send({ status: "NEW" }).expect(400);
+    });
+
+    it("converts a qualified lead into an opportunity without losing lead history", async () => {
+      const res = await repAgent
+        .post(`/api/v1/leads/${leadId}/convert`)
+        .send({ title: "Aditi Sharma — annual plan", amountMinor: 500000 })
+        .expect(201);
+
+      opportunityId = res.body.id;
+      expect(res.body.stageId).toBe(stages[0].id);
+
+      const lead = await repAgent.get(`/api/v1/leads/${leadId}`).expect(200);
+      expect(lead.body.status).toBe("CONVERTED");
+      expect(lead.body.convertedOpportunityId).toBe(opportunityId);
+    });
+
+    it("rejects converting the same lead twice", async () => {
+      await repAgent
+        .post(`/api/v1/leads/${leadId}/convert`)
+        .send({ title: "Duplicate conversion attempt" })
+        .expect(400);
+    });
+
+    it("moves the opportunity through pipeline stages, recording an event each time", async () => {
+      const qualifiedStage = stages.find((s) => s.name === "Qualified")!;
+      await repAgent
+        .post(`/api/v1/opportunities/${opportunityId}/stage-transitions`)
+        .send({ stageId: qualifiedStage.id })
+        .expect(201);
+
+      const list = await ownerAgent.get("/api/v1/opportunities").expect(200);
+      const found = list.body.find((o: { id: string }) => o.id === opportunityId);
+      expect(found.stage.name).toBe("Qualified");
+    });
+
+    it("requires a lossReason when moving an opportunity to a lost stage", async () => {
+      const lostStage = stages.find((s) => s.isLost)!;
+      await repAgent
+        .post(`/api/v1/opportunities/${opportunityId}/stage-transitions`)
+        .send({ stageId: lostStage.id })
+        .expect(400);
+
+      await repAgent
+        .post(`/api/v1/opportunities/${opportunityId}/stage-transitions`)
+        .send({ stageId: lostStage.id, lossReason: "Budget frozen this quarter" })
+        .expect(201);
+    });
+
+    it("rejects moving a closed (lost) opportunity further", async () => {
+      const wonStage = stages.find((s) => s.isWon)!;
+      await repAgent
+        .post(`/api/v1/opportunities/${opportunityId}/stage-transitions`)
+        .send({ stageId: wonStage.id })
+        .expect(400);
+    });
+
+    it("blocks a plain employee from adjusting the forecast category", async () => {
+      await repAgent
+        .post(`/api/v1/opportunities/${opportunityId}/forecast-category`)
+        .send({ category: "COMMITTED" })
+        .expect(403);
+    });
+
+    it("lets a manager adjust the forecast category with an audited reason", async () => {
+      await ownerAgent
+        .post(`/api/v1/opportunities/${opportunityId}/forecast-category`)
+        .send({ category: "OMITTED", reason: "Deal is dead" })
+        .expect(201);
+    });
+
+    it("exports leads as CSV", async () => {
+      const res = await ownerAgent.get("/api/v1/exports/leads.csv").expect(200);
+      expect(res.text).toContain("Aditi Sharma");
+    });
+
+    it("returns sales dashboard data with stage breakdown and win/loss counts", async () => {
+      const res = await ownerAgent.get("/api/v1/reports/sales-dashboard").expect(200);
+      expect(res.body.winLoss.lost).toBeGreaterThanOrEqual(1);
+      expect(Array.isArray(res.body.stageBreakdown)).toBe(true);
+    });
+  });
+
   it("reports readiness once the database is reachable", async () => {
     await request(server()).get("/api/health/ready").expect(200);
   });
@@ -338,6 +483,13 @@ describe("Zulivio (e2e)", () => {
   afterAll(async () => {
     // Best-effort cleanup of everything this run created, so the test DB
     // stays reusable across runs.
+    await prisma.forecastAdjustment.deleteMany({});
+    await prisma.opportunityEvent.deleteMany({});
+    await prisma.opportunity.deleteMany({});
+    await prisma.lead.deleteMany({});
+    await prisma.pipelineStage.deleteMany({});
+    await prisma.pipeline.deleteMany({});
+    await prisma.assignmentRule.deleteMany({});
     await prisma.auditEvent.deleteMany({});
     await prisma.assignmentEvent.deleteMany({});
     await prisma.assignment.deleteMany({});

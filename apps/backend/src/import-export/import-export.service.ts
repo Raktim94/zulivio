@@ -5,6 +5,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
 import { EmployeesService } from "../employees/employees.service";
 import { AssignmentsService } from "../assignments/assignments.service";
+import { LeadsService } from "../leads/leads.service";
 import { GoogleSheetsService } from "./google-sheets.service";
 import { toCsv } from "./csv.util";
 import { GoogleSheetsSyncDto } from "./dto/google-sheets-sync.dto";
@@ -12,6 +13,7 @@ import { GoogleSheetsSyncDto } from "./dto/google-sheets-sync.dto";
 const MANAGER_RANK: Role[] = [Role.MANAGER, Role.SALES_HEAD, Role.COMPANY_ADMIN, Role.MASTER_OWNER];
 const EMPLOYEE_COLUMNS = ["employeeNumber", "fullName", "email", "role", "department", "employmentStatus"];
 const ASSIGNMENT_COLUMNS = ["assignmentNumber", "title", "status", "priority", "owner", "dueAt"];
+const LEAD_COLUMNS = ["fullName", "email", "phone", "company", "source", "status", "owner"];
 
 export interface RowError {
   row: number;
@@ -24,6 +26,7 @@ export class ImportExportService {
     private readonly prisma: PrismaService,
     private readonly employeesService: EmployeesService,
     private readonly assignmentsService: AssignmentsService,
+    private readonly leadsService: LeadsService,
     private readonly googleSheets: GoogleSheetsService,
   ) {}
 
@@ -51,6 +54,61 @@ export class ImportExportService {
       dueAt: a.dueAt ? a.dueAt.toISOString() : "",
     }));
     return toCsv(rows, ASSIGNMENT_COLUMNS);
+  }
+
+  async exportLeadsCsv(actor: AuthenticatedEmployee): Promise<string> {
+    this.requireManager(actor);
+    const leads = await this.leadsService.list(actor, {});
+    const rows = leads.map((l) => ({
+      fullName: l.fullName,
+      email: l.email ?? "",
+      phone: l.phone ?? "",
+      company: l.company ?? "",
+      source: l.source ?? "",
+      status: l.status,
+      owner: l.owner?.fullName ?? "",
+    }));
+    return toCsv(rows, LEAD_COLUMNS);
+  }
+
+  /** Header-mapped CSV import for leads: full_name/name, email, phone, company, source. */
+  async importLeadsCsv(actor: AuthenticatedEmployee, fileContent: string) {
+    this.requireManager(actor);
+
+    let records: Record<string, string>[];
+    try {
+      records = parse(fileContent, { columns: true, skip_empty_lines: true, trim: true });
+    } catch (err) {
+      throw new BadRequestException(`Malformed CSV: ${(err as Error).message}`);
+    }
+
+    const created: unknown[] = [];
+    const errors: RowError[] = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const raw = records[i];
+      const fullName = raw.full_name || raw.fullName || raw.name;
+
+      if (!fullName) {
+        errors.push({ row: i + 2, message: "Missing required field: full_name/name" });
+        continue;
+      }
+
+      try {
+        const lead = await this.leadsService.create(actor, {
+          fullName,
+          email: raw.email || undefined,
+          phone: raw.phone || undefined,
+          company: raw.company || undefined,
+          source: raw.source || "CSV import",
+        });
+        created.push(lead);
+      } catch (err) {
+        errors.push({ row: i + 2, message: (err as Error).message });
+      }
+    }
+
+    return { createdCount: created.length, errorCount: errors.length, created, errors };
   }
 
   /** Header-mapped CSV import for employees: full_name/name, email, role, department. */

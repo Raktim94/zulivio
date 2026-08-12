@@ -115,3 +115,78 @@ export interface EmployeeTotalReport {
 export interface ApiErrorBody {
   error: { code: string; message: string | string[]; correlationId: string };
 }
+
+export type LeadStatus = "NEW" | "CONTACTED" | "QUALIFIED" | "DISQUALIFIED" | "CONVERTED";
+
+export interface LeadSummary {
+  id: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  company: string | null;
+  source: string | null;
+  status: LeadStatus;
+  notes: string | null;
+  ownerId: string | null;
+  owner: { id: string; fullName: string; employeeNumber: string } | null;
+  respondBySlaAt: string | null;
+  firstRespondedAt: string | null;
+  convertedOpportunityId: string | null;
+  createdAt: string;
+}
+
+export type OpportunityStatus = "OPEN" | "WON" | "LOST";
+export type ForecastCategory = "PIPELINE" | "BEST_CASE" | "COMMITTED" | "OMITTED";
+
+export interface PipelineStageSummary {
+  id: string;
+  name: string;
+  sortOrder: number;
+  probability: number;
+  isWon: boolean;
+  isLost: boolean;
+}
+
+export interface PipelineSummary {
+  id: string;
+  name: string;
+  isDefault: boolean;
+  stages: PipelineStageSummary[];
+}
+
+export interface OpportunitySummary {
+  id: string;
+  pipelineId: string;
+  stageId: string;
+  stage: PipelineStageSummary;
+  title: string;
+  company: string | null;
+  amountMinor: number;
+  currency: string;
+  status: OpportunityStatus;
+  forecastCategory: ForecastCategory;
+  lossReason: string | null;
+  ownerId: string | null;
+  owner: { id: string; fullName: string; employeeNumber: string } | null;
+  expectedCloseDate: string | null;
+  createdAt: string;
+}
+
+export interface AssignmentRuleSummary {
+  id: string;
+  name: string;
+  isActive: boolean;
+  slaMinutes: number;
+  memberIds: string[];
+}
+
+export interface SalesDashboardData {
+  generatedAt: string;
+  pipelineValue: { totalMinor: number; weightedForecastMinor: number };
+  stageBreakdown: { stageId: string; stageName: string; count: number; valueMinor: number }[];
+  forecastByCategory: Record<string, number>;
+  byOwner: { ownerId: string; ownerName: string; valueMinor: number; count: number }[];
+  leadFunnel: Record<string, number>;
+  overdueLeads: number;
+  winLoss: { won: number; lost: number };
+}

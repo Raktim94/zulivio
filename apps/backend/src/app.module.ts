@@ -11,6 +11,10 @@ import { KnowledgeModule } from "./knowledge/knowledge.module";
 import { TipsModule } from "./tips/tips.module";
 import { ReportsModule } from "./reports/reports.module";
 import { ImportExportModule } from "./import-export/import-export.module";
+import { PipelinesModule } from "./pipelines/pipelines.module";
+import { AssignmentRulesModule } from "./assignment-rules/assignment-rules.module";
+import { LeadsModule } from "./leads/leads.module";
+import { OpportunitiesModule } from "./opportunities/opportunities.module";
 
 @Module({
   imports: [
@@ -26,6 +30,10 @@ import { ImportExportModule } from "./import-export/import-export.module";
     TipsModule,
     ReportsModule,
     ImportExportModule,
+    PipelinesModule,
+    AssignmentRulesModule,
+    LeadsModule,
+    OpportunitiesModule,
   ],
 })
 export class AppModule {}

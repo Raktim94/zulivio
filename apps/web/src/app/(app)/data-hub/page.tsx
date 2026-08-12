@@ -21,7 +21,10 @@ export default function DataHubPage() {
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold text-ink">Data Hub</h1>
-        <p className="text-sm text-muted">CSV and Google Sheets import/export for employees.</p>
+        <p className="text-sm text-muted">
+          CSV and Google Sheets import/export for employees, assignments, and leads. Lead-specific import lives on
+          the <a href="/leads" className="text-emerald underline">Leads</a> page, next to lead management.
+        </p>
       </div>
 
       <Card>
@@ -32,6 +35,9 @@ export default function DataHubPage() {
           </a>
           <a href="/api/v1/exports/assignments.csv">
             <Button variant="secondary">Export assignments.csv</Button>
+          </a>
+          <a href="/api/v1/exports/leads.csv">
+            <Button variant="secondary">Export leads.csv</Button>
           </a>
         </div>
       </Card>

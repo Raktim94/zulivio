@@ -7,14 +7,21 @@
 > It describes an 8–12 person delivery team working over 15–18 months.
 >
 > **What's actually built today** (see [README.md](README.md)) is the
-> foundation and the first slice of Tier A/B below: organizations, roles
-> and permissions, employee lifecycle, work assignments, attendance,
-> knowledge base, a master dashboard, and CSV/Google Sheets import-export.
-> Everything else in this document — the departmental workspaces, the
-> automation engine, marketing/service/success/delivery/field-service
-> modules, AI features — is the plan, not a claim about current
-> functionality. Treat section numbers and stage names below as the
-> aspirational sequence this project is built toward, not a status report.
+> foundation plus the first slice of Tier A/B: organizations, roles and
+> permissions, employee lifecycle, work assignments, attendance, knowledge
+> base, a master dashboard, CSV/Google Sheets import-export, and a first
+> cut of Sales CRM (Section 5.2 / Stage 3-4 below) — leads with a
+> qualification pipeline, round-robin assignment rules with response SLA,
+> lead-to-opportunity conversion, a Kanban pipeline board, manager
+> forecast-category overrides with an audit trail, and a sales dashboard
+> with charts. Not yet built from Section 5.2: territory/capacity-based
+> routing, multiple pipelines per org, and a contacts/accounts layer.
+> Everything else in this document — the remaining departmental
+> workspaces, the automation engine, marketing/service/success/delivery/
+> field-service modules, AI features — is the plan, not a claim about
+> current functionality. Treat section numbers and stage names below as
+> the aspirational sequence this project is built toward, not a status
+> report.
 
 Document type: Business-first product roadmap
 Scope: Product features, departmental workspaces, rollout, adoption and integrations

@@ -45,6 +45,14 @@ export class ImportExportController {
     res.send(csv);
   }
 
+  @Get("exports/leads.csv")
+  @Header("Content-Type", "text/csv")
+  async exportLeads(@CurrentEmployee() actor: AuthenticatedEmployee, @Res() res: Response) {
+    const csv = await this.importExportService.exportLeadsCsv(actor);
+    res.setHeader("Content-Disposition", `attachment; filename="leads-${Date.now()}.csv"`);
+    res.send(csv);
+  }
+
   @Post("imports/employees/csv")
   @UseInterceptors(FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }))
   async importEmployees(
@@ -52,6 +60,15 @@ export class ImportExportController {
     @UploadedFile() file: Express.Multer.File,
   ) {
     return this.importExportService.importEmployeesCsv(actor, file.buffer.toString("utf-8"));
+  }
+
+  @Post("imports/leads/csv")
+  @UseInterceptors(FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }))
+  async importLeads(
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.importExportService.importLeadsCsv(actor, file.buffer.toString("utf-8"));
   }
 
   @Get("integrations/google-sheets/status")

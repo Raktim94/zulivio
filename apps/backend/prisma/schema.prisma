@@ -56,6 +56,10 @@ model Organization {
   documents      KnowledgeDocument[]
   tips           Tip[]
   auditEvents    AuditEvent[]
+  leads          Lead[]
+  pipelines      Pipeline[]
+  opportunities  Opportunity[]
+  assignmentRules AssignmentRule[]
 
   @@map("organizations")
 }
@@ -85,6 +89,10 @@ model Employee {
   workSessions         WorkSession[]
   trainingResults      TrainingResult[]
   tipAcknowledgements  TipAcknowledgement[]
+  leadsOwned           Lead[]              @relation("LeadOwner")
+  leadsCreated         Lead[]              @relation("LeadCreatedBy")
+  opportunitiesOwned   Opportunity[]       @relation("OpportunityOwner")
+  opportunitiesCreated Opportunity[]       @relation("OpportunityCreatedBy")
 
   @@unique([organizationId, employeeNumber])
   @@unique([organizationId, email])
@@ -270,4 +278,167 @@ model AuditEvent {
 
   @@index([organizationId, createdAt])
   @@map("audit_events")
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  DISQUALIFIED
+  CONVERTED
+}
+
+model Lead {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  fullName       String
+  email          String?
+  phone          String?
+  company        String?
+  source         String?
+  status         LeadStatus   @default(NEW)
+  ownerId        String?
+  owner          Employee?    @relation("LeadOwner", fields: [ownerId], references: [id])
+  createdById    String
+  createdBy      Employee     @relation("LeadCreatedBy", fields: [createdById], references: [id])
+  notes          String?
+  respondBySlaAt DateTime?
+  firstRespondedAt DateTime?
+  convertedOpportunityId String?  @unique
+  convertedOpportunity   Opportunity? @relation("LeadConvertedOpportunity", fields: [convertedOpportunityId], references: [id])
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  opportunities  Opportunity[] @relation("OpportunityFromLead")
+
+  @@index([organizationId, status])
+  @@index([organizationId, ownerId])
+  @@map("leads")
+}
+
+model Pipeline {
+  id             String         @id @default(uuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  name           String
+  isDefault      Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+
+  stages         PipelineStage[]
+  opportunities  Opportunity[]
+
+  @@map("pipelines")
+}
+
+model PipelineStage {
+  id          String   @id @default(uuid())
+  pipelineId  String
+  pipeline    Pipeline @relation(fields: [pipelineId], references: [id])
+  name        String
+  sortOrder   Int
+  probability Int      @default(0)
+  isWon       Boolean  @default(false)
+  isLost      Boolean  @default(false)
+
+  opportunities Opportunity[]
+
+  @@index([pipelineId, sortOrder])
+  @@map("pipeline_stages")
+}
+
+enum OpportunityStatus {
+  OPEN
+  WON
+  LOST
+}
+
+enum ForecastCategory {
+  PIPELINE
+  BEST_CASE
+  COMMITTED
+  OMITTED
+}
+
+model Opportunity {
+  id             String            @id @default(uuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  pipelineId     String
+  pipeline       Pipeline          @relation(fields: [pipelineId], references: [id])
+  stageId        String
+  stage          PipelineStage     @relation(fields: [stageId], references: [id])
+  title          String
+  company        String?
+  amountMinor    Int               @default(0)
+  currency       String            @default("INR")
+  leadId         String?
+  fromLead       Lead?             @relation("OpportunityFromLead", fields: [leadId], references: [id])
+  ownerId        String?
+  owner          Employee?         @relation("OpportunityOwner", fields: [ownerId], references: [id])
+  createdById    String
+  createdBy      Employee          @relation("OpportunityCreatedBy", fields: [createdById], references: [id])
+  expectedCloseDate DateTime?
+  status         OpportunityStatus @default(OPEN)
+  lossReason     String?
+  forecastCategory ForecastCategory @default(PIPELINE)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  stageChangedAt DateTime          @default(now())
+
+  convertedFromLead Lead? @relation("LeadConvertedOpportunity")
+  events         OpportunityEvent[]
+  forecastAdjustments ForecastAdjustment[]
+
+  @@index([organizationId, status])
+  @@index([organizationId, ownerId])
+  @@index([organizationId, stageId])
+  @@map("opportunities")
+}
+
+model OpportunityEvent {
+  id            String       @id @default(uuid())
+  opportunityId String
+  opportunity   Opportunity  @relation(fields: [opportunityId], references: [id])
+  fromStageId   String?
+  toStageId     String
+  actorId       String
+  reason        String?
+  createdAt     DateTime     @default(now())
+
+  @@index([opportunityId])
+  @@map("opportunity_events")
+}
+
+model ForecastAdjustment {
+  id                  String      @id @default(uuid())
+  organizationId      String
+  opportunityId       String
+  opportunity         Opportunity @relation(fields: [opportunityId], references: [id])
+  actorId             String
+  previousCategory    ForecastCategory
+  newCategory         ForecastCategory
+  previousAmountMinor Int
+  newAmountMinor      Int
+  reason              String?
+  createdAt           DateTime    @default(now())
+
+  @@index([organizationId, opportunityId])
+  @@map("forecast_adjustments")
+}
+
+model AssignmentRule {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  isActive       Boolean      @default(true)
+  slaMinutes     Int          @default(60)
+  memberIds      String[]
+  cursor         Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, isActive])
+  @@map("assignment_rules")
 }

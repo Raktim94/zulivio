@@ -14,6 +14,11 @@ export class ReportsController {
     return this.reportsService.dashboard(actor);
   }
 
+  @Get("sales-dashboard")
+  async salesDashboard(@CurrentEmployee() actor: AuthenticatedEmployee) {
+    return this.reportsService.salesDashboard(actor);
+  }
+
   @Get("employees/:employeeId")
   async employeeReport(
     @CurrentEmployee() actor: AuthenticatedEmployee,

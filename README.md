@@ -226,9 +226,18 @@ by hiding a button in the UI.
   lifecycle, role/person-targeted training assignments with per-version
   acknowledgement tracking, and a "today's tips" feed on the employee
   front page.
-- **Data Hub** — CSV export (employees, assignments) with spreadsheet
-  formula-injection protection; CSV import with row-level error reporting;
-  a real Google Sheets adapter (see below).
+- **Data Hub** — CSV export (employees, assignments, leads) with
+  spreadsheet formula-injection protection; CSV import with row-level
+  error reporting; a real Google Sheets adapter (see below).
+- **Sales CRM** — leads with a configurable qualification pipeline
+  (`NEW → CONTACTED → QUALIFIED → DISQUALIFIED`), round-robin assignment
+  rules with a per-rule response SLA and an overdue queue, lead-to-
+  opportunity conversion that preserves history, a Kanban pipeline board
+  (default 6-stage pipeline: New/Qualified/Proposal/Negotiation/Won/Lost)
+  with an auditable stage-transition trail, manager-only forecast-category
+  overrides with a full adjustment audit, and a sales dashboard (pipeline
+  value by stage, lead funnel, forecast-by-category, and value-by-rep
+  charts). CSV import/export for leads included.
 
 ## Google Sheets integration
 
@@ -380,8 +389,11 @@ today (see [Get Zulivio](#get-zulivio)).
 This build intentionally implements the **workforce-operations core** of a
 much larger specification, not the full spec. Explicitly **not** built yet:
 
-- No leads/contacts/accounts/opportunities/pipeline CRM objects — this is
-  an employee/assignment/attendance system, not (yet) a sales pipeline CRM.
+- No contacts/accounts objects or multiple pipelines per organization —
+  leads/opportunities exist on a single default pipeline per org; a
+  contact/account layer and custom pipelines are not built yet.
+- No territory- or capacity-based assignment routing — only round-robin
+  is implemented; territory and workload-aware routing are on the roadmap.
 - No background job queue / Redis / worker service — CSV import and PDF
   upload run synchronously in the request. Fine at small-team scale; a
   large CSV import or PDF library will need this added.

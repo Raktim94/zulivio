@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 /*
- * Theme follows the OS/browser color-scheme preference (`prefers-color-scheme`)
- * with no manual toggle — "system" is the only mode. Tailwind v4 compiles
- * `@theme` tokens to CSS custom properties on :root, so overriding those
- * variables inside the dark media query re-themes every `bg-canvas`,
- * `text-ink`, etc. utility without touching component markup.
+ * Three theme states: "system" (default, follows prefers-color-scheme),
+ * or an explicit "light"/"dark" stamped as data-theme on <html> by the
+ * ThemeToggle. Tailwind v4 compiles `@theme` tokens to CSS custom
+ * properties on :root, so overriding those variables re-themes every
+ * `bg-canvas`, `text-ink`, etc. utility without touching component markup.
  */
 @theme {
   --color-navy: #102635;
@@ -22,7 +22,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --color-canvas: #0c1720;
     --color-surface: #142430;
     --color-emerald: #2dbb8d;
@@ -34,6 +34,23 @@
     --color-muted: #93a4ac;
     --color-border: #24363f;
   }
+}
+
+:root[data-theme="dark"] {
+  --color-canvas: #0c1720;
+  --color-surface: #142430;
+  --color-emerald: #2dbb8d;
+  --color-emerald-dark: #43d6a5;
+  --color-coral: #f08a76;
+  --color-amber: #eab34a;
+  --color-indigo: #8484e8;
+  --color-ink: #eef2f1;
+  --color-muted: #93a4ac;
+  --color-border: #24363f;
+}
+
+body {
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 body {
