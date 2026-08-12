@@ -33,8 +33,24 @@ vision — see [ROADMAP.md](ROADMAP.md) for the full multi-department plan and
 [Scope and limitations](#scope-and-limitations) below for exactly what is
 and isn't built yet before you rely on this in production.
 
+## Get Zulivio
+
+Two ways to install, both built from the same code and pointed at the same
+`http://<server>:3100` — pick whichever fits your setup.
+
+| Platform | Status | Install | What it needs |
+| --- | --- | --- | --- |
+| 🐳 **Docker Compose** (any OS) | ✅ Done — the primary, most-used path | `git clone` + `./install.sh` (see [Quick start](#quick-start)) | Docker |
+| 🏠 **CasaOS / ZimaOS** | ✅ Ready to install now, official app store submission pending | Install from a compose URL — see [`casaos/docker-compose.yml`](casaos/docker-compose.yml) | Nothing — CasaOS/ZimaOS pulls pre-built images, no build step |
+
+Both pull the same multi-arch (amd64/arm64) images published by
+[`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml)
+and share the same database schema — nothing about your data changes if you
+switch install methods later.
+
 ## Contents
 
+- [Get Zulivio](#get-zulivio)
 - [Screenshots](#screenshots)
 - [Stack](#stack)
 - [Quick start](#quick-start)
@@ -87,32 +103,56 @@ sample data) — not mockups.
 
 ## Quick start
 
-### One-click install (recommended)
+Requires [Docker](https://docs.docker.com/get-docker/) and Docker Compose
+(bundled with current Docker Desktop/Engine).
+
+### One-click install
 
 ```bash
-./install.sh
+git clone https://github.com/Raktim94/zulivio.git && cd zulivio && ./install.sh
 ```
 
-This checks for Docker, generates a `.env` with a random Postgres password
-(only if one doesn't already exist — safe to re-run), builds the images,
-starts the stack, and waits for the app to come online. It prints the URL
-to open when done. Re-run it any time (e.g. after `git pull`) to rebuild
-and restart — it never touches existing data.
+[`install.sh`](install.sh) checks that Docker is installed, generates a
+`.env` with a random Postgres password (only if one doesn't already exist —
+safe to re-run), builds the images, starts the stack, waits for the backend
+to report healthy, then prints the URL to open. Re-run it any time (e.g.
+after `git pull`) to rebuild and restart — it never touches existing data.
 
-### Manual
+### Manual install
+
+If you'd rather run each step yourself (or `install.sh` doesn't fit your
+setup), here's exactly what it does, one command at a time:
 
 ```bash
+# 1. Get the code
+git clone https://github.com/Raktim94/zulivio.git
+cd zulivio
+
+# 2. Set a real Postgres password — compose refuses to start without one.
 cp .env.example .env
-# Edit .env: set POSTGRES_PASSWORD to a real value (required — compose
-# refuses to start without it). Generate one with: openssl rand -base64 32
+# Edit .env: set POSTGRES_PASSWORD (generate one with: openssl rand -base64 32)
 
-docker compose up --build
+# 3. Build the images (multi-stage, node:24-alpine) and start the stack.
+#    The `migrate` service applies database migrations before `backend`
+#    starts. First run takes a few minutes; later runs are cached and fast.
+docker compose up --build -d
+
+# 4. (optional) Watch the logs until the backend reports healthy.
+docker compose logs -f
+
+# 5. (later) Stop the stack without deleting your data:
+docker compose down
 ```
 
-Either way, once the stack is healthy, open **http://localhost:3100/setup**
-and create your organization — this creates your company and its first
-**Master Owner** account. There is no baked-in demo password; you choose
-the master owner's password during setup.
+Then open **http://localhost:3100/setup** and create your organization —
+this creates your company and its first **Master Owner** account. There is
+no baked-in demo password; you choose the master owner's password during
+setup.
+
+All data (the Postgres database and uploaded knowledge-base PDFs) lives in
+**named Docker volumes**, not inside the containers, so it survives
+`docker compose down`, container recreation, and image rebuilds. See
+[Common operations](#common-operations) for backup/restore commands.
 
 To close self-service organization creation once you're done setting up
 (recommended for a single-tenant deployment), set `BOOTSTRAP_DISABLED=true`
@@ -306,11 +346,16 @@ convention). Differences from the plain `compose.yaml`:
   built and published to GHCR by `.github/workflows/docker-publish.yml`
   (multi-arch amd64/arm64) rather than built locally.
 
-`casaos/icon.png` and `casaos/thumbnail.png` are real, rendered from the
-actual in-app SVG lettermark — not placeholders. **Not yet done**: no
-`screenshot-*.png` yet (capturing a real one needs a working browser),
-so the manifest simply omits `screenshot_link` rather than pointing at
-files that don't exist.
+`casaos/icon.png`, `casaos/thumbnail.png`, and `casaos/screenshot-{1,2,3}.png`
+are all real — the icon/thumbnail come from the actual Zulivio brand
+assets, and the screenshots are genuine captures from a running instance
+(same source as [Screenshots](#screenshots) above), not placeholders.
+
+**Not yet done**: official submission to the CasaOS/ZimaOS App Store
+(`IceWhaleTech/CasaOS-AppStore`) — the manifest is ready and validated
+locally, but hasn't been merged into the official store index yet, so
+CasaOS's own "Custom Install"/compose-URL flow is the way to install it
+today (see [Get Zulivio](#get-zulivio)).
 
 ## Architecture notes
 
