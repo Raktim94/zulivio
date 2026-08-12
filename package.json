@@ -1,18 +1,18 @@
 {
-  "name": "nodedr-crm",
+  "name": "zulivio",
   "private": true,
   "version": "0.1.0",
-  "description": "NodeDR CRM — open-source, self-hostable CRM and humane workforce-operations platform",
+  "description": "Zulivio — open-source, self-hostable CRM and humane workforce-operations platform",
   "author": "Raktim Ranjit <ranjitraktim5@gmail.com> (https://github.com/Raktim94)",
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Raktim94/nodedr-crm.git"
+    "url": "https://github.com/Raktim94/zulivio.git"
   },
   "bugs": {
-    "url": "https://github.com/Raktim94/nodedr-crm/issues"
+    "url": "https://github.com/Raktim94/zulivio/issues"
   },
-  "homepage": "https://github.com/Raktim94/nodedr-crm#readme",
+  "homepage": "https://github.com/Raktim94/zulivio#readme",
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",

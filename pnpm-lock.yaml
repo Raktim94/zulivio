@@ -114,12 +114,12 @@ importers:
 
   apps/web:
     dependencies:
-      '@nodedr-crm/types':
-        specifier: workspace:*
-        version: link:../../packages/types
       '@tanstack/react-query':
         specifier: ^5.62.11
         version: 5.101.4(react@19.2.8)
+      '@zulivio/types':
+        specifier: workspace:*
+        version: link:../../packages/types
       clsx:
         specifier: ^2.1.1
         version: 2.1.1

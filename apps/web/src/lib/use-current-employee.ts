@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import type { CurrentEmployee } from "@nodedr-crm/types";
+import type { CurrentEmployee } from "@zulivio/types";
 import { api } from "./api";
 
 export function useCurrentEmployee() {

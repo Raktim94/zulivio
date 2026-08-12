@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { Button, Card, ErrorState, Input } from "@/components/ui";
+import { Logo } from "@/components/logo";
 
 export default function SetupPage() {
   const router = useRouter();
@@ -28,7 +29,8 @@ export default function SetupPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-navy px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-navy px-4">
+      <Logo size="lg" onDark />
       <Card className="w-full max-w-sm">
         <h1 className="text-lg font-semibold text-ink">Create your organization</h1>
         <p className="mt-1 text-sm text-muted">

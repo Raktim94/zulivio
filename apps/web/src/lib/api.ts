@@ -1,4 +1,4 @@
-import type { ApiErrorBody } from "@nodedr-crm/types";
+import type { ApiErrorBody } from "@zulivio/types";
 
 export class ApiError extends Error {
   constructor(

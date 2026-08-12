@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import type { DashboardData } from "@nodedr-crm/types";
+import type { DashboardData } from "@zulivio/types";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "@/lib/api";
 import { Badge, Card, ErrorState, Spinner } from "@/components/ui";

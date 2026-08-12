@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { EmployeeSummary } from "@nodedr-crm/types";
+import type { EmployeeSummary } from "@zulivio/types";
 import { api, ApiError } from "@/lib/api";
 import { AssignmentList } from "@/components/assignment-list";
 import { Button, Card, ErrorState, Input, Select } from "@/components/ui";

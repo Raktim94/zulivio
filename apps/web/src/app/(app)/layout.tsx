@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useCurrentEmployee, isManagerOrAbove } from "@/lib/use-current-employee";
 import { api } from "@/lib/api";
 import { Spinner } from "@/components/ui";
+import { Logo } from "@/components/logo";
 
 const NAV = [
   { href: "/", label: "Overview" },
@@ -46,7 +47,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen">
       <aside className="hidden w-60 shrink-0 flex-col bg-navy px-4 py-6 text-white md:flex">
-        <div className="mb-8 px-2 text-lg font-semibold">NodeDR CRM</div>
+        <Logo size="sm" onDark className="mb-8 px-2" />
         <nav className="flex flex-1 flex-col gap-1">
           {NAV.filter((item) => !item.managerOnly || isManager).map((item) => (
             <Link

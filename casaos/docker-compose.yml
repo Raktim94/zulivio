@@ -1,15 +1,15 @@
-name: nodedr-crm
+name: zulivio
 
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: nodedr-crm-postgres
-    hostname: nodedr-crm-postgres
+    container_name: zulivio-postgres
+    hostname: zulivio-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: nodedr
       POSTGRES_PASSWORD: "please-change-this-password"
-      POSTGRES_DB: nodedr_crm
+      POSTGRES_DB: zulivio
     volumes:
       - type: bind
         source: /DATA/AppData/$AppID/postgres
@@ -20,12 +20,12 @@ services:
       timeout: 5s
       retries: 10
     networks:
-      - nodedr-crm
+      - zulivio
 
   backend:
-    image: ghcr.io/raktim94/nodedr-crm-backend:1.0.0
-    container_name: nodedr-crm-backend
-    hostname: nodedr-crm-backend
+    image: ghcr.io/raktim94/zulivio-backend:1.0.0
+    container_name: zulivio-backend
+    hostname: zulivio-backend
     restart: unless-stopped
     # CasaOS has no clean way to run a one-shot init container before the
     # main app, so migrations run inline here on every start instead of the
@@ -33,7 +33,7 @@ services:
     # migrate deploy is idempotent, so this is safe on restarts.
     command: ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
     environment:
-      DATABASE_URL: "postgresql://nodedr:please-change-this-password@nodedr-crm-postgres:5432/nodedr_crm"
+      DATABASE_URL: "postgresql://nodedr:please-change-this-password@zulivio-postgres:5432/zulivio"
       PORT: "4100"
       NODE_ENV: "production"
       CORS_ORIGIN: "http://localhost:3100"
@@ -49,7 +49,7 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - nodedr-crm
+      - zulivio
     x-casaos:
       envs:
         - container: DATABASE_URL
@@ -73,9 +73,9 @@ services:
             en_US: Uploaded knowledge-base PDFs — back this up.
 
   web:
-    image: ghcr.io/raktim94/nodedr-crm-web:1.0.0
-    container_name: nodedr-crm-web
-    hostname: nodedr-crm-web
+    image: ghcr.io/raktim94/zulivio-web:1.0.0
+    container_name: zulivio-web
+    hostname: zulivio-web
     restart: unless-stopped
     ports:
       - target: 3000
@@ -84,39 +84,39 @@ services:
     depends_on:
       - backend
     networks:
-      - nodedr-crm
+      - zulivio
     x-casaos:
       ports:
         - container: "3000"
           description:
-            en_US: NodeDR CRM web interface
+            en_US: Zulivio web interface
           protocol: tcp
 
 networks:
-  nodedr-crm:
+  zulivio:
     driver: bridge
 
 x-casaos:
-  id: com.nodedr.crm
+  id: com.nodedr.zulivio
   architectures:
     - amd64
     - arm64
   main: web
-  author: Nodedr Info Tech Private Limited
+  author: NodeDR Infotech Private Limited
   developer: Raktim94
   category: Business
-  icon: https://cdn.jsdelivr.net/gh/Raktim94/nodedr-crm@master/casaos/icon.png
-  thumbnail: https://cdn.jsdelivr.net/gh/Raktim94/nodedr-crm@master/casaos/thumbnail.png
+  icon: https://cdn.jsdelivr.net/gh/Raktim94/zulivio@master/casaos/icon.png
+  thumbnail: https://cdn.jsdelivr.net/gh/Raktim94/zulivio@master/casaos/thumbnail.png
   screenshot_link:
-    - https://cdn.jsdelivr.net/gh/Raktim94/nodedr-crm@master/casaos/screenshot-1.png
-    - https://cdn.jsdelivr.net/gh/Raktim94/nodedr-crm@master/casaos/screenshot-2.png
+    - https://cdn.jsdelivr.net/gh/Raktim94/zulivio@master/casaos/screenshot-1.png
+    - https://cdn.jsdelivr.net/gh/Raktim94/zulivio@master/casaos/screenshot-2.png
   title:
-    en_US: NodeDR CRM
+    en_US: Zulivio
   tagline:
     en_US: Open-source CRM and humane workforce operations — employees, assignments, attendance, and reporting
   description:
     en_US: |
-      NodeDR CRM is a free, open-source, self-hostable CRM and workforce
+      Zulivio is a free, open-source, self-hostable CRM and workforce
       operations platform: role-based employee management (add/remove with
       auto-generated credentials), work assignment tracking with outcomes,
       an explicit attendance state machine (shift/break/logout with a full
@@ -135,7 +135,7 @@ x-casaos:
         `backend` service's `DATABASE_URL` — they must match.
 
         Your data (Postgres database + uploaded knowledge-base PDFs)
-        persists at `/DATA/AppData/nodedr-crm/`, following CasaOS/ZimaOS's
+        persists at `/DATA/AppData/zulivio/`, following CasaOS/ZimaOS's
         standard backup/restore convention.
 
         After install, open the app and go to `/setup` to create your
@@ -152,6 +152,6 @@ x-casaos:
       control, work assignments, attendance tracking, knowledge base and
       tips, master dashboard, and CSV/Google Sheets import-export.
   website: "https://crm.nodedr.com/"
-  repo: "https://github.com/Raktim94/nodedr-crm"
+  repo: "https://github.com/Raktim94/zulivio"
   support: "https://crm.nodedr.com/contact"
-  docs: "https://github.com/Raktim94/nodedr-crm#readme"
+  docs: "https://github.com/Raktim94/zulivio#readme"

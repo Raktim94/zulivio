@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import { Button, Card, ErrorState, Input } from "@/components/ui";
+import { Logo } from "@/components/logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,9 +30,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-navy px-4">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-navy px-4">
+      <Logo size="lg" onDark />
       <Card className="w-full max-w-sm">
-        <h1 className="text-lg font-semibold text-ink">NodeDR CRM</h1>
+        <h1 className="text-lg font-semibold text-ink">Sign in</h1>
         <p className="mt-1 text-sm text-muted">Sign in to your organization</p>
 
         <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
@@ -61,7 +63,7 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-6 text-center text-xs text-muted">
-          Setting up NodeDR CRM for the first time?{" "}
+          Setting up Zulivio for the first time?{" "}
           <Link href="/setup" className="font-medium text-emerald">
             Create your organization
           </Link>

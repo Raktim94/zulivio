@@ -1,4 +1,6 @@
-# NodeDR CRM
+# Zulivio
+
+Developed by [NodeDR Infotech Private Limited](https://www.nodedr.com/)
 
 An open-source, self-hostable CRM and humane workforce-operations platform:
 role-based employee management, work assignments, an explicit attendance
@@ -7,9 +9,10 @@ dashboard, and CSV/Google Sheets import-export. Built to run on your own
 hardware — no subscription, no data leaving your server — and to be
 CasaOS/ZimaOS installable.
 
-This is the **core workforce-operations slice** of a much larger CRM
-specification. See [Scope and limitations](#scope-and-limitations) below for
-exactly what is and isn't built yet before you rely on this in production.
+This is the **core workforce-operations slice** of a much larger product
+vision — see [ROADMAP.md](ROADMAP.md) for the full multi-department plan and
+[Scope and limitations](#scope-and-limitations) below for exactly what is
+and isn't built yet before you rely on this in production.
 
 ## Stack
 
@@ -169,10 +172,10 @@ docker compose exec backend npx prisma migrate deploy
 SEED_MASTER_OWNER_PASSWORD='...' docker compose exec -e SEED_MASTER_OWNER_PASSWORD backend npx prisma db seed
 
 # Backup the database
-docker compose exec postgres pg_dump -U nodedr nodedr_crm | gzip > backup-$(date +%F).sql.gz
+docker compose exec postgres pg_dump -U nodedr zulivio | gzip > backup-$(date +%F).sql.gz
 
 # Restore
-gunzip -c backup-2026-08-12.sql.gz | docker compose exec -T postgres psql -U nodedr nodedr_crm
+gunzip -c backup-2026-08-12.sql.gz | docker compose exec -T postgres psql -U nodedr zulivio
 
 # Tail logs
 docker compose logs -f backend web
@@ -191,8 +194,8 @@ pnpm install
 
 # Start a local Postgres however you like, then:
 cd apps/backend
-DATABASE_URL="postgresql://user:pass@localhost:5432/nodedr_crm" npx prisma migrate dev
-DATABASE_URL="postgresql://user:pass@localhost:5432/nodedr_crm" pnpm dev   # backend on :4100
+DATABASE_URL="postgresql://user:pass@localhost:5432/zulivio" npx prisma migrate dev
+DATABASE_URL="postgresql://user:pass@localhost:5432/zulivio" pnpm dev   # backend on :4100
 
 cd ../web
 BACKEND_URL="http://localhost:4100" pnpm dev   # frontend on :3100
@@ -208,13 +211,13 @@ pnpm build       # nest build
 # e2e/integration suite against a real Postgres (not mocked) — covers RBAC
 # negative paths (privilege escalation, cross-employee report access),
 # the attendance state machine, and the assignment status-transition guard
-docker run --rm -d --name nodedr-crm-test-pg -e POSTGRES_PASSWORD=test \
-  -e POSTGRES_DB=nodedr_crm_test -p 55432:5432 postgres:16-alpine
-DATABASE_URL="postgresql://postgres:test@localhost:55432/nodedr_crm_test" \
+docker run --rm -d --name zulivio-test-pg -e POSTGRES_PASSWORD=test \
+  -e POSTGRES_DB=zulivio_test -p 55432:5432 postgres:16-alpine
+DATABASE_URL="postgresql://postgres:test@localhost:55432/zulivio_test" \
   npx prisma migrate deploy
-DATABASE_URL="postgresql://postgres:test@localhost:55432/nodedr_crm_test" \
+DATABASE_URL="postgresql://postgres:test@localhost:55432/zulivio_test" \
   NODE_ENV=test npx jest --config ./test/jest-e2e.json --runInBand
-docker rm -f nodedr-crm-test-pg
+docker rm -f zulivio-test-pg
 ```
 
 At last run: **26/26 tests passing** — bootstrap/login/logout, privilege
@@ -240,7 +243,7 @@ convention). Differences from the plain `compose.yaml`:
   (`prisma migrate deploy && node dist/src/main.js`) instead of a separate
   one-shot service, since CasaOS doesn't cleanly support init containers —
   this is safe because `migrate deploy` is idempotent.
-- Images are referenced by tag (`ghcr.io/raktim94/nodedr-crm-*:1.0.0`)
+- Images are referenced by tag (`ghcr.io/raktim94/zulivio-*:1.0.0`)
   rather than built locally — publish images to GHCR before submitting to
   the App Store.
 
@@ -294,6 +297,22 @@ much larger specification, not the full spec. Explicitly **not** built yet:
 
 None of the above are silently faked — where a feature isn't built, there
 is no button or endpoint pretending it works.
+
+## Roadmap
+
+What's in this repository today is the **workforce-operations foundation**
+of a much larger product: a shared identity/permission/relationship core
+with purpose-built departmental workspaces (Sales, Marketing, Service,
+Success, Delivery, Field Service, People, Partner/Vendor) layered on top
+over time, integrations-first rather than rebuilding accounting/payroll/
+telephony/ad platforms in-house, and governed AI added only after the data
+foundation is solid.
+
+The full 15–18 month, phase-by-phase implementation and rollout plan —
+department workspace designs, feature catalogue, migration/rollout
+playbook, go/no-go checklists, and adoption safeguards — lives in
+**[ROADMAP.md](ROADMAP.md)**. It's also mirrored on the
+[project wiki](../../wiki) alongside architecture and getting-started pages.
 
 ## License
 

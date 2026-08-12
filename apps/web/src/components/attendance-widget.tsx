@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { WorkSessionStatus } from "@nodedr-crm/types";
+import type { WorkSessionStatus } from "@zulivio/types";
 import { api } from "@/lib/api";
 import { Badge, Button, Card, Spinner } from "@/components/ui";
 

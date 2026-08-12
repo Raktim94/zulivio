@@ -5,7 +5,7 @@ import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/prisma/prisma.service";
 
-describe("NodeDR CRM (e2e)", () => {
+describe("Zulivio (e2e)", () => {
   let app: INestApplication;
   let prisma: PrismaService;
 

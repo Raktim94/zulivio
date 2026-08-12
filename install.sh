@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One-click installer for NodeDR CRM.
+# One-click installer for Zulivio.
 #
 # Run this from the repo root after cloning:
 #   ./install.sh
@@ -53,7 +53,7 @@ EOF
 fi
 
 # --- 3. Build the images and start the stack --------------------------------
-echo "Building NodeDR CRM images and starting the stack (this can take a few minutes on first run)..."
+echo "Building Zulivio images and starting the stack (this can take a few minutes on first run)..."
 docker compose up -d --build
 
 # --- 4. Wait for the app to report healthy ----------------------------------
@@ -80,5 +80,5 @@ fi
 
 # --- 5. Done -----------------------------------------------------------------
 echo ""
-echo "NodeDR CRM is up and running."
+echo "Zulivio is up and running."
 echo "Open http://localhost:${HOST_PORT}/setup to create your organization and Master Owner account."

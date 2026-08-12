@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import type { DashboardData, EmployeeSummary } from "@nodedr-crm/types";
+import type { DashboardData, EmployeeSummary } from "@zulivio/types";
 import { api } from "@/lib/api";
 import { AttendanceWidget } from "@/components/attendance-widget";
 import { Badge, Card, ErrorState, Spinner } from "@/components/ui";

@@ -1,5 +1,5 @@
 # Built from the MONOREPO ROOT context (see compose.yaml `context: .`)
-# because this app depends on the workspace package @nodedr-crm/types.
+# because this app depends on the workspace package @zulivio/types.
 
 FROM node:24-alpine AS base
 RUN corepack enable
@@ -21,7 +21,7 @@ ARG BACKEND_URL=http://backend:4100
 ENV BACKEND_URL=${BACKEND_URL}
 COPY packages/types packages/types
 COPY apps/web apps/web
-RUN pnpm --filter @nodedr-crm/types build
+RUN pnpm --filter @zulivio/types build
 RUN pnpm --filter web build
 
 # --- runtime ---

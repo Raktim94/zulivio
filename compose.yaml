@@ -1,12 +1,12 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: nodedr-crm-postgres
+    container_name: zulivio-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: nodedr
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a real POSTGRES_PASSWORD in .env}
-      POSTGRES_DB: nodedr_crm
+      POSTGRES_DB: zulivio
     expose:
       - "5432"
     volumes:
@@ -28,9 +28,9 @@ services:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
-    container_name: nodedr-crm-migrate
+    container_name: zulivio-migrate
     environment:
-      DATABASE_URL: "postgresql://nodedr:${POSTGRES_PASSWORD:?set a real POSTGRES_PASSWORD in .env}@postgres:5432/nodedr_crm"
+      DATABASE_URL: "postgresql://nodedr:${POSTGRES_PASSWORD:?set a real POSTGRES_PASSWORD in .env}@postgres:5432/zulivio"
     command: ["npx", "prisma", "migrate", "deploy"]
     depends_on:
       postgres:
@@ -43,10 +43,10 @@ services:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
-    container_name: nodedr-crm-backend
+    container_name: zulivio-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: "postgresql://nodedr:${POSTGRES_PASSWORD:?set a real POSTGRES_PASSWORD in .env}@postgres:5432/nodedr_crm"
+      DATABASE_URL: "postgresql://nodedr:${POSTGRES_PASSWORD:?set a real POSTGRES_PASSWORD in .env}@postgres:5432/zulivio"
       PORT: "4100"
       NODE_ENV: production
       CORS_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:3100}"
@@ -83,7 +83,7 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         BACKEND_URL: "http://backend:4100"
-    container_name: nodedr-crm-web
+    container_name: zulivio-web
     restart: unless-stopped
     environment:
       PORT: "3000"

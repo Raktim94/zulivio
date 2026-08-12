@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { TipFeedItem, TrainingFeedItem } from "@nodedr-crm/types";
+import type { TipFeedItem, TrainingFeedItem } from "@zulivio/types";
 import { api } from "@/lib/api";
 import { Badge, Button, Card, Spinner } from "@/components/ui";
 

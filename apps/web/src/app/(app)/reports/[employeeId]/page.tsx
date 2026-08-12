@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import type { EmployeeTotalReport } from "@nodedr-crm/types";
+import type { EmployeeTotalReport } from "@zulivio/types";
 import { api } from "@/lib/api";
 import { Card, ErrorState, Spinner } from "@/components/ui";
 

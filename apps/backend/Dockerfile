@@ -1,12 +1,12 @@
 # Built from the MONOREPO ROOT context (see compose.yaml `context: .`)
-# because this app depends on the workspace package @nodedr-crm/types.
+# because this app depends on the workspace package @zulivio/types.
 # Do not try to `docker build` this file with apps/backend as context.
 
 FROM node:24-alpine AS base
 RUN corepack enable
 WORKDIR /repo
 
-# --- deps: install with full workspace visible so pnpm can link @nodedr-crm/types ---
+# --- deps: install with full workspace visible so pnpm can link @zulivio/types ---
 FROM base AS deps
 RUN apk add --no-cache openssl
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml* ./
@@ -16,7 +16,7 @@ COPY packages/types/package.json packages/types/package.json
 RUN pnpm install --frozen-lockfile
 
 # --- builder: generate Prisma client, build Nest ---
-# (backend has no runtime dependency on @nodedr-crm/types — that package is
+# (backend has no runtime dependency on @zulivio/types — that package is
 # consumed by the web app only.)
 FROM deps AS builder
 COPY apps/backend apps/backend

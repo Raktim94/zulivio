@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import type { EmployeeSummary, EmploymentStatus, Role } from "@nodedr-crm/types";
+import type { EmployeeSummary, EmploymentStatus, Role } from "@zulivio/types";
 import { api, ApiError } from "@/lib/api";
 import { Badge, Button, Card, ErrorState, Input, Select, Spinner } from "@/components/ui";
 

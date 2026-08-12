@@ -3,7 +3,7 @@ import { QueryProvider } from "@/lib/query-provider";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "NodeDR CRM",
+  title: "Zulivio",
   description: "Open-source CRM and humane workforce-operations platform",
 };
 

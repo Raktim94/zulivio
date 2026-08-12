@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AssignmentStatus, AssignmentSummary } from "@nodedr-crm/types";
+import type { AssignmentStatus, AssignmentSummary } from "@zulivio/types";
 import { api } from "@/lib/api";
 import { Badge, Card, EmptyState, ErrorState, Select, Spinner } from "@/components/ui";
 
