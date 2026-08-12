@@ -104,12 +104,9 @@ x-casaos:
   main: web
   author: NodeDR Infotech Private Limited
   developer: Raktim94
-  category: Business
+  category: Productivity
   icon: https://cdn.jsdelivr.net/gh/Raktim94/zulivio@master/casaos/icon.png
   thumbnail: https://cdn.jsdelivr.net/gh/Raktim94/zulivio@master/casaos/thumbnail.png
-  screenshot_link:
-    - https://cdn.jsdelivr.net/gh/Raktim94/zulivio@master/casaos/screenshot-1.png
-    - https://cdn.jsdelivr.net/gh/Raktim94/zulivio@master/casaos/screenshot-2.png
   title:
     en_US: Zulivio
   tagline:

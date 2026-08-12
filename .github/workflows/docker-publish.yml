@@ -1,0 +1,110 @@
+name: Publish Docker images
+
+# Builds and publishes the backend/web images that the CasaOS/ZimaOS app
+# store manifest (casaos/docker-compose.yml) pulls as pre-built,
+# version-pinned images from GHCR. CasaOS installs an app straight from its
+# compose file with no build step and no access to this repo's source, so
+# `build:` (used in the repo-root compose.yaml for a clone+build flow) is
+# not an option there — the CasaOS manifest instead references
+# `ghcr.io/raktim94/zulivio-{backend,web}:<version>`, and those tags only
+# exist because this workflow pushed them.
+#
+# Multi-arch (amd64 + arm64) on purpose: a real share of CasaOS/ZimaOS boxes
+# are ARM SBCs, and declaring `architectures: [amd64, arm64]` in the
+# x-casaos manifest without actually publishing an arm64 image would
+# install a broken app on that hardware.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/backend/**"
+      - "apps/web/**"
+      - "packages/types/**"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
+      - ".github/workflows/docker-publish.yml"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag to publish (e.g. 1.0.0). Also pushed as :latest."
+        required: false
+        default: ""
+
+concurrency:
+  group: docker-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      matrix:
+        include:
+          - image: zulivio-backend
+            dockerfile: apps/backend/Dockerfile
+          - image: zulivio-web
+            dockerfile: apps/web/Dockerfile
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Shallow checkout has no tags, which would silently produce an
+          # empty VERSION below (git describe finds nothing, no error) —
+          # fetch-depth: 0 pulls full history + tags.
+          fetch-depth: 0
+
+      - name: Resolve version and image owner
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            GIT_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+            if [ -n "$GIT_TAG" ]; then
+              VERSION="${GIT_TAG#v}"
+            else
+              VERSION="0.0.0-dev"
+            fi
+          fi
+          if [ -z "$VERSION" ]; then
+            echo "::error::Resolved VERSION is empty - refusing to publish an untagged image" >&2
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          # GHCR image paths must be lowercase; the GitHub owner name is not
+          # guaranteed to be.
+          echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU (for arm64 emulation)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.version.outputs.owner }}/${{ matrix.image }}:${{ steps.version.outputs.version }}
+            ${{ env.REGISTRY }}/${{ steps.version.outputs.owner }}/${{ matrix.image }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
