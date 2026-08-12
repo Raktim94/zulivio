@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { Button, Card, ErrorState, Input } from "@/components/ui";
 import { Logo } from "@/components/logo";
+import { MadeBy } from "@/components/made-by";
 
 export default function SetupPage() {
   const router = useRouter();
@@ -80,6 +81,7 @@ export default function SetupPage() {
           </Button>
         </form>
       </Card>
+      <MadeBy onDark />
     </div>
   );
 }

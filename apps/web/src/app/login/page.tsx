@@ -6,6 +6,7 @@ import Link from "next/link";
 import { api, ApiError } from "@/lib/api";
 import { Button, Card, ErrorState, Input } from "@/components/ui";
 import { Logo } from "@/components/logo";
+import { MadeBy } from "@/components/made-by";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -69,6 +70,7 @@ export default function LoginPage() {
           </Link>
         </p>
       </Card>
+      <MadeBy onDark />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { useCurrentEmployee, isManagerOrAbove } from "@/lib/use-current-employee";
 import { Spinner } from "@/components/ui";
 import { Logo } from "@/components/logo";
+import { MadeBy } from "@/components/made-by";
 import { TopBar } from "@/components/top-bar";
 
 const NAV = [
@@ -60,7 +61,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </Link>
           ))}
         </nav>
-        <p className="border-t border-white/10 pt-4 text-[11px] text-white/40">Zulivio · Open-source CRM</p>
+        <MadeBy onDark className="border-t border-white/10 pt-4" />
       </aside>
       <div className="flex min-h-screen flex-1 flex-col bg-canvas">
         <TopBar title={pageTitle} employee={employee} />
