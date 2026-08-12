@@ -1,9 +1,28 @@
+<div align="center">
+
+<img src="assets/banner.jpg" alt="Zulivio by NodeDR" width="100%">
+
+<br>
+
+<img src="assets/logo.png" alt="Zulivio logo" width="120">
+
 # Zulivio
+
+**Open-source, self-hostable CRM and humane workforce-operations platform**
 
 Developed by [NodeDR Infotech Private Limited](https://www.nodedr.com/)
 
-An open-source, self-hostable CRM and humane workforce-operations platform:
-role-based employee management, work assignments, an explicit attendance
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)](package.json)
+[![NestJS](https://img.shields.io/badge/backend-NestJS%2011-E0234E?logo=nestjs&logoColor=white)](apps/backend)
+[![Next.js](https://img.shields.io/badge/frontend-Next.js%2015-000000?logo=next.js&logoColor=white)](apps/web)
+[![Tests](https://img.shields.io/badge/e2e%20tests-26%2F26%20passing-brightgreen)](apps/backend/test/app.e2e-spec.ts)
+
+</div>
+
+---
+
+Role-based employee management, work assignments, an explicit attendance
 state machine, a PDF knowledge base with daily team tips, a live master
 dashboard, and CSV/Google Sheets import-export. Built to run on your own
 hardware — no subscription, no data leaving your server — and to be
@@ -13,6 +32,23 @@ This is the **core workforce-operations slice** of a much larger product
 vision — see [ROADMAP.md](ROADMAP.md) for the full multi-department plan and
 [Scope and limitations](#scope-and-limitations) below for exactly what is
 and isn't built yet before you rely on this in production.
+
+## Contents
+
+- [Stack](#stack)
+- [Quick start](#quick-start)
+- [Roles and access](#roles-and-access)
+- [Core features](#core-features)
+- [Google Sheets integration](#google-sheets-integration)
+- [Environment variables](#environment-variables)
+- [Common operations](#common-operations)
+- [Local development](#local-development-without-docker)
+- [Tests](#tests)
+- [CasaOS / ZimaOS](#casaos--zimaos)
+- [Architecture notes](#architecture-notes)
+- [Scope and limitations](#scope-and-limitations)
+- [Roadmap](#roadmap)
+- [License](#license)
 
 ## Stack
 
@@ -243,15 +279,15 @@ convention). Differences from the plain `compose.yaml`:
   (`prisma migrate deploy && node dist/src/main.js`) instead of a separate
   one-shot service, since CasaOS doesn't cleanly support init containers —
   this is safe because `migrate deploy` is idempotent.
-- Images are referenced by tag (`ghcr.io/raktim94/zulivio-*:1.0.0`)
-  rather than built locally — publish images to GHCR before submitting to
-  the App Store.
+- Images are referenced by tag (`ghcr.io/raktim94/zulivio-*:1.0.0`) and
+  built and published to GHCR by `.github/workflows/docker-publish.yml`
+  (multi-arch amd64/arm64) rather than built locally.
 
-**Not yet done**: the `casaos/icon.png`, `thumbnail.png`, and
-`screenshot-*.png` assets referenced in the manifest still need to be
-created and the version/image references updated before this is
-submission-ready — placeholder URLs point at files that don't exist yet in
-this repository.
+`casaos/icon.png` and `casaos/thumbnail.png` are real, rendered from the
+actual in-app SVG lettermark — not placeholders. **Not yet done**: no
+`screenshot-*.png` yet (capturing a real one needs a working browser),
+so the manifest simply omits `screenshot_link` rather than pointing at
+files that don't exist.
 
 ## Architecture notes
 
@@ -317,3 +353,11 @@ playbook, go/no-go checklists, and adoption safeguards — lives in
 ## License
 
 AGPL-3.0-only. See [LICENSE](LICENSE).
+
+<div align="center">
+
+<br>
+
+Built by [NodeDR Infotech Private Limited](https://www.nodedr.com/)
+
+</div>
