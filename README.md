@@ -279,15 +279,15 @@ convention). Differences from the plain `compose.yaml`:
   (`prisma migrate deploy && node dist/src/main.js`) instead of a separate
   one-shot service, since CasaOS doesn't cleanly support init containers —
   this is safe because `migrate deploy` is idempotent.
-- Images are referenced by tag (`ghcr.io/raktim94/zulivio-*:1.0.0`)
-  rather than built locally — publish images to GHCR before submitting to
-  the App Store.
+- Images are referenced by tag (`ghcr.io/raktim94/zulivio-*:1.0.0`) and
+  built and published to GHCR by `.github/workflows/docker-publish.yml`
+  (multi-arch amd64/arm64) rather than built locally.
 
-**Not yet done**: the `casaos/icon.png`, `thumbnail.png`, and
-`screenshot-*.png` assets referenced in the manifest still need to be
-created and the version/image references updated before this is
-submission-ready — placeholder URLs point at files that don't exist yet in
-this repository.
+`casaos/icon.png` and `casaos/thumbnail.png` are real, rendered from the
+actual in-app SVG lettermark — not placeholders. **Not yet done**: no
+`screenshot-*.png` yet (capturing a real one needs a working browser),
+so the manifest simply omits `screenshot_link` rather than pointing at
+files that don't exist.
 
 ## Architecture notes
 
