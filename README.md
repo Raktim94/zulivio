@@ -1,9 +1,28 @@
+<div align="center">
+
+<img src="assets/banner.jpg" alt="Zulivio by NodeDR" width="100%">
+
+<br>
+
+<img src="assets/logo.png" alt="Zulivio logo" width="120">
+
 # Zulivio
+
+**Open-source, self-hostable CRM and humane workforce-operations platform**
 
 Developed by [NodeDR Infotech Private Limited](https://www.nodedr.com/)
 
-An open-source, self-hostable CRM and humane workforce-operations platform:
-role-based employee management, work assignments, an explicit attendance
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
+[![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)](package.json)
+[![NestJS](https://img.shields.io/badge/backend-NestJS%2011-E0234E?logo=nestjs&logoColor=white)](apps/backend)
+[![Next.js](https://img.shields.io/badge/frontend-Next.js%2015-000000?logo=next.js&logoColor=white)](apps/web)
+[![Tests](https://img.shields.io/badge/e2e%20tests-26%2F26%20passing-brightgreen)](apps/backend/test/app.e2e-spec.ts)
+
+</div>
+
+---
+
+Role-based employee management, work assignments, an explicit attendance
 state machine, a PDF knowledge base with daily team tips, a live master
 dashboard, and CSV/Google Sheets import-export. Built to run on your own
 hardware — no subscription, no data leaving your server — and to be
@@ -13,6 +32,23 @@ This is the **core workforce-operations slice** of a much larger product
 vision — see [ROADMAP.md](ROADMAP.md) for the full multi-department plan and
 [Scope and limitations](#scope-and-limitations) below for exactly what is
 and isn't built yet before you rely on this in production.
+
+## Contents
+
+- [Stack](#stack)
+- [Quick start](#quick-start)
+- [Roles and access](#roles-and-access)
+- [Core features](#core-features)
+- [Google Sheets integration](#google-sheets-integration)
+- [Environment variables](#environment-variables)
+- [Common operations](#common-operations)
+- [Local development](#local-development-without-docker)
+- [Tests](#tests)
+- [CasaOS / ZimaOS](#casaos--zimaos)
+- [Architecture notes](#architecture-notes)
+- [Scope and limitations](#scope-and-limitations)
+- [Roadmap](#roadmap)
+- [License](#license)
 
 ## Stack
 
@@ -317,3 +353,11 @@ playbook, go/no-go checklists, and adoption safeguards — lives in
 ## License
 
 AGPL-3.0-only. See [LICENSE](LICENSE).
+
+<div align="center">
+
+<br>
+
+Built by [NodeDR Infotech Private Limited](https://www.nodedr.com/)
+
+</div>
