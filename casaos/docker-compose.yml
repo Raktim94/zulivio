@@ -148,7 +148,7 @@ x-casaos:
       Initial CasaOS/ZimaOS release: employee lifecycle, role-based access
       control, work assignments, attendance tracking, knowledge base and
       tips, master dashboard, and CSV/Google Sheets import-export.
-  website: "https://crm.nodedr.com/"
+  website: "https://github.com/Raktim94/zulivio"
   repo: "https://github.com/Raktim94/zulivio"
-  support: "https://crm.nodedr.com/contact"
+  support: "https://github.com/Raktim94/zulivio/issues"
   docs: "https://github.com/Raktim94/zulivio#readme"
