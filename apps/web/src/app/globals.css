@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/*
+ * Theme follows the OS/browser color-scheme preference (`prefers-color-scheme`)
+ * with no manual toggle — "system" is the only mode. Tailwind v4 compiles
+ * `@theme` tokens to CSS custom properties on :root, so overriding those
+ * variables inside the dark media query re-themes every `bg-canvas`,
+ * `text-ink`, etc. utility without touching component markup.
+ */
+@theme {
+  --color-navy: #102635;
+  --color-canvas: #f6f7f4;
+  --color-surface: #ffffff;
+  --color-emerald: #168b65;
+  --color-emerald-dark: #106e51;
+  --color-coral: #e66e58;
+  --color-amber: #d99a2b;
+  --color-indigo: #5b5bd6;
+  --color-ink: #17262e;
+  --color-muted: #64748b;
+  --color-border: #e2e5e0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-canvas: #0c1720;
+    --color-surface: #142430;
+    --color-emerald: #2dbb8d;
+    --color-emerald-dark: #43d6a5;
+    --color-coral: #f08a76;
+    --color-amber: #eab34a;
+    --color-indigo: #8484e8;
+    --color-ink: #eef2f1;
+    --color-muted: #93a4ac;
+    --color-border: #24363f;
+  }
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}

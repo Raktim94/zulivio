@@ -1,0 +1,273 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  MASTER_OWNER
+  COMPANY_ADMIN
+  SALES_HEAD
+  MANAGER
+  EMPLOYEE
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  SUSPENDED
+  ON_LEAVE
+  SEPARATED
+}
+
+enum AssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  FOLLOW_UP
+  BLOCKED
+  COMPLETED
+  CANCELED
+}
+
+enum AttendanceEventType {
+  WORKING
+  ON_BREAK
+  LOGGED_OUT
+}
+
+enum DocumentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  timezone  String   @default("Asia/Kolkata")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  employees      Employee[]
+  assignments    Assignment[]
+  workSessions   WorkSession[]
+  documents      KnowledgeDocument[]
+  tips           Tip[]
+  auditEvents    AuditEvent[]
+
+  @@map("organizations")
+}
+
+model Employee {
+  id               String            @id @default(uuid())
+  organizationId   String
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  employeeNumber   String
+  fullName         String
+  email            String
+  passwordHash     String
+  role             Role              @default(EMPLOYEE)
+  department       String?
+  employmentStatus EmploymentStatus  @default(ACTIVE)
+  mustChangePassword Boolean         @default(true)
+  managerId        String?
+  manager          Employee?         @relation("EmployeeManager", fields: [managerId], references: [id])
+  reports          Employee[]        @relation("EmployeeManager")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  separatedAt      DateTime?
+
+  sessions             Session[]
+  assignmentsOwned     Assignment[]        @relation("AssignmentOwner")
+  assignmentsCreated   Assignment[]        @relation("AssignmentCreatedBy")
+  workSessions         WorkSession[]
+  trainingResults      TrainingResult[]
+  tipAcknowledgements  TipAcknowledgement[]
+
+  @@unique([organizationId, employeeNumber])
+  @@unique([organizationId, email])
+  @@index([organizationId, employmentStatus])
+  @@map("employees")
+}
+
+model Session {
+  id         String   @id @default(uuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  tokenHash  String   @unique
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  userAgent  String?
+  ipAddress  String?
+
+  @@index([employeeId])
+  @@map("sessions")
+}
+
+model Assignment {
+  id             String            @id @default(uuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  assignmentNumber Int
+  title          String
+  description    String?
+  status         AssignmentStatus  @default(ASSIGNED)
+  priority       String            @default("normal")
+  ownerId        String?
+  owner          Employee?         @relation("AssignmentOwner", fields: [ownerId], references: [id])
+  createdById    String
+  createdBy      Employee          @relation("AssignmentCreatedBy", fields: [createdById], references: [id])
+  dueAt          DateTime?
+  outcome        String?
+  outcomeNotes   String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  completedAt    DateTime?
+
+  events AssignmentEvent[]
+
+  @@unique([organizationId, assignmentNumber])
+  @@index([organizationId, status])
+  @@index([organizationId, ownerId])
+  @@map("assignments")
+}
+
+model AssignmentEvent {
+  id           String     @id @default(uuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id])
+  fromStatus   AssignmentStatus?
+  toStatus     AssignmentStatus
+  actorId      String
+  reason       String?
+  createdAt    DateTime   @default(now())
+
+  @@index([assignmentId])
+  @@map("assignment_events")
+}
+
+model WorkSession {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  employeeId     String
+  employee       Employee     @relation(fields: [employeeId], references: [id])
+  startedAt      DateTime     @default(now())
+  endedAt        DateTime?
+
+  breaks Break[]
+
+  @@index([organizationId, employeeId, startedAt])
+  @@map("work_sessions")
+}
+
+model Break {
+  id            String       @id @default(uuid())
+  workSessionId String
+  workSession   WorkSession  @relation(fields: [workSessionId], references: [id])
+  startedAt     DateTime     @default(now())
+  endedAt       DateTime?
+  reason        String?
+
+  @@index([workSessionId])
+  @@map("breaks")
+}
+
+model KnowledgeDocument {
+  id             String         @id @default(uuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  title          String
+  description    String?
+  category       String?
+  status         DocumentStatus @default(DRAFT)
+  storageKey     String
+  fileName       String
+  mimeType       String
+  sizeBytes      Int
+  version        Int            @default(1)
+  ownerId        String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  trainingAssignments TrainingAssignment[]
+
+  @@index([organizationId, status])
+  @@map("knowledge_documents")
+}
+
+model TrainingAssignment {
+  id         String            @id @default(uuid())
+  documentId String
+  document   KnowledgeDocument @relation(fields: [documentId], references: [id])
+  targetRole Role?
+  targetEmployeeId String?
+  dueAt      DateTime?
+  createdAt  DateTime          @default(now())
+
+  results TrainingResult[]
+
+  @@map("training_assignments")
+}
+
+model TrainingResult {
+  id                   String              @id @default(uuid())
+  trainingAssignmentId String
+  trainingAssignment   TrainingAssignment  @relation(fields: [trainingAssignmentId], references: [id])
+  employeeId           String
+  employee             Employee            @relation(fields: [employeeId], references: [id])
+  acknowledgedAt       DateTime?
+  documentVersion      Int
+
+  @@unique([trainingAssignmentId, employeeId])
+  @@map("training_results")
+}
+
+model Tip {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  title          String
+  body           String
+  linkedDocumentId String?
+  targetRole     Role?
+  targetDepartment String?
+  publishAt      DateTime     @default(now())
+  createdById    String
+  createdAt      DateTime     @default(now())
+
+  acknowledgements TipAcknowledgement[]
+
+  @@index([organizationId, publishAt])
+  @@map("tips")
+}
+
+model TipAcknowledgement {
+  id         String   @id @default(uuid())
+  tipId      String
+  tip        Tip      @relation(fields: [tipId], references: [id])
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id])
+  acknowledgedAt DateTime @default(now())
+
+  @@unique([tipId, employeeId])
+  @@map("tip_acknowledgements")
+}
+
+model AuditEvent {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  actorId        String?
+  action         String
+  targetType     String
+  targetId       String?
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@map("audit_events")
+}

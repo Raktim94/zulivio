@@ -1,0 +1,264 @@
+# NodeDR CRM
+
+An open-source, self-hostable CRM and humane workforce-operations platform:
+role-based employee management, work assignments, an explicit attendance
+state machine, a PDF knowledge base with daily team tips, a live master
+dashboard, and CSV/Google Sheets import-export. Built to run on your own
+hardware — no subscription, no data leaving your server — and to be
+CasaOS/ZimaOS installable.
+
+This is the **core workforce-operations slice** of a much larger CRM
+specification. See [Scope and limitations](#scope-and-limitations) below for
+exactly what is and isn't built yet before you rely on this in production.
+
+## Stack
+
+- **Backend**: NestJS 11 + Prisma 6 + PostgreSQL 16, session-based auth
+  (Argon2id password hashing), REST API under `/api/v1`.
+- **Frontend**: Next.js 15 (App Router) + React 19 + TanStack Query +
+  Tailwind CSS v4. Talks to the backend only through a same-origin
+  server-side proxy (`/api/*` rewrites), so the session cookie stays
+  first-party.
+- **Monorepo**: pnpm workspaces + Turborepo, Node.js 24.
+- **Shared types**: `packages/types` — TypeScript interfaces shared between
+  frontend and backend API contracts.
+
+## Quick start (Docker)
+
+```bash
+cp .env.example .env
+# Edit .env: set POSTGRES_PASSWORD to a real value (required — compose
+# refuses to start without it). Generate one with: openssl rand -base64 32
+
+docker compose up --build
+```
+
+Once `docker compose ps` shows `backend` and `web` as healthy, open
+**http://localhost:3100/setup** and create your organization — this creates
+your company and its first **Master Owner** account. There is no baked-in
+demo password; you choose the master owner's password during setup.
+
+To close self-service organization creation once you're done setting up
+(recommended for a single-tenant deployment), set `BOOTSTRAP_DISABLED=true`
+in `.env` and restart the `backend` service.
+
+## Roles and access
+
+Roles form a strict hierarchy — each role can manage everything below it,
+never above or beside it:
+
+| Role | Typical use | Can do |
+|---|---|---|
+| **Master Owner** | Company owner | Everything, including creating Company Admins |
+| **Company Admin** | Operations lead | Everything except creating other admins/owners |
+| **Sales Head** | Head of sales | Manage managers/employees, assignments, reports |
+| **Manager** | Team lead | Add/remove employees below them, assign work, view team reports |
+| **Employee** | Front-line staff | Own attendance, own assignments, knowledge base, tips |
+
+Enforced **server-side** on every request — a manager cannot create a peer
+or higher role (privilege escalation is blocked and tested), and an
+employee cannot view another employee's report. See
+`apps/backend/test/app.e2e-spec.ts` for the authorization test suite.
+
+Adding an employee generates a unique employee number (`EMP-0001`, ...) and
+a random temporary password, shown **exactly once** in the UI at creation
+time — it is never stored in plaintext or retrievable again. Removing an
+employee marks them `SEPARATED`, immediately revokes all their sessions,
+and preserves their history for reporting/audit (no hard delete, no reused
+employee numbers).
+
+## Core features
+
+- **Employees** — add/remove with auto-generated credentials, role
+  assignment, manager hierarchy, department tagging.
+- **Assignments** — create work, assign it to a selected employee by
+  number, track through `ASSIGNED → IN_PROGRESS → FOLLOW_UP / BLOCKED →
+  COMPLETED / CANCELED` with a full transition audit trail and outcome
+  notes. Invalid transitions (e.g. skipping straight to `COMPLETED`) are
+  rejected server-side.
+- **Attendance** — explicit shift/break state machine
+  (`logged_out → working → on_break → working → logged_out`), server
+  timestamps, one open session per employee enforced, auto-closes a
+  dangling break on shift end.
+- **Employee report** — login/logout times, total worked minutes, total
+  break minutes, per-session breakdown, assignment counts by outcome
+  (completed/follow-up/blocked/in-progress), training acknowledged.
+- **Master dashboard** — headcount, assignments by status, overdue count,
+  live "who's working / on break right now" board, knowledge base stats.
+- **Knowledge base & tips** — PDF upload (managers+), draft/publish
+  lifecycle, role/person-targeted training assignments with per-version
+  acknowledgement tracking, and a "today's tips" feed on the employee
+  front page.
+- **Data Hub** — CSV export (employees, assignments) with spreadsheet
+  formula-injection protection; CSV import with row-level error reporting;
+  a real Google Sheets adapter (see below).
+
+## Google Sheets integration
+
+The Google Sheets adapter is real, not a mock — but it only activates when
+you provide credentials, per the "no fake integrations" rule this project
+follows. To enable it:
+
+1. Create a Google Cloud service account and enable the Sheets API.
+2. Generate a JSON key and set `GOOGLE_SHEETS_CLIENT_EMAIL` /
+   `GOOGLE_SHEETS_PRIVATE_KEY` in `.env` (the private key needs its
+   newlines escaped as `\n` in the `.env` file).
+3. Share your target spreadsheet with the service account's email address.
+4. Restart the `backend` service. The Data Hub page will show "Connected"
+   and expose live import/export.
+
+Without credentials configured, `GET /api/v1/integrations/google-sheets/status`
+returns `{ configured: false }` and the UI clearly says so — it never
+pretends the integration works.
+
+## Environment variables
+
+See `.env.example` for the full list with descriptions. The important ones:
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `POSTGRES_PASSWORD` | Yes | Shared by postgres/migrate/backend |
+| `FRONTEND_ORIGIN` | No | CORS allow-origin (default `http://localhost:3100`) |
+| `HOST_PORT` | No | Host port for the web app (default `3100`) |
+| `BOOTSTRAP_DISABLED` | No | Set `true` to close self-service org creation |
+| `GOOGLE_SHEETS_CLIENT_EMAIL` / `GOOGLE_SHEETS_PRIVATE_KEY` | No | Enables live Sheets sync |
+| `SEED_MASTER_OWNER_PASSWORD` | Only for `pnpm db:seed` | Never baked into the image |
+
+## Common operations
+
+```bash
+# Migrations (also run automatically by the `migrate` one-shot service on startup)
+docker compose exec backend npx prisma migrate deploy
+
+# Seed a demo organization (fails loudly if SEED_MASTER_OWNER_PASSWORD isn't set)
+SEED_MASTER_OWNER_PASSWORD='...' docker compose exec -e SEED_MASTER_OWNER_PASSWORD backend npx prisma db seed
+
+# Backup the database
+docker compose exec postgres pg_dump -U nodedr nodedr_crm | gzip > backup-$(date +%F).sql.gz
+
+# Restore
+gunzip -c backup-2026-08-12.sql.gz | docker compose exec -T postgres psql -U nodedr nodedr_crm
+
+# Tail logs
+docker compose logs -f backend web
+
+# Stop (data persists in named volumes)
+docker compose down
+
+# Stop AND delete all data (destructive)
+docker compose down -v
+```
+
+## Local development (without Docker)
+
+```bash
+pnpm install
+
+# Start a local Postgres however you like, then:
+cd apps/backend
+DATABASE_URL="postgresql://user:pass@localhost:5432/nodedr_crm" npx prisma migrate dev
+DATABASE_URL="postgresql://user:pass@localhost:5432/nodedr_crm" pnpm dev   # backend on :4100
+
+cd ../web
+BACKEND_URL="http://localhost:4100" pnpm dev   # frontend on :3100
+```
+
+## Tests
+
+```bash
+cd apps/backend
+pnpm typecheck   # tsc --noEmit
+pnpm build       # nest build
+
+# e2e/integration suite against a real Postgres (not mocked) — covers RBAC
+# negative paths (privilege escalation, cross-employee report access),
+# the attendance state machine, and the assignment status-transition guard
+docker run --rm -d --name nodedr-crm-test-pg -e POSTGRES_PASSWORD=test \
+  -e POSTGRES_DB=nodedr_crm_test -p 55432:5432 postgres:16-alpine
+DATABASE_URL="postgresql://postgres:test@localhost:55432/nodedr_crm_test" \
+  npx prisma migrate deploy
+DATABASE_URL="postgresql://postgres:test@localhost:55432/nodedr_crm_test" \
+  NODE_ENV=test npx jest --config ./test/jest-e2e.json --runInBand
+docker rm -f nodedr-crm-test-pg
+```
+
+At last run: **22/22 tests passing** — bootstrap/login/logout, privilege
+escalation blocked, cross-employee report access blocked, the full
+attendance state machine (including rejecting a second concurrent
+session/break), and the full assignment lifecycle (including rejecting
+invalid transitions and mutations on a terminal state).
+
+```bash
+cd apps/web
+pnpm typecheck
+pnpm build   # production build, verified clean
+```
+
+## CasaOS / ZimaOS
+
+`casaos/docker-compose.yml` is the CasaOS App Store manifest (`x-casaos`
+metadata, bind-mounted `/DATA/AppData/$AppID/...` volumes per CasaOS
+convention). Differences from the plain `compose.yaml`:
+
+- Migrations run inline in the backend's startup command
+  (`prisma migrate deploy && node dist/src/main.js`) instead of a separate
+  one-shot service, since CasaOS doesn't cleanly support init containers —
+  this is safe because `migrate deploy` is idempotent.
+- Images are referenced by tag (`ghcr.io/raktim94/nodedr-crm-*:1.0.0`)
+  rather than built locally — publish images to GHCR before submitting to
+  the App Store.
+
+**Not yet done**: the `casaos/icon.png`, `thumbnail.png`, and
+`screenshot-*.png` assets referenced in the manifest still need to be
+created and the version/image references updated before this is
+submission-ready — placeholder URLs point at files that don't exist yet in
+this repository.
+
+## Architecture notes
+
+- **Multi-tenancy**: every business record carries an immutable
+  `organizationId`; every repository query filters by the organization
+  taken from the authenticated session, never from client input.
+- **Authorization**: a strict role hierarchy
+  (`EMPLOYEE < MANAGER < SALES_HEAD < COMPANY_ADMIN < MASTER_OWNER`)
+  enforced by a NestJS guard plus per-service checks (e.g. "an employee can
+  only see their own attendance report").
+- **Sessions**: random 256-bit tokens, only the SHA-256 hash stored,
+  httpOnly + SameSite=lax cookies, 12h TTL, revoked on logout/password
+  change/employee removal.
+- **Audit trail**: `audit_events` table records who did what to what,
+  when — deliberately excludes plaintext temporary passwords and password
+  hashes from metadata.
+- **File storage**: local disk under `UPLOADS_DIR` (a named Docker volume
+  in production), not database blobs.
+
+## Scope and limitations
+
+This build intentionally implements the **workforce-operations core** of a
+much larger specification, not the full spec. Explicitly **not** built yet:
+
+- No leads/contacts/accounts/opportunities/pipeline CRM objects — this is
+  an employee/assignment/attendance system, not (yet) a sales pipeline CRM.
+- No background job queue / Redis / worker service — CSV import and PDF
+  upload run synchronously in the request. Fine at small-team scale; a
+  large CSV import or PDF library will need this added.
+- No S3-compatible object storage (MinIO) — files live on a local disk
+  volume. Fine for a single-server deployment; not horizontally scalable
+  as-is.
+- No automation/workflow-rule engine, no AI features.
+- No MFA/SSO/OIDC — session + password only.
+- No WhatsApp/telephony/email/calendar adapters.
+- No row-level security (RLS) in Postgres — tenant isolation is enforced
+  entirely in the application layer today.
+- Assignment/employee sequence numbers are computed via `count() + 1`
+  inside a transaction; the database's unique constraint prevents a
+  collision from corrupting data, but under heavy concurrent writes a
+  request could fail and need a retry rather than silently succeeding.
+  Fine at normal team-scale write volume.
+
+None of the above are silently faked — where a feature isn't built, there
+is no button or endpoint pretending it works.
+
+## License
+
+AGPL-3.0-only. See [LICENSE](LICENSE).

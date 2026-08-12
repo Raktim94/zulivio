@@ -1,0 +1,17 @@
+{
+  "name": "@nodedr-crm/types",
+  "version": "0.1.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": {
+    "build": "tsc --noEmit",
+    "lint": "echo \"no lint configured\"",
+    "typecheck": "tsc --noEmit",
+    "test": "echo \"no tests\""
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}

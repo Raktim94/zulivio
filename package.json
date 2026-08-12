@@ -1,0 +1,33 @@
+{
+  "name": "nodedr-crm",
+  "private": true,
+  "version": "0.1.0",
+  "description": "NodeDR CRM — open-source, self-hostable CRM and humane workforce-operations platform",
+  "author": "Raktim Ranjit <ranjitraktim5@gmail.com> (https://github.com/Raktim94)",
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Raktim94/nodedr-crm.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Raktim94/nodedr-crm/issues"
+  },
+  "homepage": "https://github.com/Raktim94/nodedr-crm#readme",
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:migrate": "pnpm --filter backend prisma migrate deploy",
+    "db:seed": "pnpm --filter backend prisma db seed"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.3",
+    "typescript": "^5.8.3"
+  },
+  "packageManager": "pnpm@11.10.0",
+  "engines": {
+    "node": ">=24"
+  }
+}

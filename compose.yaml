@@ -1,0 +1,106 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nodedr-crm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nodedr
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set a real POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: nodedr_crm
+    expose:
+      - "5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nodedr"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: nodedr-crm-migrate
+    environment:
+      DATABASE_URL: "postgresql://nodedr:${POSTGRES_PASSWORD:?set a real POSTGRES_PASSWORD in .env}@postgres:5432/nodedr_crm"
+    command: ["npx", "prisma", "migrate", "deploy"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    security_opt:
+      - no-new-privileges:true
+    restart: "no"
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: nodedr-crm-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgresql://nodedr:${POSTGRES_PASSWORD:?set a real POSTGRES_PASSWORD in .env}@postgres:5432/nodedr_crm"
+      PORT: "4100"
+      NODE_ENV: production
+      CORS_ORIGIN: "${FRONTEND_ORIGIN:-http://localhost:3100}"
+      UPLOADS_DIR: "/data/uploads"
+      BOOTSTRAP_DISABLED: "${BOOTSTRAP_DISABLED:-false}"
+      GOOGLE_SHEETS_CLIENT_EMAIL: "${GOOGLE_SHEETS_CLIENT_EMAIL:-}"
+      GOOGLE_SHEETS_PRIVATE_KEY: "${GOOGLE_SHEETS_PRIVATE_KEY:-}"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    expose:
+      - "4100"
+    volumes:
+      - uploads_data:/data/uploads
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4100/api/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        BACKEND_URL: "http://backend:4100"
+    container_name: nodedr-crm-web
+    restart: unless-stopped
+    environment:
+      PORT: "3000"
+    ports:
+      - "${HOST_PORT:-3100}:3000"
+    depends_on:
+      - backend
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+volumes:
+  pg_data:
+  uploads_data:

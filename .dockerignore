@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+.next
+**/.next
+dist
+**/dist
+.turbo
+**/.turbo
+*.tsbuildinfo
+.git
+.env
+.env.local
+apps/backend/uploads

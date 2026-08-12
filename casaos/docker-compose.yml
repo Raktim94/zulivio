@@ -1,0 +1,157 @@
+name: nodedr-crm
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: nodedr-crm-postgres
+    hostname: nodedr-crm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: nodedr
+      POSTGRES_PASSWORD: "please-change-this-password"
+      POSTGRES_DB: nodedr_crm
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/postgres
+        target: /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nodedr"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - nodedr-crm
+
+  backend:
+    image: ghcr.io/raktim94/nodedr-crm-backend:1.0.0
+    container_name: nodedr-crm-backend
+    hostname: nodedr-crm-backend
+    restart: unless-stopped
+    # CasaOS has no clean way to run a one-shot init container before the
+    # main app, so migrations run inline here on every start instead of the
+    # separate `migrate` service used by the plain `compose.yaml` — Prisma
+    # migrate deploy is idempotent, so this is safe on restarts.
+    command: ["sh", "-c", "npx prisma migrate deploy && node dist/src/main.js"]
+    environment:
+      DATABASE_URL: "postgresql://nodedr:please-change-this-password@nodedr-crm-postgres:5432/nodedr_crm"
+      PORT: "4100"
+      NODE_ENV: "production"
+      CORS_ORIGIN: "http://localhost:3100"
+      UPLOADS_DIR: "/data/uploads"
+      BOOTSTRAP_DISABLED: "false"
+      GOOGLE_SHEETS_CLIENT_EMAIL: ""
+      GOOGLE_SHEETS_PRIVATE_KEY: ""
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/uploads
+        target: /data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - nodedr-crm
+    x-casaos:
+      envs:
+        - container: DATABASE_URL
+          description:
+            en_US: Must match the Postgres password below if you change it. Leave as default unless you know why you're changing it.
+        - container: CORS_ORIGIN
+          description:
+            en_US: Origin the browser uses to reach the web app. Leave as the default for local/LAN use.
+        - container: BOOTSTRAP_DISABLED
+          description:
+            en_US: Set to true after you've created your organization, to close self-service signup on this instance.
+        - container: GOOGLE_SHEETS_CLIENT_EMAIL
+          description:
+            en_US: Optional — a Google service account email, to enable live Google Sheets import/export. Leave blank to keep this feature disabled.
+        - container: GOOGLE_SHEETS_PRIVATE_KEY
+          description:
+            en_US: Optional — paired with GOOGLE_SHEETS_CLIENT_EMAIL above. Leave blank to keep Google Sheets sync disabled.
+      volumes:
+        - container: /data/uploads
+          description:
+            en_US: Uploaded knowledge-base PDFs — back this up.
+
+  web:
+    image: ghcr.io/raktim94/nodedr-crm-web:1.0.0
+    container_name: nodedr-crm-web
+    hostname: nodedr-crm-web
+    restart: unless-stopped
+    ports:
+      - target: 3000
+        published: "3100"
+        protocol: tcp
+    depends_on:
+      - backend
+    networks:
+      - nodedr-crm
+    x-casaos:
+      ports:
+        - container: "3000"
+          description:
+            en_US: NodeDR CRM web interface
+          protocol: tcp
+
+networks:
+  nodedr-crm:
+    driver: bridge
+
+x-casaos:
+  id: com.nodedr.crm
+  architectures:
+    - amd64
+    - arm64
+  main: web
+  author: Nodedr Info Tech Private Limited
+  developer: Raktim94
+  category: Business
+  icon: https://cdn.jsdelivr.net/gh/Raktim94/nodedr-crm@master/casaos/icon.png
+  thumbnail: https://cdn.jsdelivr.net/gh/Raktim94/nodedr-crm@master/casaos/thumbnail.png
+  screenshot_link:
+    - https://cdn.jsdelivr.net/gh/Raktim94/nodedr-crm@master/casaos/screenshot-1.png
+    - https://cdn.jsdelivr.net/gh/Raktim94/nodedr-crm@master/casaos/screenshot-2.png
+  title:
+    en_US: NodeDR CRM
+  tagline:
+    en_US: Open-source CRM and humane workforce operations — employees, assignments, attendance, and reporting
+  description:
+    en_US: |
+      NodeDR CRM is a free, open-source, self-hostable CRM and workforce
+      operations platform: role-based employee management (add/remove with
+      auto-generated credentials), work assignment tracking with outcomes,
+      an explicit attendance state machine (shift/break/logout with a full
+      audit trail), a PDF knowledge base with acknowledgement tracking,
+      daily team tips, a master dashboard with live analytics, and CSV/Google
+      Sheets import-export. Runs entirely on your own hardware — no
+      subscription, no data leaving your server.
+
+      Access it from any device on your home network at
+      `http://<your-server>:3100`.
+  tips:
+    before_install:
+      en_US: |
+        **Before first launch**, change the placeholder Postgres password
+        in both the `postgres` service's `POSTGRES_PASSWORD` and the
+        `backend` service's `DATABASE_URL` — they must match.
+
+        Your data (Postgres database + uploaded knowledge-base PDFs)
+        persists at `/DATA/AppData/nodedr-crm/`, following CasaOS/ZimaOS's
+        standard backup/restore convention.
+
+        After install, open the app and go to `/setup` to create your
+        organization and its first Master Owner account — no manual
+        configuration or demo data needed.
+  index: /
+  scheme: http
+  port_map: "3100"
+  version: "1.0.0"
+  update_at: "2026-08-12"
+  release_notes:
+    en_US: |-
+      Initial CasaOS/ZimaOS release: employee lifecycle, role-based access
+      control, work assignments, attendance tracking, knowledge base and
+      tips, master dashboard, and CSV/Google Sheets import-export.
+  website: "https://crm.nodedr.com/"
+  repo: "https://github.com/Raktim94/nodedr-crm"
+  support: "https://crm.nodedr.com/contact"
+  docs: "https://github.com/Raktim94/nodedr-crm#readme"
