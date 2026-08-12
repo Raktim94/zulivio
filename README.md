@@ -35,6 +35,7 @@ and isn't built yet before you rely on this in production.
 
 ## Contents
 
+- [Screenshots](#screenshots)
 - [Stack](#stack)
 - [Quick start](#quick-start)
 - [Roles and access](#roles-and-access)
@@ -49,6 +50,28 @@ and isn't built yet before you rely on this in production.
 - [Scope and limitations](#scope-and-limitations)
 - [Roadmap](#roadmap)
 - [License](#license)
+
+## Screenshots
+
+All captured from a real running instance (Docker Compose, seeded with
+sample data) — not mockups.
+
+| | |
+|---|---|
+| **Master dashboard** — live headcount, assignment mix, who's on the clock | **Employee directory** — add/edit/reset-password/remove, all rank-guarded |
+| ![Master dashboard](docs/screenshots/dashboard.png) | ![Employees](docs/screenshots/employees.png) |
+| **Employee front page** — "My Work", today's tips, shift controls | **Assignments** — status pipeline with guarded transitions |
+| ![Employee front page](docs/screenshots/employee-front-page.png) | ![Assignments](docs/screenshots/assignments.png) |
+
+<details>
+<summary>More screenshots (attendance, knowledge base, data hub, sign in)</summary>
+
+| | |
+|---|---|
+| ![Attendance](docs/screenshots/attendance.png) | ![Knowledge base](docs/screenshots/knowledge.png) |
+| ![Data Hub](docs/screenshots/data-hub.png) | ![Sign in](docs/screenshots/login.png) |
+
+</details>
 
 ## Stack
 

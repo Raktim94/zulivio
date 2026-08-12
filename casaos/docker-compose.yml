@@ -107,6 +107,10 @@ x-casaos:
   category: Productivity
   icon: https://cdn.jsdelivr.net/gh/Raktim94/zulivio@master/casaos/icon.png
   thumbnail: https://cdn.jsdelivr.net/gh/Raktim94/zulivio@master/casaos/thumbnail.png
+  screenshot_link:
+    - https://cdn.jsdelivr.net/gh/Raktim94/zulivio@master/casaos/screenshot-1.png
+    - https://cdn.jsdelivr.net/gh/Raktim94/zulivio@master/casaos/screenshot-2.png
+    - https://cdn.jsdelivr.net/gh/Raktim94/zulivio@master/casaos/screenshot-3.png
   title:
     en_US: Zulivio
   tagline:
@@ -148,7 +152,7 @@ x-casaos:
       Initial CasaOS/ZimaOS release: employee lifecycle, role-based access
       control, work assignments, attendance tracking, knowledge base and
       tips, master dashboard, and CSV/Google Sheets import-export.
-  website: "https://github.com/Raktim94/zulivio"
+  website: "https://crm.nodedr.com/"
   repo: "https://github.com/Raktim94/zulivio"
-  support: "https://github.com/Raktim94/zulivio/issues"
+  support: "https://crm.nodedr.com/contact"
   docs: "https://github.com/Raktim94/zulivio#readme"

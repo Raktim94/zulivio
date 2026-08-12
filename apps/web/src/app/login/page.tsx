@@ -31,7 +31,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-navy px-4">
-      <Logo size="lg" onDark />
+      <Logo size="lg" />
       <Card className="w-full max-w-sm">
         <h1 className="text-lg font-semibold text-ink">Sign in</h1>
         <p className="mt-1 text-sm text-muted">Sign in to your organization</p>
