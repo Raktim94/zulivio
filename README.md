@@ -23,7 +23,21 @@ exactly what is and isn't built yet before you rely on this in production.
 - **Shared types**: `packages/types` — TypeScript interfaces shared between
   frontend and backend API contracts.
 
-## Quick start (Docker)
+## Quick start
+
+### One-click install (recommended)
+
+```bash
+./install.sh
+```
+
+This checks for Docker, generates a `.env` with a random Postgres password
+(only if one doesn't already exist — safe to re-run), builds the images,
+starts the stack, and waits for the app to come online. It prints the URL
+to open when done. Re-run it any time (e.g. after `git pull`) to rebuild
+and restart — it never touches existing data.
+
+### Manual
 
 ```bash
 cp .env.example .env
@@ -33,10 +47,10 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Once `docker compose ps` shows `backend` and `web` as healthy, open
-**http://localhost:3100/setup** and create your organization — this creates
-your company and its first **Master Owner** account. There is no baked-in
-demo password; you choose the master owner's password during setup.
+Either way, once the stack is healthy, open **http://localhost:3100/setup**
+and create your organization — this creates your company and its first
+**Master Owner** account. There is no baked-in demo password; you choose
+the master owner's password during setup.
 
 To close self-service organization creation once you're done setting up
 (recommended for a single-tenant deployment), set `BOOTSTRAP_DISABLED=true`
@@ -66,6 +80,27 @@ time — it is never stored in plaintext or retrievable again. Removing an
 employee marks them `SEPARATED`, immediately revokes all their sessions,
 and preserves their history for reporting/audit (no hard delete, no reused
 employee numbers).
+
+The Master Owner (and anyone with a high-enough rank over the target) has
+full operational control over the organization from the Employees page:
+
+- **Edit** any subordinate's role, department, or employment status
+  (including reactivating someone `SUSPENDED`/`ON_LEAVE`) — `PATCH
+  /api/v1/employees/:id`. Guarded the same way as creation: you can never
+  promote someone to your own rank or above.
+- **Reset password** — force-generates a new temporary password for a
+  subordinate and immediately revokes all their active sessions, so a
+  reset takes effect right away rather than on their next natural login —
+  `POST /api/v1/employees/:id/reset-password`.
+- **Remove** — separates an employee and revokes their sessions —
+  `DELETE /api/v1/employees/:id`.
+- Full visibility into every assignment, attendance record, and report in
+  the organization (Manager rank and above is unrestricted by scope;
+  Employee/Manager-of-a-team see only their own or their direct reports').
+
+All of the above are enforced server-side, tested in
+`apps/backend/test/app.e2e-spec.ts` (26/26 passing), and never gated only
+by hiding a button in the UI.
 
 ## Core features
 
@@ -182,8 +217,9 @@ DATABASE_URL="postgresql://postgres:test@localhost:55432/nodedr_crm_test" \
 docker rm -f nodedr-crm-test-pg
 ```
 
-At last run: **22/22 tests passing** — bootstrap/login/logout, privilege
-escalation blocked, cross-employee report access blocked, the full
+At last run: **26/26 tests passing** — bootstrap/login/logout, privilege
+escalation blocked (on both create and edit), cross-employee report access
+blocked, owner edit/reset-password/remove on subordinates, the full
 attendance state machine (including rejecting a second concurrent
 session/break), and the full assignment lifecycle (including rejecting
 invalid transitions and mutations on a terminal state).

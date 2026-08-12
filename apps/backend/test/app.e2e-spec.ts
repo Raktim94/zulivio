@@ -152,6 +152,64 @@ describe("NodeDR CRM (e2e)", () => {
 
       await employeeAgent.get(`/api/v1/work-sessions/report/${ownerId}`).expect(403);
     });
+
+    it("lets the owner edit a subordinate's role and department", async () => {
+      const agent = request.agent(server());
+      await agent.post("/api/v1/auth/sessions").send({ email: orgEmail, password: orgPassword }).expect(201);
+
+      const res = await agent
+        .patch(`/api/v1/employees/${employeeCreds.id}`)
+        .send({ role: "MANAGER", department: "Operations" })
+        .expect(200);
+
+      expect(res.body.role).toBe("MANAGER");
+      expect(res.body.department).toBe("Operations");
+    });
+
+    it("blocks promoting a subordinate to a peer-or-higher role via update", async () => {
+      const agent = request.agent(server());
+      await agent.post("/api/v1/auth/sessions").send({ email: orgEmail, password: orgPassword }).expect(201);
+
+      await agent
+        .patch(`/api/v1/employees/${employeeCreds.id}`)
+        .send({ role: "MASTER_OWNER" })
+        .expect(403);
+    });
+
+    it("blocks a manager from editing a peer-or-higher-ranked employee", async () => {
+      const agent = request.agent(server());
+      await agent.post("/api/v1/auth/sessions").send(managerCreds).expect(201);
+
+      await agent.patch(`/api/v1/employees/${ownerId}`).send({ department: "Nope" }).expect(403);
+    });
+
+    it("lets the owner force-reset a subordinate's password, revoking their sessions", async () => {
+      const employeeAgent = request.agent(server());
+      await employeeAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email: employeeCreds.email, password: employeeCreds.password })
+        .expect(201);
+      // Confirm the pre-reset session actually works before we invalidate it.
+      await employeeAgent.get("/api/v1/employees/me").expect(200);
+
+      const ownerAgent = request.agent(server());
+      await ownerAgent.post("/api/v1/auth/sessions").send({ email: orgEmail, password: orgPassword }).expect(201);
+      const res = await ownerAgent
+        .post(`/api/v1/employees/${employeeCreds.id}/reset-password`)
+        .expect(201);
+
+      expect(res.body.temporaryPassword).toHaveLength(14);
+
+      // The old session must be dead — reset revokes all active sessions.
+      await employeeAgent.get("/api/v1/employees/me").expect(401);
+
+      // The new temporary password must work.
+      const reloginAgent = request.agent(server());
+      await reloginAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email: employeeCreds.email, password: res.body.temporaryPassword })
+        .expect(201);
+    });
   });
 
   describe("attendance state machine", () => {

@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
-import type { EmployeeSummary, Role } from "@nodedr-crm/types";
+import type { EmployeeSummary, EmploymentStatus, Role } from "@nodedr-crm/types";
 import { api, ApiError } from "@/lib/api";
 import { Badge, Button, Card, ErrorState, Input, Select, Spinner } from "@/components/ui";
 
 const ROLES: Role[] = ["EMPLOYEE", "MANAGER", "SALES_HEAD", "COMPANY_ADMIN"];
+const EMPLOYMENT_STATUSES: EmploymentStatus[] = ["ACTIVE", "SUSPENDED", "ON_LEAVE"];
 
 export default function EmployeesPage() {
   const queryClient = useQueryClient();
@@ -19,27 +20,62 @@ export default function EmployeesPage() {
   const [form, setForm] = useState({ fullName: "", email: "", role: "EMPLOYEE" as Role, department: "" });
   const [credentials, setCredentials] = useState<{ employeeNumber: string; temporaryPassword: string } | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [rowError, setRowError] = useState<string | null>(null);
+  const [resetPasswordFor, setResetPasswordFor] = useState<{ name: string; temporaryPassword: string } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ["employees"] });
+  }
 
   const createEmployee = useMutation({
     mutationFn: () => api.post<{ employeeNumber: string; temporaryPassword: string }>("/api/v1/employees", form),
     onSuccess: (result) => {
       setCredentials(result);
       setForm({ fullName: "", email: "", role: "EMPLOYEE", department: "" });
-      queryClient.invalidateQueries({ queryKey: ["employees"] });
+      invalidate();
     },
     onError: (err) => setFormError(err instanceof ApiError ? err.message : "Could not create employee"),
   });
 
+  const updateEmployee = useMutation({
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: string;
+      patch: Partial<Pick<EmployeeSummary, "role" | "department"> & { employmentStatus: EmploymentStatus }>;
+    }) => api.patch(`/api/v1/employees/${id}`, patch),
+    onSuccess: () => {
+      setEditingId(null);
+      invalidate();
+    },
+    onError: (err) => setRowError(err instanceof ApiError ? err.message : "Could not update employee"),
+  });
+
   const removeEmployee = useMutation({
     mutationFn: (id: string) => api.delete(`/api/v1/employees/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["employees"] }),
+    onSuccess: invalidate,
+    onError: (err) => setRowError(err instanceof ApiError ? err.message : "Could not remove employee"),
+  });
+
+  const resetPassword = useMutation({
+    mutationFn: (id: string) => api.post<{ temporaryPassword: string }>(`/api/v1/employees/${id}/reset-password`),
+    onSuccess: (result, id) => {
+      const emp = data?.find((e) => e.id === id);
+      setResetPasswordFor({ name: emp?.fullName ?? "Employee", temporaryPassword: result.temporaryPassword });
+    },
+    onError: (err) => setRowError(err instanceof ApiError ? err.message : "Could not reset password"),
   });
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold text-ink">Employees</h1>
-        <p className="text-sm text-muted">Add, remove, and manage roles for your team.</p>
+        <p className="text-sm text-muted">
+          Add, remove, edit roles, and reset passwords for anyone below your rank — a Master Owner has full
+          control over the organization.
+        </p>
       </div>
 
       <Card>
@@ -99,6 +135,18 @@ export default function EmployeesPage() {
 
       <Card>
         <h2 className="mb-4 text-sm font-medium text-ink">Directory</h2>
+        {rowError && <div className="mb-3"><ErrorState message={rowError} /></div>}
+        {resetPasswordFor && (
+          <div className="mb-4 rounded-lg border border-emerald/30 bg-emerald/5 p-3 text-sm">
+            <p className="font-medium text-emerald-dark">
+              Password reset for {resetPasswordFor.name} — share this once, it won&apos;t be shown again. Their
+              existing sessions have been signed out.
+            </p>
+            <p className="mt-1">
+              New temporary password: <span className="font-mono">{resetPasswordFor.temporaryPassword}</span>
+            </p>
+          </div>
+        )}
         {isLoading ? (
           <Spinner />
         ) : error ? (
@@ -118,43 +166,144 @@ export default function EmployeesPage() {
                 </tr>
               </thead>
               <tbody>
-                {data?.map((emp) => (
-                  <tr key={emp.id} className="border-t border-border">
-                    <td className="py-2 font-mono text-xs">{emp.employeeNumber}</td>
-                    <td className="py-2">{emp.fullName}</td>
-                    <td className="py-2">{emp.role.replace("_", " ")}</td>
-                    <td className="py-2">{emp.department ?? "—"}</td>
-                    <td className="py-2">
-                      <Badge tone={emp.employmentStatus === "ACTIVE" ? "success" : "neutral"}>
-                        {emp.employmentStatus}
-                      </Badge>
-                    </td>
-                    <td className="py-2">
-                      <Link href={`/reports/${emp.id}`} className="text-emerald underline">
-                        View
-                      </Link>
-                    </td>
-                    <td className="py-2 text-right">
-                      {emp.employmentStatus === "ACTIVE" && (
-                        <button
-                          onClick={() => {
-                            if (confirm(`Remove ${emp.fullName}? This revokes their access.`)) {
-                              removeEmployee.mutate(emp.id);
-                            }
-                          }}
-                          className="text-xs text-coral underline"
-                        >
-                          Remove
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {data?.map((emp) =>
+                  editingId === emp.id ? (
+                    <EditRow
+                      key={emp.id}
+                      employee={emp}
+                      pending={updateEmployee.isPending}
+                      onCancel={() => setEditingId(null)}
+                      onSave={(patch) => {
+                        setRowError(null);
+                        updateEmployee.mutate({ id: emp.id, patch });
+                      }}
+                    />
+                  ) : (
+                    <tr key={emp.id} className="border-t border-border">
+                      <td className="py-2 font-mono text-xs">{emp.employeeNumber}</td>
+                      <td className="py-2">{emp.fullName}</td>
+                      <td className="py-2">{emp.role.replace("_", " ")}</td>
+                      <td className="py-2">{emp.department ?? "—"}</td>
+                      <td className="py-2">
+                        <Badge tone={emp.employmentStatus === "ACTIVE" ? "success" : "neutral"}>
+                          {emp.employmentStatus}
+                        </Badge>
+                      </td>
+                      <td className="py-2">
+                        <Link href={`/reports/${emp.id}`} className="text-emerald underline">
+                          View
+                        </Link>
+                      </td>
+                      <td className="py-2 text-right">
+                        <div className="flex justify-end gap-3">
+                          <button
+                            onClick={() => {
+                              setRowError(null);
+                              setEditingId(emp.id);
+                            }}
+                            className="text-xs text-emerald underline"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm(`Reset ${emp.fullName}'s password? This signs them out immediately.`)) {
+                                setRowError(null);
+                                resetPassword.mutate(emp.id);
+                              }
+                            }}
+                            className="text-xs text-amber underline"
+                          >
+                            Reset password
+                          </button>
+                          {emp.employmentStatus === "ACTIVE" && (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Remove ${emp.fullName}? This revokes their access.`)) {
+                                  setRowError(null);
+                                  removeEmployee.mutate(emp.id);
+                                }
+                              }}
+                              className="text-xs text-coral underline"
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ),
+                )}
               </tbody>
             </table>
           </div>
         )}
       </Card>
     </div>
+  );
+}
+
+function EditRow({
+  employee,
+  pending,
+  onSave,
+  onCancel,
+}: {
+  employee: EmployeeSummary;
+  pending: boolean;
+  onSave: (patch: { role: Role; department: string; employmentStatus: EmploymentStatus }) => void;
+  onCancel: () => void;
+}) {
+  const [role, setRole] = useState<Role>(employee.role);
+  const [department, setDepartment] = useState(employee.department ?? "");
+  const [employmentStatus, setEmploymentStatus] = useState<EmploymentStatus>(
+    employee.employmentStatus === "SEPARATED" ? "ACTIVE" : employee.employmentStatus,
+  );
+
+  return (
+    <tr className="border-t border-border bg-canvas">
+      <td className="py-2 font-mono text-xs">{employee.employeeNumber}</td>
+      <td className="py-2">{employee.fullName}</td>
+      <td className="py-2">
+        <Select value={role} onChange={(e) => setRole(e.target.value as Role)} className="py-1">
+          {ROLES.map((r) => (
+            <option key={r} value={r}>
+              {r.replace("_", " ")}
+            </option>
+          ))}
+        </Select>
+      </td>
+      <td className="py-2">
+        <Input value={department} onChange={(e) => setDepartment(e.target.value)} className="py-1" />
+      </td>
+      <td className="py-2">
+        <Select
+          value={employmentStatus}
+          onChange={(e) => setEmploymentStatus(e.target.value as EmploymentStatus)}
+          className="py-1"
+        >
+          {EMPLOYMENT_STATUSES.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </Select>
+      </td>
+      <td className="py-2 text-xs text-muted">—</td>
+      <td className="py-2 text-right">
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={() => onSave({ role, department, employmentStatus })}
+            disabled={pending}
+            className="text-xs text-emerald underline disabled:opacity-50"
+          >
+            {pending ? "Saving..." : "Save"}
+          </button>
+          <button onClick={onCancel} className="text-xs text-muted underline">
+            Cancel
+          </button>
+        </div>
+      </td>
+    </tr>
   );
 }
