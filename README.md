@@ -95,6 +95,16 @@ sample data) — not mockups.
 
 ## Stack
 
+> **Versioning policy**: identify the latest *stable* major version of each
+> language/framework/tool at the start of a project (or before a dependency
+> bump), and default to it — don't build against an outdated version out of
+> habit. "Latest" still means judgment, not automatic: a version released
+> days ago with no ecosystem adoption (e.g. a from-scratch compiler rewrite)
+> is a deliberate, separately-tested upgrade, not a default. As of this
+> writing, Next.js 16 and Prisma 7 are both newer majors than what's below —
+> tracked as a deliberate future upgrade (Prisma 7 in particular changes
+> driver adapters and config, not a drop-in bump), not done yet.
+
 - **Backend**: NestJS 11 + Prisma 6 + PostgreSQL 16, session-based auth
   (Argon2id password hashing), REST API under `/api/v1`.
 - **Frontend**: Next.js 15 (App Router) + React 19 + TanStack Query +
