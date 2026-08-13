@@ -23,7 +23,7 @@ services:
       - zulivio
 
   backend:
-    image: ghcr.io/raktim94/zulivio-backend:1.3.0
+    image: ghcr.io/raktim94/zulivio-backend:1.4.0
     container_name: zulivio-backend
     hostname: zulivio-backend
     restart: unless-stopped
@@ -102,7 +102,7 @@ services:
             en_US: Uploaded knowledge-base PDFs — back this up.
 
   web:
-    image: ghcr.io/raktim94/zulivio-web:1.3.0
+    image: ghcr.io/raktim94/zulivio-web:1.4.0
     container_name: zulivio-web
     hostname: zulivio-web
     restart: unless-stopped
@@ -180,10 +180,17 @@ x-casaos:
   index: /
   scheme: http
   port_map: "2996"
-  version: "1.3.0"
+  version: "1.4.0"
   update_at: "2026-08-13"
   release_notes:
     en_US: |-
+      1.4.0: the employee directory now only ever shows accounts strictly
+      below your rank (never a peer or higher), matching what
+      edit/reset-password/remove already enforced. Employees, Sales
+      Dashboard, Data Hub, and Settings are now guarded even on direct URL
+      access, not just a hidden nav link. Adds an audit log viewer
+      (Settings > Activity log, Master Owner only).
+
       1.3.0: backups can now be connected entirely from Settings (Master
       Owner only) — endpoint, bucket, and access key are entered there,
       tested live before saving, and stored in the app itself. No CasaOS/
