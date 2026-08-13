@@ -11,17 +11,23 @@
 > permissions, employee lifecycle, work assignments, attendance, knowledge
 > base, a master dashboard, CSV/Google Sheets import-export, and a first
 > cut of Sales CRM (Section 5.2 / Stage 3-4 below) — leads with a
-> qualification pipeline, round-robin assignment rules with response SLA,
-> lead-to-opportunity conversion, a Kanban pipeline board, manager
-> forecast-category overrides with an audit trail, and a sales dashboard
-> with charts. Not yet built from Section 5.2: territory/capacity-based
-> routing, multiple pipelines per org, and a contacts/accounts layer.
-> Everything else in this document — the remaining departmental
-> workspaces, the automation engine, marketing/service/success/delivery/
-> field-service modules, AI features — is the plan, not a claim about
-> current functionality. Treat section numbers and stage names below as
-> the aspirational sequence this project is built toward, not a status
-> report.
+> qualification pipeline, lead-to-opportunity conversion, a Kanban pipeline
+> board, manager forecast-category overrides with an audit trail, and a
+> sales dashboard with charts. **Shipped** from the Section 5.2 "Lead
+> assignment" and "Forecasting and goals" gaps (as of `v1.1.0`): round
+> robin **plus territory and capacity-based assignment routing**, a
+> response SLA and overdue queue on every mode, opportunities CSV
+> import/export, and **rep-level** forecast breakdown (weighted forecast +
+> forecast-by-category per owner) alongside the existing manager-override
+> and company-level views. **Not yet built** from Section 5.2: product/
+> skill-based routing, multiple pipelines per org, and a contacts/accounts
+> layer (leads and opportunities still stand alone, with no shared
+> contact/company record). Everything else in this document — the
+> remaining departmental workspaces, the automation engine, marketing/
+> service/success/delivery/field-service modules, AI features — is the
+> plan, not a claim about current functionality. Treat section numbers and
+> stage names below as the aspirational sequence this project is built
+> toward, not a status report.
 
 Document type: Business-first product roadmap
 Scope: Product features, departmental workspaces, rollout, adoption and integrations
