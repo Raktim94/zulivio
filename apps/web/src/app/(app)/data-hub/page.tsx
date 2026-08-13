@@ -3,12 +3,13 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
-import { Button, Card, ErrorState, Input } from "@/components/ui";
+import { Button, Card, ErrorState, FileInput, Input } from "@/components/ui";
 
 interface ImportResult {
   createdCount: number;
   errorCount: number;
   errors: { row: number; message: string }[];
+  detectedHeaders?: string[];
 }
 
 export default function DataHubPage() {
@@ -129,10 +130,10 @@ function CsvImportCard({
           setResult(null);
           importCsv.mutate();
         }}
-        className="flex flex-wrap items-center gap-3"
+        className="flex flex-col items-start gap-3"
       >
-        <input type="file" accept=".csv,text/csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} required />
-        <Button type="submit" disabled={importCsv.isPending}>
+        <FileInput value={file} onChange={setFile} accept=".csv,text/csv" required />
+        <Button type="submit" disabled={!file || importCsv.isPending}>
           {importCsv.isPending ? "Importing..." : "Import"}
         </Button>
       </form>
@@ -142,11 +143,18 @@ function CsvImportCard({
             {result.createdCount} created, {result.errorCount} errors
           </p>
           {result.errors.length > 0 && (
-            <ul className="mt-2 flex flex-col gap-1 text-xs text-coral">
-              {result.errors.map((e, i) => (
-                <li key={i}>Row {e.row}: {e.message}</li>
-              ))}
-            </ul>
+            <>
+              <ul className="mt-2 flex flex-col gap-1 text-xs text-coral">
+                {result.errors.map((e, i) => (
+                  <li key={i}>Row {e.row}: {e.message}</li>
+                ))}
+              </ul>
+              {result.detectedHeaders && (
+                <p className="mt-2 text-xs text-muted">
+                  Columns detected in your file: {result.detectedHeaders.join(", ") || "none"}
+                </p>
+              )}
+            </>
           )}
         </div>
       )}

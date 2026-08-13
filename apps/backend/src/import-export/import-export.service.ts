@@ -32,6 +32,27 @@ export interface RowError {
   message: string;
 }
 
+/**
+ * CSV headers exported by Excel/Google Sheets ("Full Name", "E-mail") don't
+ * match our snake_case/camelCase field names byte-for-byte, so a naive
+ * `raw.full_name` lookup silently fails the whole row. Normalize every
+ * header key to lowercase-alphanumeric-only before matching against a list
+ * of accepted aliases, so casing/spacing/punctuation differences don't
+ * produce a false "missing field" error.
+ */
+function normalizeKey(key: string): string {
+  return key.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function pickField(raw: Record<string, string>, aliases: string[]): string | undefined {
+  const normalized = new Map(Object.entries(raw).map(([k, v]) => [normalizeKey(k), v]));
+  for (const alias of aliases) {
+    const value = normalized.get(normalizeKey(alias))?.trim();
+    if (value) return value;
+  }
+  return undefined;
+}
+
 @Injectable()
 export class ImportExportService {
   constructor(
@@ -120,33 +141,39 @@ export class ImportExportService {
 
     const created: unknown[] = [];
     const errors: RowError[] = [];
+    const detectedHeaders = records.length > 0 ? Object.keys(records[0]) : [];
 
     for (let i = 0; i < records.length; i++) {
       const raw = records[i];
-      const title = raw.title || raw.name;
+      const title = pickField(raw, ["title", "name"]);
 
       if (!title) {
-        errors.push({ row: i + 2, message: "Missing required field: title/name" });
+        errors.push({
+          row: i + 2,
+          message: `Missing required field: title/name (detected columns: ${detectedHeaders.join(", ") || "none"})`,
+        });
         continue;
       }
 
+      const amountText = pickField(raw, ["amountMinor", "amount_minor"]);
+      const amountMajorText = pickField(raw, ["amount"]);
       let amountMinor: number | undefined;
-      if (raw.amountMinor || raw.amount_minor) {
-        amountMinor = parseInt(raw.amountMinor || raw.amount_minor, 10);
-      } else if (raw.amount) {
-        amountMinor = Math.round(parseFloat(raw.amount) * 100);
+      if (amountText) {
+        amountMinor = parseInt(amountText, 10);
+      } else if (amountMajorText) {
+        amountMinor = Math.round(parseFloat(amountMajorText) * 100);
       }
       if (amountMinor !== undefined && Number.isNaN(amountMinor)) {
-        errors.push({ row: i + 2, message: `Invalid amount "${raw.amount ?? raw.amountMinor}"` });
+        errors.push({ row: i + 2, message: `Invalid amount "${amountMajorText ?? amountText}"` });
         continue;
       }
 
       try {
         const opportunity = await this.opportunitiesService.create(actor, {
           title,
-          company: raw.company || undefined,
+          company: pickField(raw, ["company"]),
           amountMinor,
-          expectedCloseDate: raw.expectedCloseDate || raw.expected_close_date || undefined,
+          expectedCloseDate: pickField(raw, ["expectedCloseDate", "expected_close_date"]),
         });
         created.push(opportunity);
       } catch (err) {
@@ -154,7 +181,7 @@ export class ImportExportService {
       }
     }
 
-    return { createdCount: created.length, errorCount: errors.length, created, errors };
+    return { createdCount: created.length, errorCount: errors.length, created, errors, detectedHeaders };
   }
 
   /** Header-mapped CSV import for leads: full_name/name, email, phone, company, source. */
@@ -170,24 +197,28 @@ export class ImportExportService {
 
     const created: unknown[] = [];
     const errors: RowError[] = [];
+    const detectedHeaders = records.length > 0 ? Object.keys(records[0]) : [];
 
     for (let i = 0; i < records.length; i++) {
       const raw = records[i];
-      const fullName = raw.full_name || raw.fullName || raw.name;
+      const fullName = pickField(raw, ["full_name", "fullName", "name", "full name"]);
 
       if (!fullName) {
-        errors.push({ row: i + 2, message: "Missing required field: full_name/name" });
+        errors.push({
+          row: i + 2,
+          message: `Missing required field: full_name/name (detected columns: ${detectedHeaders.join(", ") || "none"})`,
+        });
         continue;
       }
 
       try {
         const lead = await this.leadsService.create(actor, {
           fullName,
-          email: raw.email || undefined,
-          phone: raw.phone || undefined,
-          company: raw.company || undefined,
-          source: raw.source || "CSV import",
-          territory: raw.territory || undefined,
+          email: pickField(raw, ["email", "email address"]),
+          phone: pickField(raw, ["phone", "phone number", "mobile"]),
+          company: pickField(raw, ["company"]),
+          source: pickField(raw, ["source"]) ?? "CSV import",
+          territory: pickField(raw, ["territory", "region"]),
         });
         created.push(lead);
       } catch (err) {
@@ -195,7 +226,7 @@ export class ImportExportService {
       }
     }
 
-    return { createdCount: created.length, errorCount: errors.length, created, errors };
+    return { createdCount: created.length, errorCount: errors.length, created, errors, detectedHeaders };
   }
 
   /** Header-mapped CSV import for employees: full_name/name, email, role, department. */
@@ -215,19 +246,24 @@ export class ImportExportService {
   private async importRows(actor: AuthenticatedEmployee, records: Record<string, string>[]) {
     const created: unknown[] = [];
     const errors: RowError[] = [];
+    const detectedHeaders = records.length > 0 ? Object.keys(records[0]) : [];
 
     for (let i = 0; i < records.length; i++) {
       const raw = records[i];
-      const fullName = raw.full_name || raw.fullName || raw.name;
-      const email = raw.email;
-      const roleRaw = (raw.role || "EMPLOYEE").toUpperCase();
+      const fullName = pickField(raw, ["full_name", "fullName", "name", "full name"]);
+      const email = pickField(raw, ["email", "email address"]);
+      const roleField = pickField(raw, ["role"]);
+      const roleRaw = (roleField ?? "EMPLOYEE").toUpperCase();
 
       if (!fullName || !email) {
-        errors.push({ row: i + 2, message: "Missing required field: full_name/name or email" });
+        errors.push({
+          row: i + 2,
+          message: `Missing required field: full_name/name or email (detected columns: ${detectedHeaders.join(", ") || "none"})`,
+        });
         continue;
       }
       if (!Object.values(Role).includes(roleRaw as Role)) {
-        errors.push({ row: i + 2, message: `Unrecognized role "${raw.role}"` });
+        errors.push({ row: i + 2, message: `Unrecognized role "${roleField}"` });
         continue;
       }
 
@@ -236,7 +272,7 @@ export class ImportExportService {
           fullName,
           email,
           role: roleRaw as Role,
-          department: raw.department || undefined,
+          department: pickField(raw, ["department"]),
         });
         created.push(result);
       } catch (err) {
@@ -244,7 +280,7 @@ export class ImportExportService {
       }
     }
 
-    return { createdCount: created.length, errorCount: errors.length, created, errors };
+    return { createdCount: created.length, errorCount: errors.length, created, errors, detectedHeaders };
   }
 
   async exportToGoogleSheets(actor: AuthenticatedEmployee, dto: GoogleSheetsSyncDto) {

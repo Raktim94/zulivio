@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import type { AssignmentRuleMode, AssignmentRuleSummary, EmployeeSummary, LeadStatus, LeadSummary } from "@zulivio/types";
 import { api, ApiError } from "@/lib/api";
-import { Badge, Button, Card, ErrorState, Input, Select, Spinner } from "@/components/ui";
+import { Badge, Button, Card, ErrorState, FileInput, Input, Select, Spinner } from "@/components/ui";
 import { useCurrentEmployee, isManagerOrAbove } from "@/lib/use-current-employee";
 
 const STATUS_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
@@ -54,7 +54,12 @@ export default function LeadsPage() {
   const [convertTitle, setConvertTitle] = useState("");
   const [convertAmount, setConvertAmount] = useState("");
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importResult, setImportResult] = useState<{ createdCount: number; errorCount: number } | null>(null);
+  const [importResult, setImportResult] = useState<{
+    createdCount: number;
+    errorCount: number;
+    errors: { row: number; message: string }[];
+    detectedHeaders?: string[];
+  } | null>(null);
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["leads"] });
@@ -100,7 +105,12 @@ export default function LeadsPage() {
   const importCsv = useMutation({
     mutationFn: () => {
       if (!importFile) throw new Error("Choose a CSV file first");
-      return api.upload<{ createdCount: number; errorCount: number }>("/api/v1/imports/leads/csv", importFile);
+      return api.upload<{
+        createdCount: number;
+        errorCount: number;
+        errors: { row: number; message: string }[];
+        detectedHeaders?: string[];
+      }>("/api/v1/imports/leads/csv", importFile);
     },
     onSuccess: (result) => {
       setImportResult(result);
@@ -190,8 +200,8 @@ export default function LeadsPage() {
             <code className="rounded bg-canvas px-1">email</code>, <code className="rounded bg-canvas px-1">phone</code>,{" "}
             <code className="rounded bg-canvas px-1">company</code>, <code className="rounded bg-canvas px-1">source</code>.
           </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <input type="file" accept=".csv,text/csv" onChange={(e) => setImportFile(e.target.files?.[0] ?? null)} />
+          <div className="flex flex-col items-start gap-3">
+            <FileInput value={importFile} onChange={setImportFile} accept=".csv,text/csv" />
             <Button
               variant="secondary"
               disabled={!importFile || importCsv.isPending}
@@ -201,9 +211,25 @@ export default function LeadsPage() {
             </Button>
           </div>
           {importResult && (
-            <p className="mt-3 text-sm text-ink">
-              {importResult.createdCount} created, {importResult.errorCount} errors
-            </p>
+            <div className="mt-3 text-sm">
+              <p className="text-ink">
+                {importResult.createdCount} created, {importResult.errorCount} errors
+              </p>
+              {importResult.errors.length > 0 && (
+                <>
+                  <ul className="mt-2 flex flex-col gap-1 text-xs text-coral">
+                    {importResult.errors.map((e, i) => (
+                      <li key={i}>Row {e.row}: {e.message}</li>
+                    ))}
+                  </ul>
+                  {importResult.detectedHeaders && (
+                    <p className="mt-2 text-xs text-muted">
+                      Columns detected in your file: {importResult.detectedHeaders.join(", ") || "none"}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
           )}
         </Card>
       )}

@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import { useId, useRef } from "react";
 import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes } from "react";
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
@@ -55,6 +56,47 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
       )}
       {...props}
     />
+  );
+}
+
+/**
+ * A native <input type="file"> renders inconsistently (sometimes nearly
+ * invisible) across browsers/OS themes. This hides it behind a visually
+ * hidden input triggered by a real styled Button, with the chosen filename
+ * shown next to it, so the control is unambiguous.
+ */
+export function FileInput({
+  value,
+  onChange,
+  accept,
+  required,
+}: {
+  value: File | null;
+  onChange: (file: File | null) => void;
+  accept?: string;
+  required?: boolean;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const id = useId();
+
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      <input
+        ref={inputRef}
+        id={id}
+        type="file"
+        accept={accept}
+        required={required}
+        className="sr-only"
+        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+      />
+      <Button type="button" variant="secondary" onClick={() => inputRef.current?.click()}>
+        Choose CSV file
+      </Button>
+      <span className={clsx("truncate text-sm", value ? "text-ink" : "text-muted")}>
+        {value ? value.name : "No file chosen"}
+      </span>
+    </div>
   );
 }
 
