@@ -80,10 +80,14 @@ sample data) — not mockups.
 | ![Employee front page](docs/screenshots/employee-front-page.png) | ![Assignments](docs/screenshots/assignments.png) |
 
 <details>
-<summary>More screenshots (attendance, knowledge base, data hub, sign in)</summary>
+<summary>More screenshots (Sales CRM, Settings, attendance, knowledge base, data hub, sign in)</summary>
 
 | | |
 |---|---|
+| **Leads** — qualification pipeline, CSV import, territory/capacity assignment rules | **Pipeline** — Kanban board across the default 6-stage pipeline |
+| ![Leads](docs/screenshots/leads.png) | ![Pipeline](docs/screenshots/pipeline.png) |
+| **Sales dashboard** — pipeline value, lead funnel, forecast by category and by rep | **Settings** — S3 backup connection, schedule, and history (Master Owner) |
+| ![Sales dashboard](docs/screenshots/sales-dashboard.png) | ![Settings](docs/screenshots/settings.png) |
 | ![Attendance](docs/screenshots/attendance.png) | ![Knowledge base](docs/screenshots/knowledge.png) |
 | ![Data Hub](docs/screenshots/data-hub.png) | ![Sign in](docs/screenshots/login.png) |
 

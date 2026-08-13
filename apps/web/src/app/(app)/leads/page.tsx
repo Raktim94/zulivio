@@ -201,7 +201,7 @@ export default function LeadsPage() {
             <code className="rounded bg-canvas px-1">company</code>, <code className="rounded bg-canvas px-1">source</code>.
           </p>
           <div className="flex flex-col items-start gap-3">
-            <FileInput value={importFile} onChange={setImportFile} accept=".csv,text/csv" />
+            <FileInput value={importFile} onChange={setImportFile} accept=".csv,text/csv" label="Choose CSV file" />
             <Button
               variant="secondary"
               disabled={!importFile || importCsv.isPending}

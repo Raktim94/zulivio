@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
-import { Badge, Button, Card, ErrorState, Input, Spinner } from "@/components/ui";
+import { Badge, Button, Card, ErrorState, FileInput, Input, Spinner } from "@/components/ui";
 import { TipsFeed, TrainingFeed } from "@/components/tips-and-training";
 import { useCurrentEmployee, isManagerOrAbove } from "@/lib/use-current-employee";
 
@@ -89,13 +89,7 @@ export default function KnowledgePage() {
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
-            <input
-              type="file"
-              accept="application/pdf"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="text-sm"
-              required
-            />
+            <FileInput value={file} onChange={setFile} accept="application/pdf" label="Choose PDF file" required />
             <div className="md:col-span-3">
               <Button type="submit" disabled={upload.isPending}>
                 {upload.isPending ? "Uploading..." : "Upload PDF"}

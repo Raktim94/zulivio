@@ -70,11 +70,13 @@ export function FileInput({
   onChange,
   accept,
   required,
+  label = "Choose file",
 }: {
   value: File | null;
   onChange: (file: File | null) => void;
   accept?: string;
   required?: boolean;
+  label?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const id = useId();
@@ -91,7 +93,7 @@ export function FileInput({
         onChange={(e) => onChange(e.target.files?.[0] ?? null)}
       />
       <Button type="button" variant="secondary" onClick={() => inputRef.current?.click()}>
-        Choose CSV file
+        {label}
       </Button>
       <span className={clsx("truncate text-sm", value ? "text-ink" : "text-muted")}>
         {value ? value.name : "No file chosen"}

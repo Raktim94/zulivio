@@ -132,7 +132,7 @@ function CsvImportCard({
         }}
         className="flex flex-col items-start gap-3"
       >
-        <FileInput value={file} onChange={setFile} accept=".csv,text/csv" required />
+        <FileInput value={file} onChange={setFile} accept=".csv,text/csv" label="Choose CSV file" required />
         <Button type="submit" disabled={!file || importCsv.isPending}>
           {importCsv.isPending ? "Importing..." : "Import"}
         </Button>
