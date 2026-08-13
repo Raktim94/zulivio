@@ -23,7 +23,7 @@ services:
       - zulivio
 
   backend:
-    image: ghcr.io/raktim94/zulivio-backend:1.0.0
+    image: ghcr.io/raktim94/zulivio-backend:1.1.0
     container_name: zulivio-backend
     hostname: zulivio-backend
     restart: unless-stopped
@@ -37,6 +37,7 @@ services:
       PORT: "4100"
       NODE_ENV: "production"
       CORS_ORIGIN: "http://localhost:3100"
+      COOKIE_SECURE: "false"
       UPLOADS_DIR: "/data/uploads"
       BOOTSTRAP_DISABLED: "false"
       GOOGLE_SHEETS_CLIENT_EMAIL: ""
@@ -61,6 +62,9 @@ services:
         - container: BOOTSTRAP_DISABLED
           description:
             en_US: Set to true after you've created your organization, to close self-service signup on this instance.
+        - container: COOKIE_SECURE
+          description:
+            en_US: Leave false for plain-HTTP LAN access (the default and normal case for CasaOS). Only set true if you've put this instance behind your own HTTPS reverse proxy — otherwise login will silently fail.
         - container: GOOGLE_SHEETS_CLIENT_EMAIL
           description:
             en_US: Optional — a Google service account email, to enable live Google Sheets import/export. Leave blank to keep this feature disabled.
@@ -73,7 +77,7 @@ services:
             en_US: Uploaded knowledge-base PDFs — back this up.
 
   web:
-    image: ghcr.io/raktim94/zulivio-web:1.0.0
+    image: ghcr.io/raktim94/zulivio-web:1.1.0
     container_name: zulivio-web
     hostname: zulivio-web
     restart: unless-stopped
@@ -145,13 +149,19 @@ x-casaos:
   index: /
   scheme: http
   port_map: "3100"
-  version: "1.0.0"
-  update_at: "2026-08-12"
+  version: "1.1.0"
+  update_at: "2026-08-13"
   release_notes:
     en_US: |-
-      Initial CasaOS/ZimaOS release: employee lifecycle, role-based access
-      control, work assignments, attendance tracking, knowledge base and
-      tips, master dashboard, and CSV/Google Sheets import-export.
+      1.1.0: fixes login on plain-HTTP CasaOS/ZimaOS installs (the session
+      cookie was marked Secure and silently dropped by the browser — see
+      COOKIE_SECURE below). Adds opportunities CSV import/export, territory
+      and capacity-based assignment routing modes, and rep-level forecast
+      breakdown on the sales dashboard.
+
+      1.0.0: employee lifecycle, role-based access control, work
+      assignments, attendance tracking, knowledge base and tips, master
+      dashboard, and CSV/Google Sheets import-export.
   website: "https://zulivio.nodedr.com/"
   repo: "https://github.com/Raktim94/zulivio"
   support: "https://zulivio.nodedr.com/contact"

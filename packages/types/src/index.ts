@@ -127,6 +127,7 @@ export interface LeadSummary {
   source: string | null;
   status: LeadStatus;
   notes: string | null;
+  territory: string | null;
   ownerId: string | null;
   owner: { id: string; fullName: string; employeeNumber: string } | null;
   respondBySlaAt: string | null;
@@ -172,12 +173,17 @@ export interface OpportunitySummary {
   createdAt: string;
 }
 
+export type AssignmentRuleMode = "ROUND_ROBIN" | "TERRITORY" | "CAPACITY";
+
 export interface AssignmentRuleSummary {
   id: string;
   name: string;
   isActive: boolean;
+  mode: AssignmentRuleMode;
   slaMinutes: number;
   memberIds: string[];
+  territoryMap: Record<string, string> | null;
+  maxOpenLeads: number | null;
 }
 
 export interface SalesDashboardData {
@@ -185,7 +191,14 @@ export interface SalesDashboardData {
   pipelineValue: { totalMinor: number; weightedForecastMinor: number };
   stageBreakdown: { stageId: string; stageName: string; count: number; valueMinor: number }[];
   forecastByCategory: Record<string, number>;
-  byOwner: { ownerId: string; ownerName: string; valueMinor: number; count: number }[];
+  byOwner: {
+    ownerId: string;
+    ownerName: string;
+    valueMinor: number;
+    weightedForecastMinor: number;
+    count: number;
+    forecastByCategory: Record<string, number>;
+  }[];
   leadFunnel: Record<string, number>;
   overdueLeads: number;
   winLoss: { won: number; lost: number };

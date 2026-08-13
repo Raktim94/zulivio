@@ -14,7 +14,16 @@ import { AuthGuard, SESSION_COOKIE } from "../common/guards/auth.guard";
 import { CurrentEmployee } from "../common/decorators/current-employee.decorator";
 import type { AuthenticatedEmployee } from "../common/guards/auth.guard";
 
-const isProd = process.env.NODE_ENV === "production";
+// Independent from NODE_ENV: this app is self-hosted (CasaOS/ZimaOS,
+// docker compose on a home LAN) and its x-casaos manifest declares
+// scheme: http. NODE_ENV is "production" in every real deployment, but
+// most of those are plain HTTP — a cookie with `secure: true` is
+// silently dropped by the browser on a non-HTTPS origin, which broke
+// login entirely (the POST succeeds and returns 200, but no session
+// cookie is ever stored, so every subsequent request looks logged out).
+// Opt in explicitly via COOKIE_SECURE=true only when running behind a
+// real HTTPS reverse proxy.
+const cookieSecure = process.env.COOKIE_SECURE === "true";
 
 @Controller("api/v1/auth")
 export class AuthController {
@@ -33,7 +42,7 @@ export class AuthController {
 
     res.cookie(SESSION_COOKIE, result.rawToken, {
       httpOnly: true,
-      secure: isProd,
+      secure: cookieSecure,
       sameSite: "lax",
       maxAge: result.expiresInMs,
       path: "/",

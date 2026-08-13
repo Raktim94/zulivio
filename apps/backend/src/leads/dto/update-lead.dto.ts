@@ -23,6 +23,10 @@ export class UpdateLeadDto {
   notes?: string;
 
   @IsOptional()
+  @IsString()
+  territory?: string;
+
+  @IsOptional()
   @IsEnum(LeadStatus)
   status?: LeadStatus;
 

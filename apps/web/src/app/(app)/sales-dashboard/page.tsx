@@ -101,23 +101,43 @@ export default function SalesDashboardPage() {
           )}
         </Card>
 
-        <Card>
-          <h2 className="mb-4 text-sm font-medium text-ink">Pipeline value by rep</h2>
+        <Card className="lg:col-span-2">
+          <h2 className="mb-4 text-sm font-medium text-ink">Forecast by rep</h2>
           {data.byOwner.length === 0 ? (
             <p className="text-sm text-muted">No opportunities assigned yet.</p>
           ) : (
-            <ul className="flex flex-col gap-2">
-              {data.byOwner
-                .sort((a, b) => b.valueMinor - a.valueMinor)
-                .map((row) => (
-                  <li key={row.ownerId} className="flex items-center justify-between text-sm">
-                    <span>
-                      {row.ownerName} <span className="text-muted">({row.count})</span>
-                    </span>
-                    <span className="font-medium text-ink">{formatAmount(row.valueMinor)}</span>
-                  </li>
-                ))}
-            </ul>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border text-left text-xs text-muted">
+                    <th className="pb-2 font-medium">Rep</th>
+                    <th className="pb-2 font-medium">Open deals</th>
+                    <th className="pb-2 font-medium">Pipeline value</th>
+                    <th className="pb-2 font-medium">Weighted forecast</th>
+                    <th className="pb-2 font-medium">By category</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.byOwner
+                    .sort((a, b) => b.weightedForecastMinor - a.weightedForecastMinor)
+                    .map((row) => (
+                      <tr key={row.ownerId} className="border-b border-border last:border-0">
+                        <td className="py-2 text-ink">{row.ownerName}</td>
+                        <td className="py-2 text-muted">{row.count}</td>
+                        <td className="py-2 text-ink">{formatAmount(row.valueMinor)}</td>
+                        <td className="py-2 font-medium text-emerald-dark">
+                          {formatAmount(row.weightedForecastMinor)}
+                        </td>
+                        <td className="py-2 text-xs text-muted">
+                          {Object.entries(row.forecastByCategory)
+                            .map(([category, minor]) => `${category.replace("_", " ")}: ${formatAmount(minor)}`)
+                            .join(" · ")}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
       </div>

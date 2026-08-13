@@ -303,6 +303,7 @@ model Lead {
   createdById    String
   createdBy      Employee     @relation("LeadCreatedBy", fields: [createdById], references: [id])
   notes          String?
+  territory      String?
   respondBySlaAt DateTime?
   firstRespondedAt DateTime?
   convertedOpportunityId String?  @unique
@@ -427,17 +428,31 @@ model ForecastAdjustment {
   @@map("forecast_adjustments")
 }
 
+enum AssignmentRuleMode {
+  ROUND_ROBIN
+  TERRITORY
+  CAPACITY
+}
+
 model AssignmentRule {
-  id             String       @id @default(uuid())
+  id             String             @id @default(uuid())
   organizationId String
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization       @relation(fields: [organizationId], references: [id])
   name           String
-  isActive       Boolean      @default(true)
-  slaMinutes     Int          @default(60)
+  isActive       Boolean            @default(true)
+  mode           AssignmentRuleMode @default(ROUND_ROBIN)
+  slaMinutes     Int                @default(60)
   memberIds      String[]
-  cursor         Int          @default(0)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  cursor         Int                @default(0)
+  // TERRITORY mode only: lowercased territory name -> employeeId, e.g.
+  // { "north": "<employeeId>", "south": "<employeeId>" }. Leads whose
+  // territory has no entry here fall back to round robin across memberIds.
+  territoryMap   Json?
+  // CAPACITY mode only: max open (NEW/CONTACTED/QUALIFIED) leads a member
+  // may hold before they're skipped. Null means unlimited.
+  maxOpenLeads   Int?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
 
   @@index([organizationId, isActive])
   @@map("assignment_rules")

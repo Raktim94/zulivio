@@ -11,15 +11,17 @@ import {
 } from "class-validator";
 import { AssignmentRuleMode } from "@prisma/client";
 
-export class CreateAssignmentRuleDto {
+export class UpdateAssignmentRuleDto {
+  @IsOptional()
   @IsString()
   @MinLength(1)
-  name!: string;
+  name?: string;
 
+  @IsOptional()
   @IsArray()
   @ArrayMinSize(1)
   @IsString({ each: true })
-  memberIds!: string[];
+  memberIds?: string[];
 
   @IsOptional()
   @IsInt()
@@ -30,12 +32,10 @@ export class CreateAssignmentRuleDto {
   @IsEnum(AssignmentRuleMode)
   mode?: AssignmentRuleMode;
 
-  /** TERRITORY mode only: { "<territory, lowercased>": "<employeeId>" }. */
   @IsOptional()
   @IsObject()
   territoryMap?: Record<string, string>;
 
-  /** CAPACITY mode only: max open leads a member may hold. Omit for unlimited. */
   @IsOptional()
   @IsInt()
   @Min(0)

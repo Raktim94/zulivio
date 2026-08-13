@@ -6,6 +6,7 @@ import { AuthenticatedEmployee } from "../common/guards/auth.guard";
 import { EmployeesService } from "../employees/employees.service";
 import { AssignmentsService } from "../assignments/assignments.service";
 import { LeadsService } from "../leads/leads.service";
+import { OpportunitiesService } from "../opportunities/opportunities.service";
 import { GoogleSheetsService } from "./google-sheets.service";
 import { toCsv } from "./csv.util";
 import { GoogleSheetsSyncDto } from "./dto/google-sheets-sync.dto";
@@ -13,7 +14,18 @@ import { GoogleSheetsSyncDto } from "./dto/google-sheets-sync.dto";
 const MANAGER_RANK: Role[] = [Role.MANAGER, Role.SALES_HEAD, Role.COMPANY_ADMIN, Role.MASTER_OWNER];
 const EMPLOYEE_COLUMNS = ["employeeNumber", "fullName", "email", "role", "department", "employmentStatus"];
 const ASSIGNMENT_COLUMNS = ["assignmentNumber", "title", "status", "priority", "owner", "dueAt"];
-const LEAD_COLUMNS = ["fullName", "email", "phone", "company", "source", "status", "owner"];
+const LEAD_COLUMNS = ["fullName", "email", "phone", "company", "source", "territory", "status", "owner"];
+const OPPORTUNITY_COLUMNS = [
+  "title",
+  "company",
+  "amountMinor",
+  "currency",
+  "stage",
+  "status",
+  "forecastCategory",
+  "owner",
+  "expectedCloseDate",
+];
 
 export interface RowError {
   row: number;
@@ -27,6 +39,7 @@ export class ImportExportService {
     private readonly employeesService: EmployeesService,
     private readonly assignmentsService: AssignmentsService,
     private readonly leadsService: LeadsService,
+    private readonly opportunitiesService: OpportunitiesService,
     private readonly googleSheets: GoogleSheetsService,
   ) {}
 
@@ -65,10 +78,83 @@ export class ImportExportService {
       phone: l.phone ?? "",
       company: l.company ?? "",
       source: l.source ?? "",
+      territory: l.territory ?? "",
       status: l.status,
       owner: l.owner?.fullName ?? "",
     }));
     return toCsv(rows, LEAD_COLUMNS);
+  }
+
+  async exportOpportunitiesCsv(actor: AuthenticatedEmployee): Promise<string> {
+    this.requireManager(actor);
+    const opportunities = await this.opportunitiesService.list(actor, {});
+    const rows = opportunities.map((o) => ({
+      title: o.title,
+      company: o.company ?? "",
+      amountMinor: o.amountMinor,
+      currency: o.currency,
+      stage: o.stage?.name ?? "",
+      status: o.status,
+      forecastCategory: o.forecastCategory,
+      owner: o.owner?.fullName ?? "",
+      expectedCloseDate: o.expectedCloseDate ? o.expectedCloseDate.toISOString() : "",
+    }));
+    return toCsv(rows, OPPORTUNITY_COLUMNS);
+  }
+
+  /**
+   * Header-mapped CSV import for opportunities: title/name, company,
+   * amountMinor (or amount, in major currency units), expectedCloseDate.
+   * Always lands in the org's default pipeline's first stage, same as a
+   * manually created opportunity with no pipelineId/stageId given.
+   */
+  async importOpportunitiesCsv(actor: AuthenticatedEmployee, fileContent: string) {
+    this.requireManager(actor);
+
+    let records: Record<string, string>[];
+    try {
+      records = parse(fileContent, { columns: true, skip_empty_lines: true, trim: true });
+    } catch (err) {
+      throw new BadRequestException(`Malformed CSV: ${(err as Error).message}`);
+    }
+
+    const created: unknown[] = [];
+    const errors: RowError[] = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const raw = records[i];
+      const title = raw.title || raw.name;
+
+      if (!title) {
+        errors.push({ row: i + 2, message: "Missing required field: title/name" });
+        continue;
+      }
+
+      let amountMinor: number | undefined;
+      if (raw.amountMinor || raw.amount_minor) {
+        amountMinor = parseInt(raw.amountMinor || raw.amount_minor, 10);
+      } else if (raw.amount) {
+        amountMinor = Math.round(parseFloat(raw.amount) * 100);
+      }
+      if (amountMinor !== undefined && Number.isNaN(amountMinor)) {
+        errors.push({ row: i + 2, message: `Invalid amount "${raw.amount ?? raw.amountMinor}"` });
+        continue;
+      }
+
+      try {
+        const opportunity = await this.opportunitiesService.create(actor, {
+          title,
+          company: raw.company || undefined,
+          amountMinor,
+          expectedCloseDate: raw.expectedCloseDate || raw.expected_close_date || undefined,
+        });
+        created.push(opportunity);
+      } catch (err) {
+        errors.push({ row: i + 2, message: (err as Error).message });
+      }
+    }
+
+    return { createdCount: created.length, errorCount: errors.length, created, errors };
   }
 
   /** Header-mapped CSV import for leads: full_name/name, email, phone, company, source. */
@@ -101,6 +187,7 @@ export class ImportExportService {
           phone: raw.phone || undefined,
           company: raw.company || undefined,
           source: raw.source || "CSV import",
+          territory: raw.territory || undefined,
         });
         created.push(lead);
       } catch (err) {

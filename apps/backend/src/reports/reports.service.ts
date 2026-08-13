@@ -171,17 +171,32 @@ export class ReportsService {
       forecastByCategory[o.forecastCategory] = (forecastByCategory[o.forecastCategory] ?? 0) + o.amountMinor;
     }
 
-    const byOwnerMap = new Map<string, { ownerId: string; ownerName: string; valueMinor: number; count: number }>();
+    const byOwnerMap = new Map<
+      string,
+      {
+        ownerId: string;
+        ownerName: string;
+        valueMinor: number;
+        weightedForecastMinor: number;
+        count: number;
+        forecastByCategory: Record<string, number>;
+      }
+    >();
     for (const o of openOpportunities) {
       if (!o.owner) continue;
       const existing = byOwnerMap.get(o.owner.id) ?? {
         ownerId: o.owner.id,
         ownerName: o.owner.fullName,
         valueMinor: 0,
+        weightedForecastMinor: 0,
         count: 0,
+        forecastByCategory: {},
       };
       existing.valueMinor += o.amountMinor;
+      existing.weightedForecastMinor += Math.round((o.amountMinor * o.stage.probability) / 100);
       existing.count += 1;
+      existing.forecastByCategory[o.forecastCategory] =
+        (existing.forecastByCategory[o.forecastCategory] ?? 0) + o.amountMinor;
       byOwnerMap.set(o.owner.id, existing);
     }
 

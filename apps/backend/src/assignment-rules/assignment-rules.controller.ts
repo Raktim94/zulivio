@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
 import { AssignmentRulesService } from "./assignment-rules.service";
 import { CreateAssignmentRuleDto } from "./dto/create-assignment-rule.dto";
+import { UpdateAssignmentRuleDto } from "./dto/update-assignment-rule.dto";
 import { SetActiveDto } from "./dto/set-active.dto";
 import { AuthGuard } from "../common/guards/auth.guard";
 import { CurrentEmployee } from "../common/decorators/current-employee.decorator";
@@ -28,5 +29,14 @@ export class AssignmentRulesController {
     @Body() dto: SetActiveDto,
   ) {
     return this.assignmentRulesService.setActive(actor, id, dto.isActive);
+  }
+
+  @Patch(":id")
+  async update(
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+    @Param("id") id: string,
+    @Body() dto: UpdateAssignmentRuleDto,
+  ) {
+    return this.assignmentRulesService.update(actor, id, dto);
   }
 }

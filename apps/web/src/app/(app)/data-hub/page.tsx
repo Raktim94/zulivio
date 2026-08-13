@@ -22,14 +22,15 @@ export default function DataHubPage() {
       <div>
         <h1 className="text-xl font-semibold text-ink">Data Hub</h1>
         <p className="text-sm text-muted">
-          CSV and Google Sheets import/export for employees, assignments, and leads. Lead-specific import lives on
-          the <a href="/leads" className="text-emerald underline">Leads</a> page, next to lead management.
+          CSV and Google Sheets import/export for employees, assignments, leads, and opportunities. Lead-specific
+          import lives on the <a href="/leads" className="text-emerald underline">Leads</a> page, next to lead
+          management.
         </p>
       </div>
 
       <Card>
         <h2 className="mb-4 text-sm font-medium text-ink">CSV export</h2>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <a href="/api/v1/exports/employees.csv">
             <Button variant="secondary">Export employees.csv</Button>
           </a>
@@ -39,10 +40,38 @@ export default function DataHubPage() {
           <a href="/api/v1/exports/leads.csv">
             <Button variant="secondary">Export leads.csv</Button>
           </a>
+          <a href="/api/v1/exports/opportunities.csv">
+            <Button variant="secondary">Export opportunities.csv</Button>
+          </a>
         </div>
       </Card>
 
-      <CsvImportCard />
+      <CsvImportCard
+        title="Import employees from CSV"
+        endpoint="/api/v1/imports/employees/csv"
+        hint={
+          <>
+            Header row must include <code className="rounded bg-canvas px-1">full_name</code>,{" "}
+            <code className="rounded bg-canvas px-1">email</code>, and optionally{" "}
+            <code className="rounded bg-canvas px-1">role</code>, <code className="rounded bg-canvas px-1">department</code>.
+          </>
+        }
+      />
+
+      <CsvImportCard
+        title="Import opportunities from CSV"
+        endpoint="/api/v1/imports/opportunities/csv"
+        hint={
+          <>
+            Header row must include <code className="rounded bg-canvas px-1">title</code>, and optionally{" "}
+            <code className="rounded bg-canvas px-1">company</code>,{" "}
+            <code className="rounded bg-canvas px-1">amount</code> (major currency units, e.g. 1500.00) or{" "}
+            <code className="rounded bg-canvas px-1">amountMinor</code>,{" "}
+            <code className="rounded bg-canvas px-1">expectedCloseDate</code>. Lands in the default pipeline&apos;s
+            first stage.
+          </>
+        }
+      />
 
       <Card>
         <div className="mb-4 flex items-center justify-between">
@@ -66,7 +95,15 @@ export default function DataHubPage() {
   );
 }
 
-function CsvImportCard() {
+function CsvImportCard({
+  title,
+  endpoint,
+  hint,
+}: {
+  title: string;
+  endpoint: string;
+  hint: React.ReactNode;
+}) {
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +111,7 @@ function CsvImportCard() {
   const importCsv = useMutation({
     mutationFn: () => {
       if (!file) throw new Error("Choose a CSV file first");
-      return api.upload<ImportResult>("/api/v1/imports/employees/csv", file);
+      return api.upload<ImportResult>(endpoint, file);
     },
     onSuccess: setResult,
     onError: (err) => setError(err instanceof ApiError ? err.message : "Import failed"),
@@ -82,12 +119,8 @@ function CsvImportCard() {
 
   return (
     <Card>
-      <h2 className="mb-4 text-sm font-medium text-ink">Import employees from CSV</h2>
-      <p className="mb-3 text-xs text-muted">
-        Header row must include <code className="rounded bg-canvas px-1">full_name</code>,{" "}
-        <code className="rounded bg-canvas px-1">email</code>, and optionally{" "}
-        <code className="rounded bg-canvas px-1">role</code>, <code className="rounded bg-canvas px-1">department</code>.
-      </p>
+      <h2 className="mb-4 text-sm font-medium text-ink">{title}</h2>
+      <p className="mb-3 text-xs text-muted">{hint}</p>
       {error && <div className="mb-3"><ErrorState message={error} /></div>}
       <form
         onSubmit={(e) => {

@@ -25,6 +25,11 @@ export class CreateLeadDto {
   @IsString()
   notes?: string;
 
+  /** Free-text territory tag (e.g. region/state) used by TERRITORY-mode assignment rules. */
+  @IsOptional()
+  @IsString()
+  territory?: string;
+
   @IsOptional()
   @IsString()
   ownerId?: string;

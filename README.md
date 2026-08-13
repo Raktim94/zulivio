@@ -226,18 +226,27 @@ by hiding a button in the UI.
   lifecycle, role/person-targeted training assignments with per-version
   acknowledgement tracking, and a "today's tips" feed on the employee
   front page.
-- **Data Hub** — CSV export (employees, assignments, leads) with
-  spreadsheet formula-injection protection; CSV import with row-level
+- **Data Hub** — CSV export (employees, assignments, leads, opportunities)
+  with spreadsheet formula-injection protection; CSV import with row-level
   error reporting; a real Google Sheets adapter (see below).
 - **Sales CRM** — leads with a configurable qualification pipeline
-  (`NEW → CONTACTED → QUALIFIED → DISQUALIFIED`), round-robin assignment
-  rules with a per-rule response SLA and an overdue queue, lead-to-
-  opportunity conversion that preserves history, a Kanban pipeline board
-  (default 6-stage pipeline: New/Qualified/Proposal/Negotiation/Won/Lost)
-  with an auditable stage-transition trail, manager-only forecast-category
+  (`NEW → CONTACTED → QUALIFIED → DISQUALIFIED`), lead-to-opportunity
+  conversion that preserves history, a Kanban pipeline board (default
+  6-stage pipeline: New/Qualified/Proposal/Negotiation/Won/Lost) with an
+  auditable stage-transition trail, manager-only forecast-category
   overrides with a full adjustment audit, and a sales dashboard (pipeline
-  value by stage, lead funnel, forecast-by-category, and value-by-rep
-  charts). CSV import/export for leads included.
+  value by stage, lead funnel, forecast-by-category, value/forecast-by-rep,
+  and win/loss charts). CSV import/export for both leads and opportunities.
+  - **Assignment rules** — three routing modes per rule: round robin,
+    territory (a lead's free-text territory maps to a specific rep, falling
+    back to round robin on no match), and capacity (routes to whichever
+    member holds the fewest open leads, skipping anyone at their configured
+    cap). Each rule carries a response SLA and feeds the overdue queue.
+  - **Forecasting** — rep-level (per-owner pipeline value, weighted
+    forecast, and forecast-by-category on the sales dashboard),
+    manager-level (forecast-category overrides with a full audit trail via
+    `forecast_adjustments`), and company-level (org-wide pipeline value and
+    weighted forecast rollup) views.
 
 ## Google Sheets integration
 

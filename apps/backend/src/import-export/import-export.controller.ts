@@ -53,6 +53,23 @@ export class ImportExportController {
     res.send(csv);
   }
 
+  @Get("exports/opportunities.csv")
+  @Header("Content-Type", "text/csv")
+  async exportOpportunities(@CurrentEmployee() actor: AuthenticatedEmployee, @Res() res: Response) {
+    const csv = await this.importExportService.exportOpportunitiesCsv(actor);
+    res.setHeader("Content-Disposition", `attachment; filename="opportunities-${Date.now()}.csv"`);
+    res.send(csv);
+  }
+
+  @Post("imports/opportunities/csv")
+  @UseInterceptors(FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }))
+  async importOpportunities(
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.importExportService.importOpportunitiesCsv(actor, file.buffer.toString("utf-8"));
+  }
+
   @Post("imports/employees/csv")
   @UseInterceptors(FileInterceptor("file", { storage: memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }))
   async importEmployees(

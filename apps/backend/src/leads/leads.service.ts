@@ -45,7 +45,9 @@ export class LeadsService {
     let respondBySlaAt: Date | undefined;
 
     if (!ownerId && dto.autoAssign) {
-      const picked = await this.assignmentRules.assignNext(actor.organizationId);
+      const picked = await this.assignmentRules.assignNext(actor.organizationId, {
+        territory: dto.territory,
+      });
       if (picked) {
         ownerId = picked.employeeId;
         respondBySlaAt = new Date(Date.now() + picked.slaMinutes * 60_000);
@@ -61,6 +63,7 @@ export class LeadsService {
         company: dto.company,
         source: dto.source,
         notes: dto.notes,
+        territory: dto.territory,
         ownerId,
         createdById: actor.id,
         respondBySlaAt,
@@ -136,6 +139,7 @@ export class LeadsService {
         phone: dto.phone,
         company: dto.company,
         notes: dto.notes,
+        territory: dto.territory,
         status: dto.status,
         ownerId: dto.ownerId,
         firstRespondedAt,
