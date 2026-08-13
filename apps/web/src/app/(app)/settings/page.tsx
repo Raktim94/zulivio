@@ -34,6 +34,39 @@ export default function SettingsPage() {
     refetchInterval: 30_000,
   });
 
+  const [showConfigForm, setShowConfigForm] = useState(false);
+  const [configForm, setConfigForm] = useState({
+    endpoint: "",
+    bucket: "",
+    accessKeyId: "",
+    secretAccessKey: "",
+    region: "auto",
+    intervalDays: "3",
+    retainCount: "2",
+  });
+  const [configError, setConfigError] = useState<string | null>(null);
+
+  const saveConfig = useMutation({
+    mutationFn: () =>
+      api.post("/api/v1/backups/config", {
+        ...configForm,
+        intervalDays: Number(configForm.intervalDays),
+        retainCount: Number(configForm.retainCount),
+      }),
+    onSuccess: () => {
+      setConfigError(null);
+      setShowConfigForm(false);
+      setConfigForm((f) => ({ ...f, secretAccessKey: "" }));
+      queryClient.invalidateQueries({ queryKey: ["backups"] });
+    },
+    onError: (err) => setConfigError(err instanceof ApiError ? err.message : "Could not save that connection"),
+  });
+
+  const clearConfig = useMutation({
+    mutationFn: () => api.delete("/api/v1/backups/config"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["backups"] }),
+  });
+
   const [triggerError, setTriggerError] = useState<string | null>(null);
   const triggerBackup = useMutation({
     mutationFn: () => api.post("/api/v1/backups"),
@@ -79,19 +112,128 @@ export default function SettingsPage() {
           <Spinner />
         ) : statusError || !status ? (
           <ErrorState message="Could not load backup status." />
-        ) : !status.configured ? (
-          <p className="text-sm text-muted">
-            Set <code className="rounded bg-canvas px-1">S3_BACKUP_ENDPOINT</code>,{" "}
-            <code className="rounded bg-canvas px-1">S3_BACKUP_BUCKET</code>,{" "}
-            <code className="rounded bg-canvas px-1">S3_BACKUP_ACCESS_KEY_ID</code>, and{" "}
-            <code className="rounded bg-canvas px-1">S3_BACKUP_SECRET_ACCESS_KEY</code> on the backend (in CasaOS,
-            edit these fields from the app&apos;s config screen) to enable automatic backups of the full database
-            and uploaded files to any S3-compatible bucket. Runs every{" "}
-            <code className="rounded bg-canvas px-1">S3_BACKUP_INTERVAL_DAYS</code> (default 3), keeping the last{" "}
-            <code className="rounded bg-canvas px-1">S3_BACKUP_RETAIN_COUNT</code> (default 2) verified backups.
-          </p>
+        ) : !status.configured || showConfigForm ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-muted">
+              Connect any S3-compatible bucket to enable automatic backups of the full database and uploaded
+              files. Runs on its own schedule from here on — no other setup needed once connected.
+            </p>
+            {configError && <ErrorState message={configError} />}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setConfigError(null);
+                saveConfig.mutate();
+              }}
+              className="grid grid-cols-1 gap-3 md:grid-cols-2"
+            >
+              <Input
+                placeholder="Endpoint URL, e.g. https://s3.example.com"
+                value={configForm.endpoint}
+                onChange={(e) => setConfigForm({ ...configForm, endpoint: e.target.value })}
+                required
+              />
+              <Input
+                placeholder="Bucket"
+                value={configForm.bucket}
+                onChange={(e) => setConfigForm({ ...configForm, bucket: e.target.value })}
+                required
+              />
+              <Input
+                placeholder="Access key ID"
+                value={configForm.accessKeyId}
+                onChange={(e) => setConfigForm({ ...configForm, accessKeyId: e.target.value })}
+                required
+              />
+              <Input
+                type="password"
+                placeholder="Secret access key"
+                value={configForm.secretAccessKey}
+                onChange={(e) => setConfigForm({ ...configForm, secretAccessKey: e.target.value })}
+                required
+              />
+              <Input
+                placeholder="Region (optional, default auto)"
+                value={configForm.region}
+                onChange={(e) => setConfigForm({ ...configForm, region: e.target.value })}
+              />
+              <div className="flex gap-3">
+                <Input
+                  type="number"
+                  min="1"
+                  max="30"
+                  placeholder="Backup every N days"
+                  value={configForm.intervalDays}
+                  onChange={(e) => setConfigForm({ ...configForm, intervalDays: e.target.value })}
+                />
+                <Input
+                  type="number"
+                  min="1"
+                  max="10"
+                  placeholder="Keep N backups"
+                  value={configForm.retainCount}
+                  onChange={(e) => setConfigForm({ ...configForm, retainCount: e.target.value })}
+                />
+              </div>
+              <div className="flex gap-3 md:col-span-2">
+                <Button type="submit" disabled={saveConfig.isPending}>
+                  {saveConfig.isPending ? "Testing connection..." : "Connect & save"}
+                </Button>
+                {status.configured && (
+                  <button
+                    type="button"
+                    className="text-xs text-muted underline"
+                    onClick={() => setShowConfigForm(false)}
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
         ) : (
           <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
+              <div>
+                <p className="text-ink">
+                  {status.bucket} <span className="text-muted">at {status.endpoint}</span>
+                </p>
+                <p className="text-xs text-muted">
+                  Key {status.accessKeyIdMasked} ·{" "}
+                  {status.source === "environment" ? "configured via CasaOS/environment" : "configured in Settings"}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="secondary"
+                  className="px-3 py-1.5 text-xs"
+                  onClick={() => {
+                    setConfigForm((f) => ({
+                      ...f,
+                      endpoint: status.endpoint ?? "",
+                      bucket: status.bucket ?? "",
+                      region: status.region ?? "auto",
+                      intervalDays: String(status.intervalDays),
+                      retainCount: String(status.retainCount),
+                    }));
+                    setShowConfigForm(true);
+                  }}
+                >
+                  Change
+                </Button>
+                {status.source === "database" && (
+                  <Button
+                    variant="danger"
+                    className="px-3 py-1.5 text-xs"
+                    disabled={clearConfig.isPending}
+                    onClick={() => clearConfig.mutate()}
+                  >
+                    Disconnect
+                  </Button>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
               <Stat label="Runs every" value={`${status.intervalDays} days`} />
               <Stat label="Keeps" value={`${status.retainCount} backups`} />

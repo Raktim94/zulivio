@@ -1,7 +1,8 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { Role } from "@prisma/client";
 import { BackupService } from "./backup.service";
 import { RestoreBackupDto } from "./dto/restore-backup.dto";
+import { SetBackupConfigDto } from "./dto/set-backup-config.dto";
 import { AuthGuard } from "../common/guards/auth.guard";
 import { RolesGuard } from "../common/guards/roles.guard";
 import { Roles } from "../common/decorators/roles.decorator";
@@ -23,6 +24,16 @@ export class BackupController {
   @Get("status")
   async status() {
     return this.backupService.status();
+  }
+
+  @Post("config")
+  async setConfig(@CurrentEmployee() actor: AuthenticatedEmployee, @Body() dto: SetBackupConfigDto) {
+    return this.backupService.setConfig(actor, dto);
+  }
+
+  @Delete("config")
+  async clearConfig(@CurrentEmployee() actor: AuthenticatedEmployee) {
+    return this.backupService.clearConfig(actor);
   }
 
   @Get()

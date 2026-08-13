@@ -29,6 +29,11 @@ export interface BackupRecord {
 
 export interface BackupStatusData {
   configured: boolean;
+  source: "database" | "environment" | null;
+  endpoint: string | null;
+  bucket: string | null;
+  region: string | null;
+  accessKeyIdMasked: string | null;
   intervalDays: number;
   retainCount: number;
   lastBackup: BackupRecord | null;

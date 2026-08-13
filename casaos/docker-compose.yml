@@ -23,7 +23,7 @@ services:
       - zulivio
 
   backend:
-    image: ghcr.io/raktim94/zulivio-backend:1.2.0
+    image: ghcr.io/raktim94/zulivio-backend:1.3.0
     container_name: zulivio-backend
     hostname: zulivio-backend
     restart: unless-stopped
@@ -102,7 +102,7 @@ services:
             en_US: Uploaded knowledge-base PDFs — back this up.
 
   web:
-    image: ghcr.io/raktim94/zulivio-web:1.2.0
+    image: ghcr.io/raktim94/zulivio-web:1.3.0
     container_name: zulivio-web
     hostname: zulivio-web
     restart: unless-stopped
@@ -172,21 +172,28 @@ x-casaos:
         organization and its first Master Owner account — no manual
         configuration or demo data needed.
 
-        To enable automatic backups, fill in the S3_BACKUP_* fields above
-        (any S3-compatible bucket) — the Master Owner can then see backup
-        status and history under Settings > Backups in the app.
+        To enable automatic backups, the Master Owner can connect any
+        S3-compatible bucket directly from Settings in the app (tested
+        live before it's saved — no restart needed). The S3_BACKUP_*
+        fields above are an alternative for setting it from here instead,
+        if you'd rather not enter the key in the app itself.
   index: /
   scheme: http
   port_map: "2996"
-  version: "1.2.0"
+  version: "1.3.0"
   update_at: "2026-08-13"
   release_notes:
     en_US: |-
-      1.2.0: adds automatic S3 backups of the database and uploaded files
-      (Settings, Master Owner only — see the S3_BACKUP_* fields above),
-      with verified rolling retention and a one-click destructive restore.
-      Moves the default web port from 3100 to 2996 to reduce collisions
-      with other apps.
+      1.3.0: backups can now be connected entirely from Settings (Master
+      Owner only) — endpoint, bucket, and access key are entered there,
+      tested live before saving, and stored in the app itself. No CasaOS/
+      env-var editing required, though the S3_BACKUP_* fields above still
+      work as an alternative.
+
+      1.2.0: adds automatic S3 backups of the database and uploaded files,
+      configured via the S3_BACKUP_* fields above, with verified rolling
+      retention and a one-click destructive restore. Moves the default
+      web port from 3100 to 2996 to reduce collisions with other apps.
 
       1.1.0: fixes login on plain-HTTP CasaOS/ZimaOS installs (the session
       cookie was marked Secure and silently dropped by the browser — see

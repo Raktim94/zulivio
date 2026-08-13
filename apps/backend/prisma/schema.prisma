@@ -307,6 +307,27 @@ model BackupRecord {
   @@map("backup_records")
 }
 
+// Singleton row (id is always the literal "singleton") holding S3 backup
+// credentials entered from Settings, so the app is self-contained without
+// needing env vars or CasaOS's config UI. Instance-wide, like BackupRecord.
+// Plaintext at rest, same trust boundary as DATABASE_URL/POSTGRES_PASSWORD
+// already sitting in this app's env — never returned by the API after
+// being set (masked in reads), and settable only by the Master Owner.
+model BackupConfig {
+  id              String   @id @default("singleton")
+  endpoint        String
+  bucket          String
+  accessKeyId     String
+  secretAccessKey String
+  region          String   @default("auto")
+  intervalDays    Int      @default(3)
+  retainCount     Int      @default(2)
+  updatedById     String
+  updatedAt       DateTime @updatedAt
+
+  @@map("backup_config")
+}
+
 enum LeadStatus {
   NEW
   CONTACTED

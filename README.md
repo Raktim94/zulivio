@@ -250,14 +250,17 @@ by hiding a button in the UI.
 - **Automated S3 backups** (Settings, Master Owner only) — a full
   instance backup (Postgres via `pg_dump --format=custom`, plus the
   uploads volume) to any S3-compatible bucket, on a rolling schedule
-  (`S3_BACKUP_INTERVAL_DAYS`, default 3): back up, download-and-verify the
-  upload, then delete the oldest backup past `S3_BACKUP_RETAIN_COUNT`
-  (default 2) — so a verified backup always exists in the bucket, never a
-  window with zero. One-click restore (`pg_restore --clean --if-exists`
-  plus replacing the uploads volume) is gated behind a typed `RESTORE`
-  confirmation, since it overwrites the entire database. Disabled until
-  `S3_BACKUP_ENDPOINT`/`S3_BACKUP_BUCKET`/`S3_BACKUP_ACCESS_KEY_ID`/
-  `S3_BACKUP_SECRET_ACCESS_KEY` are set — see Environment variables below.
+  (default every 3 days): back up, download-and-verify the upload, then
+  delete the oldest backup past the retention count (default 2) — so a
+  verified backup always exists in the bucket, never a window with zero.
+  One-click restore (`pg_restore --clean --if-exists` plus replacing the
+  uploads volume) is gated behind a typed `RESTORE` confirmation, since it
+  overwrites the entire database. Connect it entirely from Settings —
+  endpoint, bucket, and access key are entered there, tested live before
+  saving, and stored in the app itself (no CasaOS/env-var editing
+  required). `S3_BACKUP_*` env vars are also still supported as a
+  fallback for headless/CasaOS-config-driven deployments — Settings takes
+  priority when both are present. See Environment variables below.
 
 ## Google Sheets integration
 
