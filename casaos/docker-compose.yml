@@ -23,7 +23,7 @@ services:
       - zulivio
 
   backend:
-    image: ghcr.io/raktim94/zulivio-backend:1.1.0
+    image: ghcr.io/raktim94/zulivio-backend:1.2.0
     container_name: zulivio-backend
     hostname: zulivio-backend
     restart: unless-stopped
@@ -102,7 +102,7 @@ services:
             en_US: Uploaded knowledge-base PDFs — back this up.
 
   web:
-    image: ghcr.io/raktim94/zulivio-web:1.1.0
+    image: ghcr.io/raktim94/zulivio-web:1.2.0
     container_name: zulivio-web
     hostname: zulivio-web
     restart: unless-stopped
@@ -178,10 +178,16 @@ x-casaos:
   index: /
   scheme: http
   port_map: "2996"
-  version: "1.1.0"
+  version: "1.2.0"
   update_at: "2026-08-13"
   release_notes:
     en_US: |-
+      1.2.0: adds automatic S3 backups of the database and uploaded files
+      (Settings, Master Owner only — see the S3_BACKUP_* fields above),
+      with verified rolling retention and a one-click destructive restore.
+      Moves the default web port from 3100 to 2996 to reduce collisions
+      with other apps.
+
       1.1.0: fixes login on plain-HTTP CasaOS/ZimaOS installs (the session
       cookie was marked Secure and silently dropped by the browser — see
       COOKIE_SECURE below). Adds opportunities CSV import/export, territory
