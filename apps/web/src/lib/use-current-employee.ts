@@ -24,3 +24,7 @@ export function isManagerOrAbove(role: CurrentEmployee["role"] | undefined): boo
   if (!role) return false;
   return RANK[role] >= RANK.MANAGER;
 }
+
+export function isMasterOwner(role: CurrentEmployee["role"] | undefined): boolean {
+  return role === "MASTER_OWNER";
+}

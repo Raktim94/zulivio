@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { useCurrentEmployee, isManagerOrAbove } from "@/lib/use-current-employee";
+import { useCurrentEmployee, isManagerOrAbove, isMasterOwner } from "@/lib/use-current-employee";
 import { Spinner } from "@/components/ui";
 import { Logo } from "@/components/logo";
 import { MadeBy } from "@/components/made-by";
@@ -19,6 +19,7 @@ const NAV = [
   { href: "/knowledge", label: "Knowledge & Tips" },
   { href: "/sales-dashboard", label: "Sales Dashboard", managerOnly: true },
   { href: "/data-hub", label: "Data Hub", managerOnly: true },
+  { href: "/settings", label: "Settings", masterOwnerOnly: true },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -41,7 +42,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!employee) return null;
 
   const isManager = isManagerOrAbove(employee.role);
-  const visibleNav = NAV.filter((item) => !item.managerOnly || isManager);
+  const isOwner = isMasterOwner(employee.role);
+  const visibleNav = NAV.filter(
+    (item) => (!item.managerOnly || isManager) && (!item.masterOwnerOnly || isOwner),
+  );
   const pageTitle = visibleNav.find((item) => item.href === pathname)?.label ?? "Zulivio";
 
   return (

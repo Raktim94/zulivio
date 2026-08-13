@@ -280,6 +280,33 @@ model AuditEvent {
   @@map("audit_events")
 }
 
+enum BackupStatus {
+  PENDING
+  UPLOADING
+  VERIFIED
+  FAILED
+}
+
+// Instance-wide, not organization-scoped: a backup is a full pg_dump of
+// the whole database (every org sharing this instance) plus the uploads
+// volume, so it has no single organizationId to attach to.
+model BackupRecord {
+  id          String       @id @default(uuid())
+  status      BackupStatus @default(PENDING)
+  dbKey       String?
+  uploadsKey  String?
+  sizeBytes   Int?
+  sha256      String?
+  // "schedule" for the automatic 3-day job, or the triggering employee's id.
+  triggeredBy String
+  startedAt   DateTime     @default(now())
+  completedAt DateTime?
+  error       String?
+
+  @@index([status, completedAt])
+  @@map("backup_records")
+}
+
 enum LeadStatus {
   NEW
   CONTACTED

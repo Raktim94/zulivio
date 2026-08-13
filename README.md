@@ -247,6 +247,17 @@ by hiding a button in the UI.
     manager-level (forecast-category overrides with a full audit trail via
     `forecast_adjustments`), and company-level (org-wide pipeline value and
     weighted forecast rollup) views.
+- **Automated S3 backups** (Settings, Master Owner only) — a full
+  instance backup (Postgres via `pg_dump --format=custom`, plus the
+  uploads volume) to any S3-compatible bucket, on a rolling schedule
+  (`S3_BACKUP_INTERVAL_DAYS`, default 3): back up, download-and-verify the
+  upload, then delete the oldest backup past `S3_BACKUP_RETAIN_COUNT`
+  (default 2) — so a verified backup always exists in the bucket, never a
+  window with zero. One-click restore (`pg_restore --clean --if-exists`
+  plus replacing the uploads volume) is gated behind a typed `RESTORE`
+  confirmation, since it overwrites the entire database. Disabled until
+  `S3_BACKUP_ENDPOINT`/`S3_BACKUP_BUCKET`/`S3_BACKUP_ACCESS_KEY_ID`/
+  `S3_BACKUP_SECRET_ACCESS_KEY` are set — see Environment variables below.
 
 ## Google Sheets integration
 
@@ -277,6 +288,8 @@ See `.env.example` for the full list with descriptions. The important ones:
 | `HOST_PORT` | No | Host port for the web app (default `3100`) |
 | `BOOTSTRAP_DISABLED` | No | Set `true` to close self-service org creation |
 | `GOOGLE_SHEETS_CLIENT_EMAIL` / `GOOGLE_SHEETS_PRIVATE_KEY` | No | Enables live Sheets sync |
+| `S3_BACKUP_ENDPOINT` / `S3_BACKUP_BUCKET` / `S3_BACKUP_ACCESS_KEY_ID` / `S3_BACKUP_SECRET_ACCESS_KEY` | No | Enables automatic backups (all four required together) |
+| `S3_BACKUP_INTERVAL_DAYS` / `S3_BACKUP_RETAIN_COUNT` | No | Backup cadence (default `3`) and how many verified backups to keep (default `2`) |
 | `SEED_MASTER_OWNER_PASSWORD` | Only for `pnpm db:seed` | Never baked into the image |
 
 ## Common operations
@@ -401,14 +414,16 @@ much larger specification, not the full spec. Explicitly **not** built yet:
 - No contacts/accounts objects or multiple pipelines per organization —
   leads/opportunities exist on a single default pipeline per org; a
   contact/account layer and custom pipelines are not built yet.
-- No territory- or capacity-based assignment routing — only round-robin
-  is implemented; territory and workload-aware routing are on the roadmap.
+- No product/skill-based assignment routing — round robin, territory, and
+  capacity-based routing are implemented; those two are on the roadmap.
 - No background job queue / Redis / worker service — CSV import and PDF
   upload run synchronously in the request. Fine at small-team scale; a
   large CSV import or PDF library will need this added.
-- No S3-compatible object storage (MinIO) — files live on a local disk
-  volume. Fine for a single-server deployment; not horizontally scalable
-  as-is.
+- Live file storage is local disk under `UPLOADS_DIR`, not an
+  S3-compatible object store — fine for a single-server deployment, not
+  horizontally scalable as-is. (Automatic *backups* of that disk, plus
+  Postgres, to an S3-compatible bucket are supported — see Core features
+  above — but day-to-day serving is still local disk.)
 - No automation/workflow-rule engine, no AI features.
 - No MFA/SSO/OIDC — session + password only.
 - No WhatsApp/telephony/email/calendar adapters.

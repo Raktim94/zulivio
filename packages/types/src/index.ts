@@ -12,6 +12,29 @@ export type AssignmentStatus =
 
 export type AttendanceState = "logged_out" | "working" | "on_break";
 
+export type BackupStatus = "PENDING" | "UPLOADING" | "VERIFIED" | "FAILED";
+
+export interface BackupRecord {
+  id: string;
+  status: BackupStatus;
+  dbKey: string | null;
+  uploadsKey: string | null;
+  sizeBytes: number | null;
+  sha256: string | null;
+  triggeredBy: string;
+  startedAt: string;
+  completedAt: string | null;
+  error: string | null;
+}
+
+export interface BackupStatusData {
+  configured: boolean;
+  intervalDays: number;
+  retainCount: number;
+  lastBackup: BackupRecord | null;
+  nextScheduledAt: string | null;
+}
+
 export interface EmployeeSummary {
   id: string;
   employeeNumber: string;

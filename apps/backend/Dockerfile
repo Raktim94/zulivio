@@ -29,7 +29,10 @@ RUN pnpm --filter backend build
 # symlinks with relative paths back into the root node_modules/.pnpm store,
 # and flattening the tree breaks them silently.
 FROM node:24-alpine AS runtime
-RUN apk add --no-cache openssl
+# postgresql16-client (matching the postgres:16-alpine server used
+# everywhere in this app) provides pg_dump/pg_restore for the backup
+# feature; tar is used to archive the uploads volume alongside the DB dump.
+RUN apk add --no-cache openssl postgresql16-client tar
 RUN addgroup -S nodedr && adduser -S nodedr -G nodedr
 WORKDIR /repo
 ENV NODE_ENV=production

@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
+import { ScheduleModule } from "@nestjs/schedule";
 import { PrismaModule } from "./prisma/prisma.module";
 import { HealthModule } from "./health/health.module";
 import { BootstrapModule } from "./bootstrap/bootstrap.module";
@@ -15,10 +16,12 @@ import { PipelinesModule } from "./pipelines/pipelines.module";
 import { AssignmentRulesModule } from "./assignment-rules/assignment-rules.module";
 import { LeadsModule } from "./leads/leads.module";
 import { OpportunitiesModule } from "./opportunities/opportunities.module";
+import { BackupModule } from "./backup/backup.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     PrismaModule,
     HealthModule,
     BootstrapModule,
@@ -34,6 +37,7 @@ import { OpportunitiesModule } from "./opportunities/opportunities.module";
     AssignmentRulesModule,
     LeadsModule,
     OpportunitiesModule,
+    BackupModule,
   ],
 })
 export class AppModule {}
