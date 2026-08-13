@@ -17,6 +17,7 @@ import { AssignmentRulesModule } from "./assignment-rules/assignment-rules.modul
 import { LeadsModule } from "./leads/leads.module";
 import { OpportunitiesModule } from "./opportunities/opportunities.module";
 import { BackupModule } from "./backup/backup.module";
+import { AuditModule } from "./audit/audit.module";
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { BackupModule } from "./backup/backup.module";
     LeadsModule,
     OpportunitiesModule,
     BackupModule,
+    AuditModule,
   ],
 })
 export class AppModule {}

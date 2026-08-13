@@ -100,16 +100,19 @@ export class EmployeesService {
     };
   }
 
-  /** Scoped listing: managers see their direct reports + self, everyone above sees the whole org. */
+  /**
+   * Scoped listing: an employee sees themselves plus anyone strictly
+   * lower-ranked in the org — never a peer or anyone above, same rank
+   * comparison used by edit/reset-password/remove below, so an account is
+   * never visible to someone who couldn't also act on it.
+   */
   async list(actor: AuthenticatedEmployee) {
-    const managerScoped = actor.role === Role.MANAGER || actor.role === Role.EMPLOYEE;
+    const lowerRanks = HIERARCHY.slice(0, rank(actor.role));
 
     const employees = await this.prisma.employee.findMany({
       where: {
         organizationId: actor.organizationId,
-        ...(managerScoped
-          ? { OR: [{ id: actor.id }, { managerId: actor.id }] }
-          : {}),
+        OR: [{ id: actor.id }, { role: { in: lowerRanks } }],
       },
       select: {
         id: true,

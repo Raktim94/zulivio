@@ -5,6 +5,8 @@ import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer,
 import type { SalesDashboardData } from "@zulivio/types";
 import { api } from "@/lib/api";
 import { Card, ErrorState, Spinner } from "@/components/ui";
+import { isManagerOrAbove } from "@/lib/use-current-employee";
+import { useRequireRole } from "@/lib/use-require-role";
 
 const PIE_COLORS = ["#168b65", "#d99a2b", "#5b5bd6", "#e66e58"];
 
@@ -15,12 +17,16 @@ function formatAmount(minor: number) {
 }
 
 export default function SalesDashboardPage() {
+  const { isLoading: authLoading, authorized } = useRequireRole(isManagerOrAbove);
   const { data, isLoading, error } = useQuery<SalesDashboardData>({
     queryKey: ["reports", "sales-dashboard"],
     queryFn: () => api.get<SalesDashboardData>("/api/v1/reports/sales-dashboard"),
     refetchInterval: 30_000,
+    enabled: authorized,
   });
 
+  if (authLoading) return <Spinner />;
+  if (!authorized) return null; // redirecting
   if (isLoading) return <Spinner />;
   if (error || !data) return <ErrorState message="Could not load the sales dashboard." />;
 

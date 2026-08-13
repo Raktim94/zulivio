@@ -210,6 +210,99 @@ describe("Zulivio (e2e)", () => {
         .send({ email: employeeCreds.email, password: res.body.temporaryPassword })
         .expect(201);
     });
+
+    it("scopes the employee directory to self + strictly-lower ranks, never a peer or above", async () => {
+      // Fully self-contained fixtures — earlier tests in this describe
+      // block mutate the shared managerCreds/employeeCreds roles (one test
+      // promotes employeeCreds to MANAGER), so this builds its own clean
+      // org-chart slice rather than relying on that shared, mutated state.
+      const ownerAgent = request.agent(server());
+      await ownerAgent.post("/api/v1/auth/sessions").send({ email: orgEmail, password: orgPassword }).expect(201);
+
+      const salesHeadEmail = `saleshead-${Date.now()}@e2e.local`;
+      const salesHeadRes = await ownerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Sales Head Person", email: salesHeadEmail, role: "SALES_HEAD" })
+        .expect(201);
+      const salesHeadAgent = request.agent(server());
+      await salesHeadAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email: salesHeadEmail, password: salesHeadRes.body.temporaryPassword })
+        .expect(201);
+
+      const freshManagerEmail = `mgr2-${Date.now()}@e2e.local`;
+      const freshManagerRes = await salesHeadAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Fresh Manager", email: freshManagerEmail, role: "MANAGER" })
+        .expect(201);
+      const freshManagerAgent = request.agent(server());
+      await freshManagerAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email: freshManagerEmail, password: freshManagerRes.body.temporaryPassword })
+        .expect(201);
+
+      const freshEmployeeEmail = `emp2-${Date.now()}@e2e.local`;
+      const freshEmployeeRes = await freshManagerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Fresh Employee", email: freshEmployeeEmail, role: "EMPLOYEE" })
+        .expect(201);
+
+      // Sales head sees the manager and employee below them, never the owner above.
+      const salesHeadList = await salesHeadAgent.get("/api/v1/employees").expect(200);
+      const salesHeadIds = salesHeadList.body.map((e: { id: string }) => e.id);
+      expect(salesHeadIds).toContain(salesHeadRes.body.id); // self
+      expect(salesHeadIds).toContain(freshManagerRes.body.id); // strictly lower
+      expect(salesHeadIds).toContain(freshEmployeeRes.body.id); // strictly lower
+      expect(salesHeadIds).not.toContain(ownerId); // strictly higher — excluded
+
+      // The manager sees the employee below them, never the sales head or owner above.
+      const freshManagerList = await freshManagerAgent.get("/api/v1/employees").expect(200);
+      const freshManagerIds = freshManagerList.body.map((e: { id: string }) => e.id);
+      expect(freshManagerIds).toContain(freshEmployeeRes.body.id); // strictly lower
+      expect(freshManagerIds).not.toContain(salesHeadRes.body.id); // strictly higher — excluded
+      expect(freshManagerIds).not.toContain(ownerId); // strictly higher — excluded
+
+      // A plain employee (lowest rank) sees only themselves.
+      const freshEmployeeAgent = request.agent(server());
+      await freshEmployeeAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email: freshEmployeeEmail, password: freshEmployeeRes.body.temporaryPassword })
+        .expect(201);
+      const freshEmployeeList = await freshEmployeeAgent.get("/api/v1/employees").expect(200);
+      expect(freshEmployeeList.body.map((e: { id: string }) => e.id)).toEqual([freshEmployeeRes.body.id]);
+    });
+  });
+
+  describe("audit log", () => {
+    it("is Master-Owner only, and records employee-management actions", async () => {
+      const ownerAgent = request.agent(server());
+      const ownerLogin = await ownerAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email: orgEmail, password: orgPassword })
+        .expect(201);
+      const auditOwnerId = ownerLogin.body.employee.id;
+
+      const email = `audit-subject-${Date.now()}@e2e.local`;
+      const created = await ownerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Audit Subject", email, role: "EMPLOYEE" })
+        .expect(201);
+
+      const subjectAgent = request.agent(server());
+      await subjectAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email, password: created.body.temporaryPassword })
+        .expect(201);
+      // Below Master Owner rank — must not be able to read the audit log.
+      await subjectAgent.get("/api/v1/audit-events").expect(403);
+
+      const res = await ownerAgent.get("/api/v1/audit-events").expect(200);
+      const createdEvent = res.body.find(
+        (e: { targetId: string; action: string }) => e.targetId === created.body.id && e.action === "employee.created",
+      );
+      expect(createdEvent).toBeDefined();
+      expect(createdEvent.actor.id).toBe(auditOwnerId);
+    });
   });
 
   describe("attendance state machine", () => {

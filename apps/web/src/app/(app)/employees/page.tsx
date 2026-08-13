@@ -6,15 +6,19 @@ import Link from "next/link";
 import type { EmployeeSummary, EmploymentStatus, Role } from "@zulivio/types";
 import { api, ApiError } from "@/lib/api";
 import { Badge, Button, Card, ErrorState, Input, Select, Spinner } from "@/components/ui";
+import { isManagerOrAbove } from "@/lib/use-current-employee";
+import { useRequireRole } from "@/lib/use-require-role";
 
 const ROLES: Role[] = ["EMPLOYEE", "MANAGER", "SALES_HEAD", "COMPANY_ADMIN"];
 const EMPLOYMENT_STATUSES: EmploymentStatus[] = ["ACTIVE", "SUSPENDED", "ON_LEAVE"];
 
 export default function EmployeesPage() {
   const queryClient = useQueryClient();
+  const { employee: currentEmployee, isLoading: authLoading, authorized } = useRequireRole(isManagerOrAbove);
   const { data, isLoading, error } = useQuery<EmployeeSummary[]>({
     queryKey: ["employees"],
     queryFn: () => api.get<EmployeeSummary[]>("/api/v1/employees"),
+    enabled: authorized,
   });
 
   const [form, setForm] = useState({ fullName: "", email: "", role: "EMPLOYEE" as Role, department: "" });
@@ -67,6 +71,9 @@ export default function EmployeesPage() {
     },
     onError: (err) => setRowError(err instanceof ApiError ? err.message : "Could not reset password"),
   });
+
+  if (authLoading) return <Spinner />;
+  if (!authorized) return null; // redirecting
 
   return (
     <div className="flex flex-col gap-6">
@@ -166,8 +173,9 @@ export default function EmployeesPage() {
                 </tr>
               </thead>
               <tbody>
-                {data?.map((emp) =>
-                  editingId === emp.id ? (
+                {data?.map((emp) => {
+                  const isSelf = emp.id === currentEmployee?.id;
+                  return editingId === emp.id ? (
                     <EditRow
                       key={emp.id}
                       employee={emp}
@@ -195,45 +203,49 @@ export default function EmployeesPage() {
                         </Link>
                       </td>
                       <td className="py-2 text-right">
-                        <div className="flex justify-end gap-3">
-                          <button
-                            onClick={() => {
-                              setRowError(null);
-                              setEditingId(emp.id);
-                            }}
-                            className="text-xs text-emerald underline"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (confirm(`Reset ${emp.fullName}'s password? This signs them out immediately.`)) {
-                                setRowError(null);
-                                resetPassword.mutate(emp.id);
-                              }
-                            }}
-                            className="text-xs text-amber underline"
-                          >
-                            Reset password
-                          </button>
-                          {emp.employmentStatus === "ACTIVE" && (
+                        {isSelf ? (
+                          <span className="text-xs text-muted">You</span>
+                        ) : (
+                          <div className="flex justify-end gap-3">
                             <button
                               onClick={() => {
-                                if (confirm(`Remove ${emp.fullName}? This revokes their access.`)) {
+                                setRowError(null);
+                                setEditingId(emp.id);
+                              }}
+                              className="text-xs text-emerald underline"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (confirm(`Reset ${emp.fullName}'s password? This signs them out immediately.`)) {
                                   setRowError(null);
-                                  removeEmployee.mutate(emp.id);
+                                  resetPassword.mutate(emp.id);
                                 }
                               }}
-                              className="text-xs text-coral underline"
+                              className="text-xs text-amber underline"
                             >
-                              Remove
+                              Reset password
                             </button>
-                          )}
-                        </div>
+                            {emp.employmentStatus === "ACTIVE" && (
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Remove ${emp.fullName}? This revokes their access.`)) {
+                                    setRowError(null);
+                                    removeEmployee.mutate(emp.id);
+                                  }
+                                }}
+                                className="text-xs text-coral underline"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </td>
                     </tr>
-                  ),
-                )}
+                  );
+                })}
               </tbody>
             </table>
           </div>

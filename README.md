@@ -407,19 +407,70 @@ today (see [Get Zulivio](#get-zulivio)).
 
 ## Architecture notes
 
+### Languages and frameworks, by layer
+
+| Layer | Language / framework | Why |
+|---|---|---|
+| Backend API | TypeScript on Node.js 24, NestJS 11 | Structured DI + guards/decorators map cleanly onto the role-hierarchy authorization model below; NestJS is the current stable major (see the versioning policy above). |
+| Database access | Prisma 6 ORM, PostgreSQL 16 | Typed queries end-to-end from schema to API response; Postgres for real relational integrity (foreign keys, transactions) across employees/assignments/leads/opportunities. |
+| Frontend | TypeScript, Next.js 15 (App Router), React 19 | Server + client components in one framework; App Router's route groups (`(app)`) gave a clean split between the authenticated shell and `/login`/`/setup`. |
+| Data fetching / cache | TanStack Query | Server state (employees, assignments, leads...) is genuinely server-owned; Query's cache invalidation model fits that better than hand-rolled `useState`/`useEffect` fetching. |
+| Styling | Tailwind CSS v4 | Utility-first, no separate CSS-in-JS runtime, small production bundle. |
+| Monorepo tooling | pnpm workspaces + Turborepo | `packages/types` is imported by both `apps/backend` and `apps/web` with real type-checking across the boundary, not duplicated interfaces. |
+| Auth | Argon2id (password hashing), custom session tokens (not JWT) | Argon2id is the current OWASP-recommended password hash; sessions are opaque server-side tokens specifically so a reset/removal can actually revoke them — a JWT can't be un-issued before it expires. |
+
+### Request flow — how data actually moves
+
+```
+Browser
+  │  HTTP request to the Next.js server (same origin: e.g. http://host:3100)
+  ▼
+Next.js (apps/web) — server-side
+  │  /api/* is a Next.js rewrite (next.config.ts), not a browser-visible
+  │  redirect: the browser only ever talks to this Next.js origin, so the
+  │  session cookie stays first-party (no CORS, no third-party-cookie risk)
+  ▼
+NestJS backend (apps/backend), :4100 internally
+  │  AuthGuard reads the session cookie -> looks up the hashed token in
+  │  `sessions` -> attaches the authenticated employee to the request
+  │  RolesGuard checks @Roles(...) against the role hierarchy
+  │  Service layer re-scopes the query by organizationId + rank (never
+  │  trusts the guard alone — see Authorization below)
+  ▼
+Prisma Client -> PostgreSQL
+  │  Typed query, response shaped by the service, never the raw row
+  ▼
+... response flows back up the same path to the browser
+```
+
+Nothing in this path lets the browser reach the backend directly — there's
+no separate CORS-enabled API origin in production, which is why
+`CORS_ORIGIN`/`COOKIE_SECURE` mostly matter for edge cases (see Environment
+variables) rather than everyday requests.
+
+### Core architectural decisions
+
 - **Multi-tenancy**: every business record carries an immutable
   `organizationId`; every repository query filters by the organization
   taken from the authenticated session, never from client input.
 - **Authorization**: a strict role hierarchy
   (`EMPLOYEE < MANAGER < SALES_HEAD < COMPANY_ADMIN < MASTER_OWNER`)
   enforced by a NestJS guard plus per-service checks (e.g. "an employee can
-  only see their own attendance report").
+  only see their own attendance report", "an employee directory listing
+  only ever includes strictly-lower-ranked accounts — the same rank
+  comparison used to gate edit/reset-password/remove, so an account is
+  never visible to someone who couldn't also act on it"). Manager-only and
+  Master-Owner-only pages (Employees, Sales Dashboard, Data Hub, Settings)
+  are also guarded client-side (redirect on direct URL access, not just a
+  hidden nav link) as defense in depth on top of the server-side checks
+  that are the actual security boundary.
 - **Sessions**: random 256-bit tokens, only the SHA-256 hash stored,
   httpOnly + SameSite=lax cookies, 12h TTL, revoked on logout/password
   change/employee removal.
-- **Audit trail**: `audit_events` table records who did what to what,
-  when — deliberately excludes plaintext temporary passwords and password
-  hashes from metadata.
+- **Audit trail**: `audit_events` table records who did what to what, when
+  — deliberately excludes plaintext temporary passwords and password
+  hashes from metadata. Viewable in-app under Settings > Activity log
+  (Master Owner only).
 - **File storage**: local disk under `UPLOADS_DIR` (a named Docker volume
   in production), not database blobs.
 

@@ -27,6 +27,16 @@ export interface BackupRecord {
   error: string | null;
 }
 
+export interface AuditEventSummary {
+  id: string;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  metadata: unknown;
+  createdAt: string;
+  actor: { id: string; fullName: string; employeeNumber: string } | null;
+}
+
 export interface BackupStatusData {
   configured: boolean;
   source: "database" | "environment" | null;

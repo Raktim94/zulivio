@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
-import { Button, Card, ErrorState, FileInput, Input } from "@/components/ui";
+import { Button, Card, ErrorState, FileInput, Input, Spinner } from "@/components/ui";
+import { isManagerOrAbove } from "@/lib/use-current-employee";
+import { useRequireRole } from "@/lib/use-require-role";
 
 interface ImportResult {
   createdCount: number;
@@ -13,10 +15,15 @@ interface ImportResult {
 }
 
 export default function DataHubPage() {
+  const { isLoading: authLoading, authorized } = useRequireRole(isManagerOrAbove);
   const { data: sheetsStatus } = useQuery<{ configured: boolean }>({
     queryKey: ["integrations", "google-sheets", "status"],
     queryFn: () => api.get("/api/v1/integrations/google-sheets/status"),
+    enabled: authorized,
   });
+
+  if (authLoading) return <Spinner />;
+  if (!authorized) return null; // redirecting
 
   return (
     <div className="flex flex-col gap-6">

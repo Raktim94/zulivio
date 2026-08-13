@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { BackupRecord, BackupStatusData } from "@zulivio/types";
+import type { AuditEventSummary, BackupRecord, BackupStatusData } from "@zulivio/types";
 import { api, ApiError } from "@/lib/api";
 import { Badge, Button, Card, ErrorState, Input, Spinner } from "@/components/ui";
+import { isMasterOwner } from "@/lib/use-current-employee";
+import { useRequireRole } from "@/lib/use-require-role";
 
 const STATUS_TONE: Record<BackupRecord["status"], "neutral" | "success" | "warning" | "danger" | "info"> = {
   PENDING: "info",
@@ -21,17 +23,26 @@ function formatBytes(bytes: number | null): string {
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
+  const { isLoading: authLoading, authorized } = useRequireRole(isMasterOwner);
 
   const { data: status, isLoading: statusLoading, error: statusError } = useQuery<BackupStatusData>({
     queryKey: ["backups", "status"],
     queryFn: () => api.get<BackupStatusData>("/api/v1/backups/status"),
     refetchInterval: 30_000,
+    enabled: authorized,
+  });
+
+  const { data: auditEvents, isLoading: auditLoading, error: auditError } = useQuery<AuditEventSummary[]>({
+    queryKey: ["audit-events"],
+    queryFn: () => api.get<AuditEventSummary[]>("/api/v1/audit-events"),
+    enabled: authorized,
   });
 
   const { data: history } = useQuery<BackupRecord[]>({
     queryKey: ["backups", "list"],
     queryFn: () => api.get<BackupRecord[]>("/api/v1/backups"),
     refetchInterval: 30_000,
+    enabled: authorized,
   });
 
   const [showConfigForm, setShowConfigForm] = useState(false);
@@ -90,6 +101,9 @@ export default function SettingsPage() {
     },
     onError: (err) => setRestoreError(err instanceof ApiError ? err.message : "Restore failed"),
   });
+
+  if (authLoading) return <Spinner />;
+  if (!authorized) return null; // redirecting
 
   return (
     <div className="flex flex-col gap-6">
@@ -326,6 +340,34 @@ export default function SettingsPage() {
               )}
             </div>
           </div>
+        )}
+      </Card>
+
+      <Card>
+        <h2 className="mb-4 text-sm font-medium text-ink">Activity log</h2>
+        <p className="mb-4 text-sm text-muted">
+          Who did what — employee changes, password resets, exports, and more. Master Owner only.
+        </p>
+        {auditLoading ? (
+          <Spinner />
+        ) : auditError || !auditEvents ? (
+          <ErrorState message="Could not load the activity log." />
+        ) : auditEvents.length === 0 ? (
+          <p className="text-sm text-muted">No activity recorded yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {auditEvents.map((e) => (
+              <li key={e.id} className="flex items-center justify-between gap-3 border-t border-border py-2 text-sm first:border-t-0 first:pt-0">
+                <span>
+                  <span className="text-ink">{e.actor?.fullName ?? "System"}</span>{" "}
+                  <span className="text-muted">
+                    {e.action.replace(/_/g, " ").replace(/\./g, " ")} · {e.targetType}
+                  </span>
+                </span>
+                <span className="shrink-0 text-xs text-muted">{new Date(e.createdAt).toLocaleString()}</span>
+              </li>
+            ))}
+          </ul>
         )}
       </Card>
     </div>
