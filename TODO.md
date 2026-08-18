@@ -14,7 +14,7 @@ Full plan: `~/.claude/plans/gleaming-watching-koala.md`. Update checkboxes as wo
 - [x] Fix: rate limit bootstrap + password-change
 - [x] Fix: helmet + CSRF mitigation in `main.ts`
 - [x] Add: cross-tenant isolation e2e tests (7 tests, verified to fail pre-fix)
-- [ ] Open: `Employee.email` global-uniqueness migration (`@@unique([email])`) — app-layer check landed, DB-level fix needs a migration; deferred pending explicit confirmation before Phase 2
+- [x] `Employee.email` global-uniqueness migration (`@@unique([email])`) — applied via migration `20260818095045_employee_email_global_unique` (`prisma migrate deploy`, non-interactive; SQL generated with `prisma migrate diff` since `migrate dev`'s confirmation prompt needs a TTY this session doesn't have). Verified live via `pg_indexes`; 68/68 e2e tests still pass.
 - [ ] Open: `BackupConfig` S3 credentials plaintext-in-DB — accepted risk, not addressed this pass (see report)
 
 ## Phase 1 — Backend RBAC rework

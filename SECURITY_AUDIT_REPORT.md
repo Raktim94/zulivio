@@ -73,10 +73,10 @@ Findings are ordered by severity. Each entry: Location, Impact, Root cause, Fix,
 
 ### 9. Email-uniqueness scoping mismatch
 - **Location:** `bootstrap.service.ts`, `employees.service.ts`, `auth.service.ts`, `prisma/schema.prisma`
-- **Impact:** `Employee.email` is only DB-unique per-organization (`@@unique([organizationId, email])`), but both `login` (`auth.service.ts`) and `bootstrap` resolve an employee by `findFirst({ where: { email } })` with **no** `organizationId` in the lookup — email is a de facto global identifier in practice, but the database doesn't enforce that, and `employees.service.ts::create` (regular in-org employee creation by an admin) didn't check global uniqueness at all before this fix. Two orgs could end up with the same email on two different employees, and login would then resolve unpredictably to whichever row the DB returns first — a real cross-tenant account-confusion bug, not just an inconsistency.
-- **Fix (this session):** added the same global `findFirst({ where: { email } })` pre-check already used by `bootstrap.service.ts` into `employees.service.ts::create`, plus a `P2002`-on-`email` catch as a race-window fallback with a clean `400` instead of a raw DB error.
-- **Open — needs a migration, deferred pending explicit confirmation:** the app-layer check above narrows but does not eliminate the race (two concurrent creates in two different orgs can both pass the pre-check before either commits, since the DB itself doesn't enforce global uniqueness). Fully closing this requires changing `@@unique([organizationId, email])` to a global `@@unique([email])` on the `Employee` model — a schema migration. Per this project's own workflow rules, database migrations are gated behind explicit user confirmation and were not run in this pass. **Recommendation: apply this migration before Phase 2** (which adds more employee-creation surface area).
-- **Status:** Partially fixed (app-layer check closes most of the window); full fix open, pending migration approval.
+- **Impact:** `Employee.email` was only DB-unique per-organization (`@@unique([organizationId, email])`), but both `login` (`auth.service.ts`) and `bootstrap` resolve an employee by `findFirst({ where: { email } })` with **no** `organizationId` in the lookup — email is a de facto global identifier in practice, but the database didn't enforce that, and `employees.service.ts::create` (regular in-org employee creation by an admin) didn't check global uniqueness at all before this fix. Two orgs could end up with the same email on two different employees, and login would then resolve unpredictably to whichever row the DB returns first — a real cross-tenant account-confusion bug, not just an inconsistency.
+- **Fix (app layer):** added the same global `findFirst({ where: { email } })` pre-check already used by `bootstrap.service.ts` into `employees.service.ts::create`, plus a `P2002`-on-`email` catch as a race-window fallback with a clean `400` instead of a raw DB error.
+- **Fix (database):** migration `20260818095045_employee_email_global_unique` changed `@@unique([organizationId, email])` to a global `@@unique([email])` on the `Employee` model — applied via `prisma migrate deploy` (non-interactive; `migrate dev`'s confirmation prompt isn't available in a non-TTY session, so the exact SQL was generated with `prisma migrate diff` and committed as a normal migration, then deployed). Verified live: `employees_organizationId_email_key` dropped, `employees_email_key` (single-column, unique) confirmed present via `pg_indexes`. 68/68 e2e tests still pass post-migration, including the bootstrap-duplicate-email test.
+- **Status:** Fixed — both the app-layer check and the database constraint are now in place.
 
 ### 10. `BackupConfig` S3 credentials stored plaintext in Postgres
 - **Location:** `prisma/schema.prisma` (`BackupConfig` model, already flagged in its own schema comment)
@@ -116,7 +116,7 @@ Findings are ordered by severity. Each entry: Location, Impact, Root cause, Fix,
 | 6 | No security headers | High | Fixed |
 | 7 | Bootstrap unrated-limited + enumeration | High | Fixed (rate limit); enumeration accepted risk |
 | 8 | Password-change unrated-limited | High | Fixed |
-| 9 | Email-uniqueness scoping mismatch | Medium | Partially fixed; full fix needs a migration (open, pending approval) |
+| 9 | Email-uniqueness scoping mismatch | Medium | Fixed (app-layer check + DB constraint) |
 | 10 | Plaintext S3 credentials | Medium | Open / accepted risk |
 | 11 | Dependency currency | Info | Done — 0 known vulnerabilities |
 | 12 | Secret scan | Info | Done — clean |

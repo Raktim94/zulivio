@@ -42,6 +42,11 @@ acknowledge within a few days.
 - Login, password-change, and self-service org bootstrap are all
   rate-limited, and login responds in constant shape (a dummy hash is
   verified against nonexistent accounts) to reduce account enumeration.
+- `Employee.email` is enforced globally unique at the database level
+  (not just per-organization), matching how login and bootstrap already
+  resolve an account by email alone — closes a cross-tenant
+  account-confusion path where two organizations could otherwise end up
+  with the same email on two different employees.
 - Audit events deliberately exclude plaintext secrets and password hashes
   from their metadata.
 - `pnpm audit` reports 0 known vulnerabilities as of the last dependency
@@ -66,10 +71,6 @@ acknowledge within a few days.
 - `BackupConfig` S3 credentials are stored plaintext in Postgres — a known,
   open finding (see the audit report). Anyone with DB read access can read
   live backup-destination credentials.
-- `Employee.email` uniqueness is enforced per-organization at the database
-  level, but treated as a global identifier by login — an app-layer check
-  narrows the gap, but the full fix needs a schema migration and is not
-  yet applied (see the audit report, finding #9).
 
 If you find a gap between this document and the actual code, please report
 it — this file describes intent, not a guarantee.

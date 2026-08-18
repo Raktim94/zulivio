@@ -102,7 +102,12 @@ model Employee {
   workflowRuns            WorkflowRun[]
 
   @@unique([organizationId, employeeNumber])
-  @@unique([organizationId, email])
+  // Global, not per-org: login and bootstrap both resolve an employee by
+  // email alone (no organizationId in that lookup), so email has always
+  // been a de facto global identifier — this makes the DB actually enforce
+  // that instead of relying only on the app-layer check in
+  // employees.service.ts. See SECURITY_AUDIT_REPORT.md finding #9.
+  @@unique([email])
   @@index([organizationId, employmentStatus])
   @@map("employees")
 }
