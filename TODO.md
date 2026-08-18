@@ -39,7 +39,10 @@ Full plan: `~/.claude/plans/gleaming-watching-koala.md`. Update checkboxes as wo
 - [x] Extend `salesDashboard()` with scope filtering (landed in Phase 1), drill-down record IDs (`opportunityIds` on stageBreakdown/byOwner), and a 14-day won/lost/new-leads trend
 - [x] `apps/backend/src/sales-head/` module: employee directory (scope-filtered, open/overdue task + lead counts joined in) + employee detail (assignments/leads/opportunities/attendance/quality/recent-audit in one endpoint). Skipped separate assign/reassign wrapper endpoints — the existing scope-checked `POST /assignments` and `POST /assignments/:id/assign` already do the job (Phase 1); a duplicate `/sales-head/assignments` wrapper would just be dead weight.
 - [x] 5 new e2e tests (dashboard drill-down/trend shape, directory scope+counts, detail in/out of scope) — 68/68 passing; caught and fixed a real timezone bug in the trend bucketing (local `setHours` mixed with UTC `toISOString()` shifted day boundaries under IST) via the test, not by inspection
-- [ ] Frontend: Sales Head dashboard (graphs + drill-down), employee directory, employee detail, Assign Task dialog — next
+- [x] Frontend: Sales dashboard extended with a 14-day trend line chart and click-to-drill-down (stage bars + rep rows open a Dialog listing the underlying deals); `/sales-head/employees` directory (sortable `Table`, click a row to open detail); `/sales-head/employees/[id]` detail (Overview/Tasks/Sales/Quality/Audit History tabs) with an Assign Task dialog reusing the existing scope-checked `POST /assignments`. Added `onRowClick` to the shared `Table` primitive rather than hacking row navigation in from outside. Also deduped the `StatCard` that `dashboard.tsx` and `sales-dashboard/page.tsx` each defined locally (promoted to `components/ui.tsx` in Phase 2 but not yet wired up) — this was flagged as tech debt in the original plan.
+- [x] Live-verified through the real Next.js proxy: bootstrap, login, `/sales-head/employees`, `/reports/sales-dashboard` (with the new `dailyTrend`/`opportunityIds` fields) all confirmed working; both new page routes render without server errors.
+
+Phase 3 is done. Phase 4 (docs) is next.
 
 ## Phase 4 — Docs & report
 - [ ] README.md: tech stack section + security section

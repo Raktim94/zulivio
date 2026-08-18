@@ -1,10 +1,24 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import type { SalesDashboardData } from "@zulivio/types";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import type { OpportunitySummary, SalesDashboardData } from "@zulivio/types";
 import { api } from "@/lib/api";
-import { Card, ErrorState, Spinner } from "@/components/ui";
+import { Badge, Card, Dialog, EmptyState, ErrorState, Spinner, StatCard } from "@/components/ui";
 import { isManagerOrAbove } from "@/lib/use-current-employee";
 import { useRequireRole } from "@/lib/use-require-role";
 
@@ -23,6 +37,14 @@ export default function SalesDashboardPage() {
     queryFn: () => api.get<SalesDashboardData>("/api/v1/reports/sales-dashboard"),
     refetchInterval: 30_000,
     enabled: authorized,
+  });
+  // Fetched lazily (only once a drill-down is actually opened) since it's
+  // org-wide raw records, not needed for the aggregate charts above.
+  const [drillDown, setDrillDown] = useState<{ label: string; ids: string[] } | null>(null);
+  const { data: allOpportunities } = useQuery<OpportunitySummary[]>({
+    queryKey: ["opportunities"],
+    queryFn: () => api.get<OpportunitySummary[]>("/api/v1/opportunities"),
+    enabled: authorized && drillDown !== null,
   });
 
   if (authLoading) return <Spinner />;
@@ -57,6 +79,7 @@ export default function SalesDashboardPage() {
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
           <h2 className="mb-4 text-sm font-medium text-ink">Pipeline value by stage</h2>
+          <p className="-mt-3 mb-3 text-xs text-muted">Click a bar to see the underlying deals.</p>
           {data.stageBreakdown.length === 0 ? (
             <p className="text-sm text-muted">No opportunities yet.</p>
           ) : (
@@ -66,10 +89,33 @@ export default function SalesDashboardPage() {
                 <XAxis dataKey="stageName" fontSize={12} />
                 <YAxis fontSize={12} />
                 <Tooltip formatter={(v: number) => [`₹${v.toLocaleString()}`, "Value"]} />
-                <Bar dataKey="value" fill="#168b65" radius={[4, 4, 0, 0]} />
+                <Bar
+                  dataKey="value"
+                  fill="#168b65"
+                  radius={[4, 4, 0, 0]}
+                  cursor="pointer"
+                  onClick={(bar: { stageName: string; opportunityIds: string[] }) =>
+                    setDrillDown({ label: bar.stageName, ids: bar.opportunityIds })
+                  }
+                />
               </BarChart>
             </ResponsiveContainer>
           )}
+        </Card>
+
+        <Card>
+          <h2 className="mb-4 text-sm font-medium text-ink">14-day trend</h2>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={data.dailyTrend}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+              <XAxis dataKey="date" fontSize={11} tickFormatter={(d: string) => d.slice(5)} />
+              <YAxis fontSize={12} allowDecimals={false} />
+              <Tooltip />
+              <Line type="monotone" dataKey="won" stroke="#168b65" strokeWidth={2} dot={false} name="Won" />
+              <Line type="monotone" dataKey="lost" stroke="#e66e58" strokeWidth={2} dot={false} name="Lost" />
+              <Line type="monotone" dataKey="newLeads" stroke="#5b5bd6" strokeWidth={2} dot={false} name="New leads" />
+            </LineChart>
+          </ResponsiveContainer>
         </Card>
 
         <Card>
@@ -127,7 +173,11 @@ export default function SalesDashboardPage() {
                   {data.byOwner
                     .sort((a, b) => b.weightedForecastMinor - a.weightedForecastMinor)
                     .map((row) => (
-                      <tr key={row.ownerId} className="border-b border-border last:border-0">
+                      <tr
+                        key={row.ownerId}
+                        onClick={() => setDrillDown({ label: row.ownerName, ids: row.opportunityIds })}
+                        className="cursor-pointer border-b border-border last:border-0 hover:bg-canvas/40"
+                      >
                         <td className="py-2 text-ink">{row.ownerName}</td>
                         <td className="py-2 text-muted">{row.count}</td>
                         <td className="py-2 text-ink">{formatAmount(row.valueMinor)}</td>
@@ -147,29 +197,38 @@ export default function SalesDashboardPage() {
           )}
         </Card>
       </div>
-    </div>
-  );
-}
 
-function StatCard({
-  label,
-  value,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string | number;
-  tone?: "neutral" | "success" | "warning" | "danger";
-}) {
-  const toneColor: Record<string, string> = {
-    neutral: "text-ink",
-    success: "text-emerald-dark",
-    warning: "text-amber",
-    danger: "text-coral",
-  };
-  return (
-    <Card>
-      <p className="text-xs font-medium text-muted">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${toneColor[tone]}`}>{value}</p>
-    </Card>
+      {drillDown && (
+        <Dialog open onClose={() => setDrillDown(null)} title={drillDown.label}>
+          {!allOpportunities ? (
+            <Spinner />
+          ) : (
+            (() => {
+              const matches = allOpportunities.filter((o) => drillDown.ids.includes(o.id));
+              return matches.length === 0 ? (
+                <EmptyState title="No matching deals" description="Nothing found for this selection." />
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {matches.map((o) => (
+                    <div key={o.id} className="flex items-center justify-between gap-4 border-t border-border py-2 text-sm first:border-t-0 first:pt-0">
+                      <div>
+                        <p className="text-ink">{o.title}</p>
+                        <p className="text-xs text-muted">{o.owner?.fullName ?? "Unowned"}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-ink">{formatAmount(o.amountMinor)}</span>
+                        <Badge tone={o.status === "WON" ? "success" : o.status === "LOST" ? "danger" : "info"}>
+                          {o.status}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()
+          )}
+        </Dialog>
+      )}
+    </div>
   );
 }

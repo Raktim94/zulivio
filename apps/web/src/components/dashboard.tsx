@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { DashboardData } from "@zulivio/types";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
 import { api } from "@/lib/api";
-import { Badge, Card, ErrorState, Spinner } from "@/components/ui";
+import { Badge, Card, ErrorState, Spinner, StatCard } from "@/components/ui";
 
 export function Dashboard() {
   const { data, isLoading, error } = useQuery<DashboardData>({
@@ -74,28 +74,5 @@ export function Dashboard() {
         )}
       </Card>
     </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  tone = "neutral",
-}: {
-  label: string;
-  value: string | number;
-  tone?: "neutral" | "success" | "warning" | "danger";
-}) {
-  const toneColor: Record<string, string> = {
-    neutral: "text-ink",
-    success: "text-emerald-dark",
-    warning: "text-amber",
-    danger: "text-coral",
-  };
-  return (
-    <Card>
-      <p className="text-xs font-medium text-muted">{label}</p>
-      <p className={`mt-1 text-2xl font-semibold ${toneColor[tone]}`}>{value}</p>
-    </Card>
   );
 }

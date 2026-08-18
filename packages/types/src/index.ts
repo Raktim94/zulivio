@@ -305,6 +305,30 @@ export interface AgentAssistResult {
   tips: TipFeedItem[];
 }
 
+export interface SalesHeadDirectoryEntry {
+  id: string;
+  employeeNumber: string;
+  fullName: string;
+  role: Role;
+  department: string | null;
+  employmentStatus: EmploymentStatus;
+  openAssignments: number;
+  overdueAssignments: number;
+  openLeads: number;
+  openOpportunities: number;
+  openPipelineValueMinor: number;
+}
+
+export interface SalesHeadEmployeeDetail {
+  employee: EmployeeSummary;
+  attendance: WorkSessionStatus;
+  assignments: AssignmentSummary[];
+  leads: LeadSummary[];
+  opportunities: OpportunitySummary[];
+  qualityResults: QualityAuditResultSummary[];
+  recentAudit: AuditEventSummary[];
+}
+
 export interface SalesDashboardData {
   generatedAt: string;
   pipelineValue: { totalMinor: number; weightedForecastMinor: number };

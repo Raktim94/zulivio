@@ -383,6 +383,7 @@ export function Table<T extends { id: string }>({
   sortKey,
   sortDir,
   onSort,
+  onRowClick,
 }: {
   columns: TableColumn<T>[];
   rows: T[];
@@ -392,6 +393,7 @@ export function Table<T extends { id: string }>({
   sortKey?: string;
   sortDir?: "asc" | "desc";
   onSort?: (key: string) => void;
+  onRowClick?: (row: T) => void;
 }) {
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const pageRows = rows.slice((page - 1) * pageSize, page * pageSize);
@@ -433,7 +435,26 @@ export function Table<T extends { id: string }>({
           </thead>
           <tbody>
             {pageRows.map((row) => (
-              <tr key={row.id} className="border-b border-border last:border-0 hover:bg-canvas/40">
+              <tr
+                key={row.id}
+                onClick={onRowClick ? () => onRowClick(row) : undefined}
+                tabIndex={onRowClick ? 0 : undefined}
+                role={onRowClick ? "button" : undefined}
+                onKeyDown={
+                  onRowClick
+                    ? (e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onRowClick(row);
+                        }
+                      }
+                    : undefined
+                }
+                className={clsx(
+                  "border-b border-border last:border-0 hover:bg-canvas/40",
+                  onRowClick && "cursor-pointer focus:bg-canvas/60 focus:outline-none",
+                )}
+              >
                 {columns.map((col) => (
                   <td key={col.key} className="px-4 py-2.5 text-ink">
                     {col.render(row)}

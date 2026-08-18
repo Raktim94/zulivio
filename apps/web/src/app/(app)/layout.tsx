@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Menu } from "lucide-react";
-import { useCurrentEmployee, isManagerOrAbove, isMasterOwner } from "@/lib/use-current-employee";
+import { useCurrentEmployee, isManagerOrAbove, isMasterOwner, isSalesHeadOrAbove } from "@/lib/use-current-employee";
 import { Spinner, Dialog } from "@/components/ui";
 import { Logo } from "@/components/logo";
 import { MadeBy } from "@/components/made-by";
@@ -14,6 +14,7 @@ interface NavItem {
   href: string;
   label: string;
   managerOnly?: boolean;
+  salesHeadOnly?: boolean;
   masterOwnerOnly?: boolean;
 }
 
@@ -46,6 +47,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { href: "/leads", label: "Leads" },
       { href: "/pipeline", label: "Pipeline" },
       { href: "/sales-dashboard", label: "Sales Dashboard", managerOnly: true },
+      { href: "/sales-head/employees", label: "Team Directory", salesHeadOnly: true },
     ],
   },
   {
@@ -61,9 +63,10 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   },
 ];
 
-function NavLinks({ pathname, isManager, isOwner, onNavigate }: {
+function NavLinks({ pathname, isManager, isSalesHead, isOwner, onNavigate }: {
   pathname: string;
   isManager: boolean;
+  isSalesHead: boolean;
   isOwner: boolean;
   onNavigate?: () => void;
 }) {
@@ -71,7 +74,10 @@ function NavLinks({ pathname, isManager, isOwner, onNavigate }: {
     <nav className="flex flex-1 flex-col gap-4">
       {NAV_GROUPS.map((group) => {
         const items = group.items.filter(
-          (item) => (!item.managerOnly || isManager) && (!item.masterOwnerOnly || isOwner),
+          (item) =>
+            (!item.managerOnly || isManager) &&
+            (!item.salesHeadOnly || isSalesHead) &&
+            (!item.masterOwnerOnly || isOwner),
         );
         if (items.length === 0) return null;
         return (
@@ -122,6 +128,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (!employee) return null;
 
   const isManager = isManagerOrAbove(employee.role);
+  const isSalesHead = isSalesHeadOrAbove(employee.role);
   const isOwner = isMasterOwner(employee.role);
   const allItems = NAV_GROUPS.flatMap((g) => g.items);
   const pageTitle = allItems.find((item) => item.href === pathname)?.label ?? "Zulivio";
@@ -130,7 +137,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       <aside className="hidden w-60 shrink-0 flex-col bg-navy px-4 py-6 text-white md:flex">
         <Logo size="sm" className="mb-8 px-2" />
-        <NavLinks pathname={pathname} isManager={isManager} isOwner={isOwner} />
+        <NavLinks pathname={pathname} isManager={isManager} isSalesHead={isSalesHead} isOwner={isOwner} />
         <MadeBy onDark className="border-t border-white/10 pt-4" />
       </aside>
 
@@ -139,6 +146,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <NavLinks
             pathname={pathname}
             isManager={isManager}
+            isSalesHead={isSalesHead}
             isOwner={isOwner}
             onNavigate={() => setMobileNavOpen(false)}
           />
