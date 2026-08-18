@@ -12,7 +12,7 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nodedr"]
+      test: ["CMD-SHELL", "pg_isready -U nodedr -d zulivio"]
       interval: 5s
       timeout: 5s
       retries: 10
