@@ -7,5 +7,6 @@ import { AttendanceModule } from "../attendance/attendance.module";
   imports: [AttendanceModule],
   controllers: [ReportsController],
   providers: [ReportsService],
+  exports: [ReportsService],
 })
 export class ReportsModule {}

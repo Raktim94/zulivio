@@ -24,10 +24,12 @@ Full plan: `~/.claude/plans/gleaming-watching-koala.md`. Update checkboxes as wo
 - [x] Authorization regression tests (6 new: Manager→direct-report allowed, Manager→other-manager's-report blocked despite same rank-gate, Sales-Head→subtree-grandchild allowed, employee-report access scoped the same way, sales-dashboard owner-filtering verified per role) — verified to fail pre-fix, pass post-fix
 
 ## Phase 2 — Employee workspace
-- [ ] Backend `apps/backend/src/me/` module: `/me/home`, `/me/tasks`, `/me/quality-audits`, `/me/reports`
-- [ ] New schema: Quality Audit (definition + result models)
-- [ ] New schema: Workflow/Helpdesk (definition + run models)
-- [ ] Agent Assist endpoint (knowledge/CRM-driven, no AI) + audit logging
+- [x] Backend `apps/backend/src/me/` module: `/me/home`, `/me/tasks`, `/me/quality-audits`, `/me/reports`
+- [x] New schema: Quality Audit (definition + result models) — migration `20260818084246_quality_audit_and_workflow`
+- [x] New schema: Workflow/Helpdesk (definition + run models) — same migration
+- [x] Author-side APIs: `apps/backend/src/quality-audits/` (Manager+ create/publish results) and `apps/backend/src/workflows/` (Manager+ author/publish, employee runs) — not explicitly named in the original plan text but required for the schema above to be reachable/testable end to end
+- [x] Agent Assist endpoint (knowledge/CRM-driven, no AI) + audit logging (`agent_assist.lookup` AuditEvent, no PII beyond hasMatch)
+- [x] 20 new e2e tests (quality audits, workflows, /me endpoints) — 64/64 passing, one scope check verified to fail pre-fix
 - [ ] Frontend UI primitives: Dialog, Tabs, Toast, Table (paginated/sortable), Skeleton, mobile nav drawer, shared `StatCard`
 - [ ] Frontend: Home (extend existing "My Work"), Start Work, Tasks (Forms & Tasks), Quality, Agent Assist, Helpdesk, Settings (Profile/Team/Password tabs)
 - [ ] Sidebar regrouping (My Work / Quality / Agent Tools / Account)

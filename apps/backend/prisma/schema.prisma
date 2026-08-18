@@ -60,6 +60,10 @@ model Organization {
   pipelines      Pipeline[]
   opportunities  Opportunity[]
   assignmentRules AssignmentRule[]
+  qualityAuditDefinitions QualityAuditDefinition[]
+  qualityAuditResults     QualityAuditResult[]
+  workflowDefinitions     WorkflowDefinition[]
+  workflowRuns            WorkflowRun[]
 
   @@map("organizations")
 }
@@ -93,6 +97,9 @@ model Employee {
   leadsCreated         Lead[]              @relation("LeadCreatedBy")
   opportunitiesOwned   Opportunity[]       @relation("OpportunityOwner")
   opportunitiesCreated Opportunity[]       @relation("OpportunityCreatedBy")
+  qualityAuditsAsSubject  QualityAuditResult[] @relation("QualityAuditSubject")
+  qualityAuditsAsReviewer QualityAuditResult[] @relation("QualityAuditReviewer")
+  workflowRuns            WorkflowRun[]
 
   @@unique([organizationId, employeeNumber])
   @@unique([organizationId, email])
@@ -504,4 +511,119 @@ model AssignmentRule {
 
   @@index([organizationId, isActive])
   @@map("assignment_rules")
+}
+
+enum QualityAuditStatus {
+  DRAFT
+  PUBLISHED
+}
+
+// A reusable scoring template (e.g. "Call Quality", "Chat Handling"),
+// authored by Manager+. Draft results scored against a definition are never
+// shown to the subject employee — only once a QualityAuditResult reaches
+// PUBLISHED.
+model QualityAuditDefinition {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  name           String
+  description    String?
+  // Ordered scoring sections, each with its own criteria:
+  // [{ id, name, maxScore, criteria: [{ id, label, maxScore }] }]
+  sections       Json
+  isActive       Boolean      @default(true)
+  createdById    String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  results QualityAuditResult[]
+
+  @@index([organizationId, isActive])
+  @@map("quality_audit_definitions")
+}
+
+// One scored review of one employee against one definition, optionally
+// linked to the record it was scored from (a specific Assignment/Lead/
+// Opportunity). DRAFT until the reviewer publishes it; the employee can
+// only ever see PUBLISHED results, and only their own (or their
+// scope-authorized subordinates', for a reviewer).
+model QualityAuditResult {
+  id             String             @id @default(uuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  definitionId   String
+  definition     QualityAuditDefinition @relation(fields: [definitionId], references: [id])
+  employeeId     String
+  employee       Employee           @relation("QualityAuditSubject", fields: [employeeId], references: [id])
+  reviewerId     String
+  reviewer       Employee           @relation("QualityAuditReviewer", fields: [reviewerId], references: [id])
+  referenceType  String?
+  referenceId    String?
+  overallScore   Int
+  // Mirrors the definition's sections shape, with scores filled in:
+  // [{ sectionId, score, criteria: [{ criteriaId, score, note }] }]
+  sectionScores  Json
+  feedback       String?
+  status         QualityAuditStatus @default(DRAFT)
+  acknowledgedAt DateTime?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([organizationId, employeeId, status])
+  @@index([organizationId, reviewerId])
+  @@map("quality_audit_results")
+}
+
+enum WorkflowStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum WorkflowRunStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+// A guided step-by-step procedure (helpdesk runbook, onboarding checklist,
+// escalation flow) an employee can run themselves. Employees only ever see
+// PUBLISHED definitions.
+model WorkflowDefinition {
+  id             String         @id @default(uuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  name           String
+  description    String?
+  tags           String[]
+  version        Int            @default(1)
+  status         WorkflowStatus @default(DRAFT)
+  // Ordered steps: [{ id, title, body, fields: [{ id, label, type, required }] }]
+  steps          Json
+  ownerId        String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  runs WorkflowRun[]
+
+  @@index([organizationId, status])
+  @@map("workflow_definitions")
+}
+
+// One employee's in-progress or completed pass through a WorkflowDefinition.
+model WorkflowRun {
+  id                   String            @id @default(uuid())
+  organizationId       String
+  organization         Organization      @relation(fields: [organizationId], references: [id])
+  workflowDefinitionId String
+  workflowDefinition   WorkflowDefinition @relation(fields: [workflowDefinitionId], references: [id])
+  employeeId           String
+  employee             Employee          @relation(fields: [employeeId], references: [id])
+  currentStepIndex     Int               @default(0)
+  answers              Json              @default("{}")
+  status               WorkflowRunStatus @default(IN_PROGRESS)
+  startedAt            DateTime          @default(now())
+  completedAt          DateTime?
+
+  @@index([organizationId, employeeId, status])
+  @@map("workflow_runs")
 }

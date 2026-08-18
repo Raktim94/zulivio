@@ -545,6 +545,208 @@ describe("Zulivio (e2e)", () => {
     });
   });
 
+  describe("quality audits", () => {
+    let ownerAgent: ReturnType<typeof request.agent>;
+    let managerAgent: ReturnType<typeof request.agent>;
+    let employeeAgent: ReturnType<typeof request.agent>;
+    let outsideManagerAgent: ReturnType<typeof request.agent>;
+    let employeeId: string;
+    let definitionId: string;
+
+    beforeAll(async () => {
+      ownerAgent = request.agent(server());
+      await ownerAgent.post("/api/v1/auth/sessions").send({ email: orgEmail, password: orgPassword });
+
+      const managerEmail = `qa-mgr-${Date.now()}@e2e.local`;
+      const managerRes = await ownerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "QA Manager", email: managerEmail, role: "MANAGER" });
+      managerAgent = request.agent(server());
+      await managerAgent.post("/api/v1/auth/sessions").send({ email: managerEmail, password: managerRes.body.temporaryPassword });
+
+      const employeeEmail = `qa-emp-${Date.now()}@e2e.local`;
+      const employeeRes = await managerAgent.post("/api/v1/employees").send({
+        fullName: "QA Employee",
+        email: employeeEmail,
+        role: "EMPLOYEE",
+        managerId: managerRes.body.id,
+      });
+      employeeId = employeeRes.body.id;
+      employeeAgent = request.agent(server());
+      await employeeAgent.post("/api/v1/auth/sessions").send({ email: employeeEmail, password: employeeRes.body.temporaryPassword });
+
+      const outsideManagerEmail = `qa-outside-mgr-${Date.now()}@e2e.local`;
+      const outsideManagerRes = await ownerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "QA Outside Manager", email: outsideManagerEmail, role: "MANAGER" });
+      outsideManagerAgent = request.agent(server());
+      await outsideManagerAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email: outsideManagerEmail, password: outsideManagerRes.body.temporaryPassword });
+
+      const definitionRes = await managerAgent.post("/api/v1/quality-audits/definitions").send({
+        name: "Call Quality",
+        sections: [{ id: "s1", name: "Greeting", maxScore: 10, criteria: [{ id: "c1", label: "Friendly tone", maxScore: 10 }] }],
+      });
+      definitionId = definitionRes.body.id;
+    });
+
+    it("blocks a plain employee from authoring a definition", async () => {
+      await employeeAgent
+        .post("/api/v1/quality-audits/definitions")
+        .send({ name: "Nope", sections: [] })
+        .expect(403);
+    });
+
+    it("blocks a manager from scoring an employee outside their scope", async () => {
+      await outsideManagerAgent
+        .post("/api/v1/quality-audits/results")
+        .send({
+          definitionId,
+          employeeId,
+          overallScore: 8,
+          sectionScores: [{ sectionId: "s1", score: 8, criteria: [] }],
+        })
+        .expect(403);
+    });
+
+    it("creates a draft result, invisible to the employee until published", async () => {
+      const draftRes = await managerAgent
+        .post("/api/v1/quality-audits/results")
+        .send({
+          definitionId,
+          employeeId,
+          overallScore: 9,
+          sectionScores: [{ sectionId: "s1", score: 9, criteria: [{ criteriaId: "c1", score: 9 }] }],
+          feedback: "Great call",
+        })
+        .expect(201);
+      expect(draftRes.body.status).toBe("DRAFT");
+
+      const employeeView = await employeeAgent.get("/api/v1/me/quality-audits").expect(200);
+      expect(employeeView.body).toHaveLength(0);
+
+      await managerAgent.post(`/api/v1/quality-audits/results/${draftRes.body.id}/publish`).expect(201);
+
+      const employeeViewAfterPublish = await employeeAgent.get("/api/v1/me/quality-audits").expect(200);
+      expect(employeeViewAfterPublish.body).toHaveLength(1);
+      expect(employeeViewAfterPublish.body[0].feedback).toBe("Great call");
+
+      await employeeAgent.post(`/api/v1/quality-audits/results/${draftRes.body.id}/acknowledge`).expect(201);
+    });
+  });
+
+  describe("workflows (Helpdesk runner)", () => {
+    let ownerAgent: ReturnType<typeof request.agent>;
+    let employeeAgent: ReturnType<typeof request.agent>;
+    let definitionId: string;
+
+    beforeAll(async () => {
+      ownerAgent = request.agent(server());
+      await ownerAgent.post("/api/v1/auth/sessions").send({ email: orgEmail, password: orgPassword });
+
+      const email = `wf-emp-${Date.now()}@e2e.local`;
+      const employeeRes = await ownerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Workflow Employee", email, role: "EMPLOYEE" });
+      employeeAgent = request.agent(server());
+      await employeeAgent.post("/api/v1/auth/sessions").send({ email, password: employeeRes.body.temporaryPassword });
+
+      const definitionRes = await ownerAgent.post("/api/v1/workflows/definitions").send({
+        name: "Password Reset Runbook",
+        tags: ["helpdesk"],
+        steps: [{ id: "step1", title: "Verify identity", body: "Confirm employee number" }],
+      });
+      definitionId = definitionRes.body.id;
+    });
+
+    it("hides an unpublished workflow from employees and blocks starting a run on it", async () => {
+      const list = await employeeAgent.get("/api/v1/workflows/definitions").expect(200);
+      expect(list.body.map((w: { id: string }) => w.id)).not.toContain(definitionId);
+
+      await employeeAgent.post(`/api/v1/workflows/definitions/${definitionId}/runs`).expect(404);
+    });
+
+    it("lets an employee run a published workflow end to end", async () => {
+      await ownerAgent.post(`/api/v1/workflows/definitions/${definitionId}/publish`).expect(201);
+
+      const list = await employeeAgent.get("/api/v1/workflows/definitions").expect(200);
+      expect(list.body.map((w: { id: string }) => w.id)).toContain(definitionId);
+
+      const runRes = await employeeAgent
+        .post(`/api/v1/workflows/definitions/${definitionId}/runs`)
+        .expect(201);
+      expect(runRes.body.status).toBe("IN_PROGRESS");
+
+      await employeeAgent
+        .patch(`/api/v1/workflows/runs/${runRes.body.id}`)
+        .send({ currentStepIndex: 1, answers: { step1: "verified" } })
+        .expect(200);
+
+      const completeRes = await employeeAgent.post(`/api/v1/workflows/runs/${runRes.body.id}/complete`).expect(201);
+      expect(completeRes.body.status).toBe("COMPLETED");
+
+      await employeeAgent.post(`/api/v1/workflows/runs/${runRes.body.id}/complete`).expect(400);
+    });
+  });
+
+  describe("/me endpoints", () => {
+    let ownerAgent: ReturnType<typeof request.agent>;
+    let employeeAgent: ReturnType<typeof request.agent>;
+    let employeeId: string;
+
+    beforeAll(async () => {
+      ownerAgent = request.agent(server());
+      await ownerAgent.post("/api/v1/auth/sessions").send({ email: orgEmail, password: orgPassword });
+
+      const email = `me-emp-${Date.now()}@e2e.local`;
+      const employeeRes = await ownerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Me Employee", email, role: "EMPLOYEE" });
+      employeeId = employeeRes.body.id;
+      employeeAgent = request.agent(server());
+      await employeeAgent.post("/api/v1/auth/sessions").send({ email, password: employeeRes.body.temporaryPassword });
+
+      await ownerAgent.post("/api/v1/assignments").send({ title: "Me home test", ownerId: employeeId });
+    });
+
+    it("returns a home summary with today's assignment counts and attendance state", async () => {
+      const res = await employeeAgent.get("/api/v1/me/home").expect(200);
+      expect(res.body.attendance.state).toBe("logged_out");
+      expect(res.body.summary.assigned).toBeGreaterThanOrEqual(1);
+    });
+
+    it("returns tasks split into pending/completed", async () => {
+      const res = await employeeAgent.get("/api/v1/me/tasks").expect(200);
+      expect(res.body.pending.length).toBeGreaterThanOrEqual(1);
+      expect(res.body.completed).toHaveLength(0);
+    });
+
+    it("returns the employee's own total report", async () => {
+      const res = await employeeAgent.get("/api/v1/me/reports").expect(200);
+      expect(res.body).toHaveProperty("attendance");
+      expect(res.body).toHaveProperty("assignments");
+    });
+
+    it("agent-assist returns real lead data and valid next-status options, not fabricated text", async () => {
+      const leadRes = await ownerAgent
+        .post("/api/v1/leads")
+        .send({ fullName: "Assist Lead", phone: "+911234567890", source: "webinar" });
+
+      const res = await ownerAgent.get(`/api/v1/me/agent-assist?leadId=${leadRes.body.id}`).expect(200);
+      expect(res.body.lead.id).toBe(leadRes.body.id);
+      expect(res.body.lead.status).toBe("NEW");
+      expect(res.body.lead.nextAllowedStatuses).toEqual(["CONTACTED", "DISQUALIFIED"]);
+      expect(Array.isArray(res.body.knowledgeDocuments)).toBe(true);
+      expect(Array.isArray(res.body.tips)).toBe(true);
+    });
+
+    it("agent-assist returns no lead match (not an error) when nothing matches the phone number", async () => {
+      const res = await employeeAgent.get("/api/v1/me/agent-assist?phone=+910000000000").expect(200);
+      expect(res.body.lead).toBeNull();
+    });
+  });
+
   describe("attendance state machine", () => {
     let agent: ReturnType<typeof request.agent>;
     let sessionId: string;
@@ -823,6 +1025,10 @@ describe("Zulivio (e2e)", () => {
     await prisma.pipelineStage.deleteMany({});
     await prisma.pipeline.deleteMany({});
     await prisma.assignmentRule.deleteMany({});
+    await prisma.qualityAuditResult.deleteMany({});
+    await prisma.qualityAuditDefinition.deleteMany({});
+    await prisma.workflowRun.deleteMany({});
+    await prisma.workflowDefinition.deleteMany({});
     await prisma.auditEvent.deleteMany({});
     await prisma.assignmentEvent.deleteMany({});
     await prisma.assignment.deleteMany({});

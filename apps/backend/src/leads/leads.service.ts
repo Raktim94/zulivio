@@ -13,7 +13,9 @@ import { ConvertLeadDto } from "./dto/convert-lead.dto";
 // A lead can be contacted, then qualified or disqualified; a qualified
 // lead converts into an opportunity via a dedicated endpoint, not a
 // plain status update.
-const ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
+// Exported so other services (e.g. Agent Assist) can read "what's the valid
+// next step from here" without duplicating this state machine.
+export const LEAD_ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
   NEW: [LeadStatus.CONTACTED, LeadStatus.DISQUALIFIED],
   CONTACTED: [LeadStatus.QUALIFIED, LeadStatus.DISQUALIFIED],
   QUALIFIED: [LeadStatus.DISQUALIFIED],
@@ -91,6 +93,19 @@ export class LeadsService {
     });
   }
 
+  /** Most recent scoped lead matching a phone number, or null — used by Agent Assist. Never throws on no match. */
+  async findByPhone(actor: AuthenticatedEmployee, phone: string) {
+    const scoped = !isManagerOrAbove(actor.role);
+    return this.prisma.lead.findFirst({
+      where: {
+        organizationId: actor.organizationId,
+        phone,
+        ...(scoped ? { OR: [{ ownerId: actor.id }, { createdById: actor.id }] } : {}),
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
   private async findScoped(actor: AuthenticatedEmployee, id: string) {
     const lead = await this.prisma.lead.findFirst({
       where: { id, organizationId: actor.organizationId },
@@ -119,7 +134,7 @@ export class LeadsService {
     }
 
     if (dto.status && dto.status !== lead.status) {
-      const allowed = ALLOWED_TRANSITIONS[lead.status] ?? [];
+      const allowed = LEAD_ALLOWED_TRANSITIONS[lead.status] ?? [];
       if (!allowed.includes(dto.status)) {
         throw new BadRequestException(`Cannot transition lead from ${lead.status} to ${dto.status}`);
       }

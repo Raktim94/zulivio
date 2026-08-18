@@ -21,6 +21,9 @@ import { LeadsModule } from "./leads/leads.module";
 import { OpportunitiesModule } from "./opportunities/opportunities.module";
 import { BackupModule } from "./backup/backup.module";
 import { AuditModule } from "./audit/audit.module";
+import { QualityAuditsModule } from "./quality-audits/quality-audits.module";
+import { WorkflowsModule } from "./workflows/workflows.module";
+import { MeModule } from "./me/me.module";
 
 @Module({
   imports: [
@@ -44,6 +47,9 @@ import { AuditModule } from "./audit/audit.module";
     OpportunitiesModule,
     BackupModule,
     AuditModule,
+    QualityAuditsModule,
+    WorkflowsModule,
+    MeModule,
   ],
   providers: [
     // Global safety net: every route requires an authenticated session
