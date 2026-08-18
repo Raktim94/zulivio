@@ -224,6 +224,87 @@ export interface AssignmentRuleSummary {
   maxOpenLeads: number | null;
 }
 
+export type QualityAuditStatus = "DRAFT" | "PUBLISHED";
+
+export interface QualityAuditDefinitionSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  sections: unknown;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface QualityAuditResultSummary {
+  id: string;
+  definitionId: string;
+  definition: { id: string; name: string };
+  employeeId: string;
+  employee?: { id: string; fullName: string; employeeNumber: string };
+  reviewerId: string;
+  reviewer: { id: string; fullName: string };
+  referenceType: string | null;
+  referenceId: string | null;
+  overallScore: number;
+  sectionScores: unknown;
+  feedback: string | null;
+  status: QualityAuditStatus;
+  acknowledgedAt: string | null;
+  createdAt: string;
+}
+
+export type WorkflowStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+export type WorkflowRunStatus = "IN_PROGRESS" | "COMPLETED";
+
+export interface WorkflowDefinitionSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  tags: string[];
+  version: number;
+  status: WorkflowStatus;
+  steps: { id: string; title: string; body?: string; fields?: unknown[] }[];
+  createdAt: string;
+}
+
+export interface WorkflowRunSummary {
+  id: string;
+  workflowDefinitionId: string;
+  workflowDefinition?: { id: string; name: string; tags: string[] };
+  currentStepIndex: number;
+  answers: Record<string, unknown>;
+  status: WorkflowRunStatus;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+export interface MeHomeData {
+  attendance: WorkSessionStatus;
+  summary: { assigned: number; inProgress: number; followUp: number; completedToday: number };
+  activeWork: AssignmentSummary[];
+}
+
+export interface MeTasksData {
+  pending: AssignmentSummary[];
+  completed: AssignmentSummary[];
+  all: AssignmentSummary[];
+  workflowRuns: WorkflowRunSummary[];
+}
+
+export interface AgentAssistResult {
+  lead: {
+    id: string;
+    fullName: string;
+    status: LeadStatus;
+    ownerId: string | null;
+    territory: string | null;
+    source: string | null;
+    nextAllowedStatuses: LeadStatus[];
+  } | null;
+  knowledgeDocuments: { id: string; title: string; category: string | null; status: string }[];
+  tips: TipFeedItem[];
+}
+
 export interface SalesDashboardData {
   generatedAt: string;
   pipelineValue: { totalMinor: number; weightedForecastMinor: number };

@@ -28,3 +28,8 @@ export function isManagerOrAbove(role: CurrentEmployee["role"] | undefined): boo
 export function isMasterOwner(role: CurrentEmployee["role"] | undefined): boolean {
   return role === "MASTER_OWNER";
 }
+
+export function isSalesHeadOrAbove(role: CurrentEmployee["role"] | undefined): boolean {
+  if (!role) return false;
+  return RANK[role] >= RANK.SALES_HEAD;
+}

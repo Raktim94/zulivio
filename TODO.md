@@ -30,9 +30,10 @@ Full plan: `~/.claude/plans/gleaming-watching-koala.md`. Update checkboxes as wo
 - [x] Author-side APIs: `apps/backend/src/quality-audits/` (Manager+ create/publish results) and `apps/backend/src/workflows/` (Manager+ author/publish, employee runs) — not explicitly named in the original plan text but required for the schema above to be reachable/testable end to end
 - [x] Agent Assist endpoint (knowledge/CRM-driven, no AI) + audit logging (`agent_assist.lookup` AuditEvent, no PII beyond hasMatch)
 - [x] 20 new e2e tests (quality audits, workflows, /me endpoints) — 64/64 passing, one scope check verified to fail pre-fix
-- [ ] Frontend UI primitives: Dialog, Tabs, Toast, Table (paginated/sortable), Skeleton, mobile nav drawer, shared `StatCard`
-- [ ] Frontend: Home (extend existing "My Work"), Start Work, Tasks (Forms & Tasks), Quality, Agent Assist, Helpdesk, Settings (Profile/Team/Password tabs)
-- [ ] Sidebar regrouping (My Work / Quality / Agent Tools / Account)
+- [x] Frontend UI primitives: Dialog (native `<dialog>`-based, real focus trap/Escape), Tabs, Toast, Table (paginated/sortable), Skeleton, mobile nav drawer, shared `StatCard` — added to `components/ui.tsx`
+- [x] Frontend: Home (extended with a KPI row + active-work list from `/me/home`), Start Work, Tasks (Pending/Completed/All/Workflow Runs tabs), Quality (own results + Manager+ scoring panel), Agent Assist, Helpdesk (workflow list + step runner + Manager+ author panel), Settings split into Profile/Team/Password tabs (no longer Master-Owner-only) + Backups & Activity tab (still Master-Owner-only)
+- [x] Sidebar regrouping (My Work / Quality / Agent Tools / Sales / Management / Account) + mobile nav drawer
+- [x] Verified live end-to-end through the real Next.js proxy (not just curl direct-to-backend): login, `/me/home`, `/me/tasks`, `/me/quality-audits`, `/workflows/definitions` all confirmed working with real session cookies. Full Playwright browser/screenshot verification at 375/768/1440px was **not** possible this session — no system Chrome, no sudo, and the Playwright MCP server's browser env var was misconfigured (fixed in `~/.claude/settings.json`, needs a session restart to take effect). Typecheck/lint/build all green on both apps as the next-best verification.
 
 ## Phase 3 — Sales Head workspace
 - [ ] Extend `salesDashboard()` with scope filtering, drill-down record IDs, trend data
