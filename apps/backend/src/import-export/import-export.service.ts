@@ -11,6 +11,7 @@ import { OpportunitiesService } from "../opportunities/opportunities.service";
 import { GoogleSheetsService } from "./google-sheets.service";
 import { sanitizeCsvCell, toCsv } from "./csv.util";
 import { GoogleSheetsSyncDto } from "./dto/google-sheets-sync.dto";
+import { SetGoogleSheetsConfigDto } from "./dto/set-google-sheets-config.dto";
 
 const EMPLOYEE_COLUMNS = ["employeeNumber", "fullName", "email", "role", "department", "employmentStatus"];
 const ASSIGNMENT_COLUMNS = ["assignmentNumber", "title", "status", "priority", "owner", "dueAt"];
@@ -358,6 +359,14 @@ export class ImportExportService {
   }
 
   googleSheetsStatus() {
-    return { configured: this.googleSheets.isConfigured() };
+    return this.googleSheets.status();
+  }
+
+  setGoogleSheetsConfig(actor: AuthenticatedEmployee, dto: SetGoogleSheetsConfigDto) {
+    return this.googleSheets.setConfig(actor, dto);
+  }
+
+  clearGoogleSheetsConfig(actor: AuthenticatedEmployee) {
+    return this.googleSheets.clearConfig(actor);
   }
 }

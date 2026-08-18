@@ -272,8 +272,8 @@ only by hiding a button in the UI.
   transitions, and matching Knowledge/Tips — no AI, no generated text,
   by design), and Helpdesk (published step-by-step runbooks employees
   run themselves, with a Manager+ author panel). Settings is split into
-  Profile/Team/Password tabs available to every employee, plus a
-  Master-Owner-only Backups & Activity tab.
+  Profile/Team/Password tabs available to every employee, plus
+  Master-Owner-only Backups & Activity and Integrations tabs.
 - **Sales Head workspace** — a Sales Head's authorized visibility is
   their full reporting subtree (recursive through the org chart), versus
   a line Manager's direct reports only — enforced by a shared
@@ -305,19 +305,25 @@ only by hiding a button in the UI.
 
 The Google Sheets adapter is real, not a mock — but it only activates when
 you provide credentials, per the "no fake integrations" rule this project
-follows. To enable it:
+follows. Connect it two ways, same pattern as backups below:
 
-1. Create a Google Cloud service account and enable the Sheets API.
-2. Generate a JSON key and set `GOOGLE_SHEETS_CLIENT_EMAIL` /
-   `GOOGLE_SHEETS_PRIVATE_KEY` in `.env` (the private key needs its
-   newlines escaped as `\n` in the `.env` file).
-3. Share your target spreadsheet with the service account's email address.
-4. Restart the `backend` service. The Data Hub page will show "Connected"
-   and expose live import/export.
+- **From Settings → Integrations (recommended, Master Owner only)** —
+  create a Google Cloud service account, enable the Sheets API, share your
+  target spreadsheet with the service account's email, then paste the
+  email and private key into the connect form there. The key is verified
+  live (a real token mint against Google) before saving, and stored in the
+  app itself — no env-var editing or container restart required.
+- **Via `GOOGLE_SHEETS_CLIENT_EMAIL` / `GOOGLE_SHEETS_PRIVATE_KEY` env
+  vars** — still supported as a fallback for headless/CasaOS-config-driven
+  deployments (the private key needs its newlines escaped as `\n` in
+  `.env`). Settings takes priority when both are present. Requires a
+  restart of the `backend` service after changing.
 
-Without credentials configured, `GET /api/v1/integrations/google-sheets/status`
-returns `{ configured: false }` and the UI clearly says so — it never
-pretends the integration works.
+Either way, the Data Hub page shows "Connected" once configured and exposes
+live import/export. Without credentials configured,
+`GET /api/v1/integrations/google-sheets/status` returns
+`{ configured: false }` and the UI clearly says so — it never pretends the
+integration works.
 
 ## Environment variables
 
@@ -333,6 +339,22 @@ See `.env.example` for the full list with descriptions. The important ones:
 | `S3_BACKUP_ENDPOINT` / `S3_BACKUP_BUCKET` / `S3_BACKUP_ACCESS_KEY_ID` / `S3_BACKUP_SECRET_ACCESS_KEY` | No | Enables automatic backups (all four required together) |
 | `S3_BACKUP_INTERVAL_DAYS` / `S3_BACKUP_RETAIN_COUNT` | No | Backup cadence (default `3`) and how many verified backups to keep (default `2`) |
 | `SEED_MASTER_OWNER_PASSWORD` | Only for `pnpm db:seed` | Never baked into the image |
+
+### Exposing this behind a custom domain, reverse proxy, or tunnel
+
+`FRONTEND_ORIGIN` (mapped to `CORS_ORIGIN` on the backend container) **must
+be the full public URL including the scheme** — e.g.
+`https://app.example.com`, not `app.example.com`. The backend matches this
+value exactly against the browser's `Origin` header, which always includes
+`http://` or `https://`; a bare hostname never matches, and the browser
+fails every API request with a **"Cross-Origin Request Blocked"** error
+(most visibly on `/setup` and `/login`), even though `curl` against the
+site looks fine. The backend now logs a `[CORS]` warning at startup if
+`CORS_ORIGIN` is missing a scheme — check `docker compose logs backend` (or
+`docker logs <container>` on CasaOS) if this happens. After fixing the
+value, the container must be **recreated**, not just restarted — the env
+var is only read at process start (`docker compose up -d --force-recreate
+backend`, or the equivalent recreate on CasaOS).
 
 ## Common operations
 

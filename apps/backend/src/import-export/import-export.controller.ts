@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   Post,
@@ -14,6 +15,7 @@ import { FileInterceptor } from "@nestjs/platform-express";
 import { memoryStorage } from "multer";
 import { ImportExportService } from "./import-export.service";
 import { GoogleSheetsSyncDto } from "./dto/google-sheets-sync.dto";
+import { SetGoogleSheetsConfigDto } from "./dto/set-google-sheets-config.dto";
 import { AuthGuard } from "../common/guards/auth.guard";
 import { CurrentEmployee } from "../common/decorators/current-employee.decorator";
 import type { AuthenticatedEmployee } from "../common/guards/auth.guard";
@@ -91,6 +93,19 @@ export class ImportExportController {
   @Get("integrations/google-sheets/status")
   status() {
     return this.importExportService.googleSheetsStatus();
+  }
+
+  @Post("integrations/google-sheets/config")
+  async setGoogleSheetsConfig(
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+    @Body() dto: SetGoogleSheetsConfigDto,
+  ) {
+    return this.importExportService.setGoogleSheetsConfig(actor, dto);
+  }
+
+  @Delete("integrations/google-sheets/config")
+  async clearGoogleSheetsConfig(@CurrentEmployee() actor: AuthenticatedEmployee) {
+    return this.importExportService.clearGoogleSheetsConfig(actor);
   }
 
   @Post("integrations/google-sheets/export")

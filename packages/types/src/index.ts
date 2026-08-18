@@ -50,6 +50,12 @@ export interface BackupStatusData {
   nextScheduledAt: string | null;
 }
 
+export interface GoogleSheetsStatusData {
+  configured: boolean;
+  source: "database" | "environment" | null;
+  clientEmail: string | null;
+}
+
 export interface EmployeeSummary {
   id: string;
   employeeNumber: string;

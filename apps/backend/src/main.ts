@@ -8,10 +8,27 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { createCsrfOriginCheck } from "./common/csrf-origin-check";
 
 function allowedOrigins(): string[] {
-  return (process.env.CORS_ORIGIN ?? "http://localhost:3100")
+  const origins = (process.env.CORS_ORIGIN ?? "http://localhost:3100")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
+
+  // A bare hostname (no scheme) never matches the browser's Origin header,
+  // which is always scheme://host[:port] — this silently breaks CORS/CSRF
+  // in production (seen in practice: CORS_ORIGIN set to "example.com"
+  // instead of "https://example.com" behind a reverse proxy/tunnel), so
+  // warn loudly at boot instead of failing invisibly on the first request.
+  for (const origin of origins) {
+    if (!/^https?:\/\//.test(origin)) {
+      console.warn(
+        `[CORS] CORS_ORIGIN entry "${origin}" has no http:// or https:// scheme and will never match a ` +
+          `browser's Origin header — requests from your real domain will be blocked. Set it to the full ` +
+          `public URL, e.g. "https://${origin}".`,
+      );
+    }
+  }
+
+  return origins;
 }
 
 async function bootstrap() {

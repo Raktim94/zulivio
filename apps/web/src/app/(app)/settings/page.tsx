@@ -2,7 +2,13 @@
 
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AuditEventSummary, BackupRecord, BackupStatusData, EmployeeSummary } from "@zulivio/types";
+import type {
+  AuditEventSummary,
+  BackupRecord,
+  BackupStatusData,
+  EmployeeSummary,
+  GoogleSheetsStatusData,
+} from "@zulivio/types";
 import { api, ApiError } from "@/lib/api";
 import { Badge, Button, Card, ErrorState, Input, Spinner, Tabs, TabPanel, useToast } from "@/components/ui";
 import { useCurrentEmployee, isMasterOwner } from "@/lib/use-current-employee";
@@ -32,6 +38,7 @@ export default function SettingsPage() {
     { id: "team", label: "Team" },
     { id: "password", label: "Password" },
     ...(owner ? [{ id: "backups", label: "Backups & Activity" }] : []),
+    ...(owner ? [{ id: "integrations", label: "Integrations" }] : []),
   ];
 
   return (
@@ -55,6 +62,11 @@ export default function SettingsPage() {
       {owner && (
         <TabPanel id="backups" active={tab}>
           <BackupsAndActivityTab />
+        </TabPanel>
+      )}
+      {owner && (
+        <TabPanel id="integrations" active={tab}>
+          <IntegrationsTab />
         </TabPanel>
       )}
     </div>
@@ -504,6 +516,128 @@ function BackupsAndActivityTab() {
               </li>
             ))}
           </ul>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function IntegrationsTab() {
+  const queryClient = useQueryClient();
+
+  const { data: status, isLoading: statusLoading, error: statusError } = useQuery<GoogleSheetsStatusData>({
+    queryKey: ["integrations", "google-sheets", "status"],
+    queryFn: () => api.get<GoogleSheetsStatusData>("/api/v1/integrations/google-sheets/status"),
+  });
+
+  const [showConfigForm, setShowConfigForm] = useState(false);
+  const [configForm, setConfigForm] = useState({ clientEmail: "", privateKey: "" });
+  const [configError, setConfigError] = useState<string | null>(null);
+
+  const saveConfig = useMutation({
+    mutationFn: () => api.post("/api/v1/integrations/google-sheets/config", configForm),
+    onSuccess: () => {
+      setConfigError(null);
+      setShowConfigForm(false);
+      setConfigForm({ clientEmail: "", privateKey: "" });
+      queryClient.invalidateQueries({ queryKey: ["integrations", "google-sheets"] });
+    },
+    onError: (err) => setConfigError(err instanceof ApiError ? err.message : "Could not save that service account"),
+  });
+
+  const clearConfig = useMutation({
+    mutationFn: () => api.delete("/api/v1/integrations/google-sheets/config"),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["integrations", "google-sheets"] }),
+  });
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Card>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-medium text-ink">Google Sheets</h2>
+          {status && (
+            <span className={`text-xs font-medium ${status.configured ? "text-emerald-dark" : "text-muted"}`}>
+              {status.configured ? "Configured" : "Not configured"}
+            </span>
+          )}
+        </div>
+
+        {statusLoading ? (
+          <Spinner />
+        ) : statusError || !status ? (
+          <ErrorState message="Could not load Google Sheets status." />
+        ) : !status.configured || showConfigForm ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-muted">
+              Connect a Google service account to enable Sheets import/export. Create one in Google Cloud, enable
+              the Sheets API, and share your target spreadsheet with the service account&apos;s email — CSV
+              import/export keeps working without this.
+            </p>
+            {configError && <ErrorState message={configError} />}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                setConfigError(null);
+                saveConfig.mutate();
+              }}
+              className="flex flex-col gap-3"
+            >
+              <Input
+                aria-label="Service account email"
+                type="email"
+                placeholder="Service account email"
+                value={configForm.clientEmail}
+                onChange={(e) => setConfigForm({ ...configForm, clientEmail: e.target.value })}
+                required
+              />
+              <textarea
+                aria-label="Private key"
+                className="min-h-32 w-full rounded-lg border border-border bg-canvas px-3 py-2 text-sm text-ink"
+                placeholder="Private key (including -----BEGIN PRIVATE KEY----- ... -----END PRIVATE KEY-----)"
+                value={configForm.privateKey}
+                onChange={(e) => setConfigForm({ ...configForm, privateKey: e.target.value })}
+                required
+              />
+              <div className="flex gap-3">
+                <Button type="submit" disabled={saveConfig.isPending}>
+                  {saveConfig.isPending ? "Verifying..." : "Connect & save"}
+                </Button>
+                {status.configured && (
+                  <button
+                    type="button"
+                    className="text-xs text-muted underline"
+                    onClick={() => setShowConfigForm(false)}
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm">
+            <div>
+              <p className="text-ink">{status.clientEmail}</p>
+              <p className="text-xs text-muted">
+                {status.source === "environment" ? "configured via CasaOS/environment" : "configured in Settings"}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="secondary" className="px-3 py-1.5 text-xs" onClick={() => setShowConfigForm(true)}>
+                Change
+              </Button>
+              {status.source === "database" && (
+                <Button
+                  variant="danger"
+                  className="px-3 py-1.5 text-xs"
+                  disabled={clearConfig.isPending}
+                  onClick={() => clearConfig.mutate()}
+                >
+                  Disconnect
+                </Button>
+              )}
+            </div>
+          </div>
         )}
       </Card>
     </div>

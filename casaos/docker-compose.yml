@@ -66,7 +66,12 @@ services:
             en_US: Must match the Postgres password below if you change it. Leave as default unless you know why you're changing it.
         - container: CORS_ORIGIN
           description:
-            en_US: Origin the browser uses to reach the web app. Leave as the default for local/LAN use.
+            en_US: >-
+              Origin the browser uses to reach the web app. Leave as the default for local/LAN use. If you put
+              this instance behind a reverse proxy, Cloudflare Tunnel, or custom domain, this MUST be the full
+              public URL including the scheme (e.g. https://your-domain.example) — a bare hostname with no
+              http:// or https:// will not match the browser's Origin header and silently breaks login/setup
+              with a "Cross-Origin Request Blocked" error.
         - container: BOOTSTRAP_DISABLED
           description:
             en_US: Set to true after you've created your organization, to close self-service signup on this instance.
@@ -82,9 +87,9 @@ services:
         - container: FIELD_ENCRYPTION_KEY
           description:
             en_US: >-
-              Required only if you set S3 backup credentials from Settings > Backups in the app (stored in
-              Postgres) rather than the S3_BACKUP_* fields below. Encrypts that stored secret access key at rest.
-              32 raw bytes, base64-encoded — generate with: openssl rand -base64 32
+              Required only if you set S3 backup credentials or a Google Sheets service account from Settings
+              in the app (stored in Postgres) rather than the env fields below. Encrypts those stored secrets
+              at rest. 32 raw bytes, base64-encoded — generate with: openssl rand -base64 32
         - container: S3_BACKUP_ENDPOINT
           description:
             en_US: Optional — S3-compatible endpoint URL (e.g. https://s3.example.com) for automatic backups. Leave blank to keep backups disabled.

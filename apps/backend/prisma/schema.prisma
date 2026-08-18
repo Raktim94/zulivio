@@ -342,6 +342,25 @@ model BackupConfig {
   @@map("backup_config")
 }
 
+// Singleton row (id is always "singleton") holding the Google service-account
+// credentials entered from Settings, mirroring BackupConfig — the app stays
+// self-contained without needing env vars or CasaOS's config UI. privateKey
+// is envelope-encrypted at rest (FieldEncryptionService, AES-256-GCM, key
+// from FIELD_ENCRYPTION_KEY), same as BackupConfig.secretAccessKey — see
+// SECURITY_AUDIT_REPORT.md finding #10, and is never returned by the API
+// (clientEmail is — it's an identifier, not a secret, shown in Settings to
+// confirm which service account is connected). Settable only by the Master
+// Owner.
+model GoogleSheetsConfig {
+  id          String   @id @default("singleton")
+  clientEmail String
+  privateKey  String
+  updatedById String
+  updatedAt   DateTime @updatedAt
+
+  @@map("google_sheets_config")
+}
+
 enum LeadStatus {
   NEW
   CONTACTED
