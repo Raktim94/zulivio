@@ -133,7 +133,22 @@ export class ReportsService {
       ? {}
       : { ownerId: { in: await this.employeeScope.authorizedEmployeeIds(actor) } };
 
-    const [pipeline, openOpportunities, leadsByStatus, overdueLeads, wonCount, lostCount] = await Promise.all([
+    // UTC throughout — mixing local setHours() with toISOString()'s UTC
+    // output shifts the day boundary by the server's UTC offset (this broke
+    // under IST until caught by a test asserting on "today"'s bucket).
+    const now = new Date();
+    const trendStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 13));
+
+    const [
+      pipeline,
+      openOpportunities,
+      leadsByStatus,
+      overdueLeads,
+      wonCount,
+      lostCount,
+      closedOpportunitiesInWindow,
+      leadsInWindow,
+    ] = await Promise.all([
       this.prisma.pipeline.findFirst({
         where: { organizationId: orgId, isDefault: true },
         include: { stages: { orderBy: { sortOrder: "asc" } } },
@@ -165,6 +180,22 @@ export class ReportsService {
       this.prisma.opportunity.count({
         where: { organizationId: orgId, status: OpportunityStatus.LOST, ...ownerFilter },
       }),
+      // stageChangedAt is the closest proxy to a "closedAt" timestamp — the
+      // Opportunity model has no dedicated one, and a WON/LOST opportunity's
+      // stage only changes again on close in practice.
+      this.prisma.opportunity.findMany({
+        where: {
+          organizationId: orgId,
+          status: { in: [OpportunityStatus.WON, OpportunityStatus.LOST] },
+          stageChangedAt: { gte: trendStart },
+          ...ownerFilter,
+        },
+        select: { status: true, stageChangedAt: true },
+      }),
+      this.prisma.lead.findMany({
+        where: { organizationId: orgId, createdAt: { gte: trendStart }, ...ownerFilter },
+        select: { createdAt: true },
+      }),
     ]);
 
     const stageBreakdown = (pipeline?.stages ?? []).map((stage) => {
@@ -174,6 +205,7 @@ export class ReportsService {
         stageName: stage.name,
         count: inStage.length,
         valueMinor: inStage.reduce((sum, o) => sum + o.amountMinor, 0),
+        opportunityIds: inStage.map((o) => o.id),
       };
     });
 
@@ -197,6 +229,7 @@ export class ReportsService {
         weightedForecastMinor: number;
         count: number;
         forecastByCategory: Record<string, number>;
+        opportunityIds: string[];
       }
     >();
     for (const o of openOpportunities) {
@@ -208,13 +241,38 @@ export class ReportsService {
         weightedForecastMinor: 0,
         count: 0,
         forecastByCategory: {},
+        opportunityIds: [],
       };
       existing.valueMinor += o.amountMinor;
       existing.weightedForecastMinor += Math.round((o.amountMinor * o.stage.probability) / 100);
       existing.count += 1;
       existing.forecastByCategory[o.forecastCategory] =
         (existing.forecastByCategory[o.forecastCategory] ?? 0) + o.amountMinor;
+      existing.opportunityIds.push(o.id);
       byOwnerMap.set(o.owner.id, existing);
+    }
+
+    // Period-over-period trend: won/lost opportunities and new leads per day,
+    // for the last 14 days — lets the dashboard show momentum, not just a
+    // point-in-time snapshot.
+    const dailyTrendMap = new Map<string, { date: string; won: number; lost: number; newLeads: number }>();
+    for (let i = 0; i < 14; i += 1) {
+      const d = new Date(trendStart);
+      d.setUTCDate(d.getUTCDate() + i);
+      const key = d.toISOString().slice(0, 10);
+      dailyTrendMap.set(key, { date: key, won: 0, lost: 0, newLeads: 0 });
+    }
+    for (const o of closedOpportunitiesInWindow) {
+      const key = o.stageChangedAt.toISOString().slice(0, 10);
+      const bucket = dailyTrendMap.get(key);
+      if (!bucket) continue;
+      if (o.status === OpportunityStatus.WON) bucket.won += 1;
+      else bucket.lost += 1;
+    }
+    for (const lead of leadsInWindow) {
+      const key = lead.createdAt.toISOString().slice(0, 10);
+      const bucket = dailyTrendMap.get(key);
+      if (bucket) bucket.newLeads += 1;
     }
 
     return {
@@ -226,6 +284,7 @@ export class ReportsService {
       leadFunnel: Object.fromEntries(leadsByStatus.map((row) => [row.status, row._count._all])),
       overdueLeads,
       winLoss: { won: wonCount, lost: lostCount },
+      dailyTrend: Array.from(dailyTrendMap.values()),
     };
   }
 }

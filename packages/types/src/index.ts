@@ -308,7 +308,13 @@ export interface AgentAssistResult {
 export interface SalesDashboardData {
   generatedAt: string;
   pipelineValue: { totalMinor: number; weightedForecastMinor: number };
-  stageBreakdown: { stageId: string; stageName: string; count: number; valueMinor: number }[];
+  stageBreakdown: {
+    stageId: string;
+    stageName: string;
+    count: number;
+    valueMinor: number;
+    opportunityIds: string[];
+  }[];
   forecastByCategory: Record<string, number>;
   byOwner: {
     ownerId: string;
@@ -317,8 +323,10 @@ export interface SalesDashboardData {
     weightedForecastMinor: number;
     count: number;
     forecastByCategory: Record<string, number>;
+    opportunityIds: string[];
   }[];
   leadFunnel: Record<string, number>;
   overdueLeads: number;
   winLoss: { won: number; lost: number };
+  dailyTrend: { date: string; won: number; lost: number; newLeads: number }[];
 }

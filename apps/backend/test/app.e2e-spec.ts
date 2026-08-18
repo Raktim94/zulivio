@@ -1004,10 +1004,91 @@ describe("Zulivio (e2e)", () => {
       expect(res.text).toContain("Aditi Sharma");
     });
 
-    it("returns sales dashboard data with stage breakdown and win/loss counts", async () => {
+    it("returns sales dashboard data with stage breakdown, drill-down IDs, and a 14-day trend", async () => {
       const res = await ownerAgent.get("/api/v1/reports/sales-dashboard").expect(200);
       expect(res.body.winLoss.lost).toBeGreaterThanOrEqual(1);
       expect(Array.isArray(res.body.stageBreakdown)).toBe(true);
+      for (const stage of res.body.stageBreakdown) {
+        expect(Array.isArray(stage.opportunityIds)).toBe(true);
+      }
+      for (const owner of res.body.byOwner) {
+        expect(Array.isArray(owner.opportunityIds)).toBe(true);
+      }
+      expect(res.body.dailyTrend).toHaveLength(14);
+      const today = new Date().toISOString().slice(0, 10);
+      const todayBucket = res.body.dailyTrend.find((d: { date: string }) => d.date === today);
+      expect(todayBucket.lost).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("sales-head workspace", () => {
+    let ownerAgent: ReturnType<typeof request.agent>;
+    let salesHeadAgent: ReturnType<typeof request.agent>;
+    let outsideManagerAgent: ReturnType<typeof request.agent>;
+    let repId: string;
+
+    beforeAll(async () => {
+      ownerAgent = request.agent(server());
+      await ownerAgent.post("/api/v1/auth/sessions").send({ email: orgEmail, password: orgPassword });
+
+      const salesHeadEmail = `sh-workspace-${Date.now()}@e2e.local`;
+      const salesHeadRes = await ownerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Workspace Sales Head", email: salesHeadEmail, role: "SALES_HEAD" });
+      salesHeadAgent = request.agent(server());
+      await salesHeadAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email: salesHeadEmail, password: salesHeadRes.body.temporaryPassword });
+
+      const repEmail = `sh-rep-${Date.now()}@e2e.local`;
+      const repRes = await salesHeadAgent.post("/api/v1/employees").send({
+        fullName: "Workspace Rep",
+        email: repEmail,
+        role: "EMPLOYEE",
+        managerId: salesHeadRes.body.id,
+      });
+      repId = repRes.body.id;
+
+      await salesHeadAgent
+        .post("/api/v1/assignments")
+        .send({ title: "Overdue for the rep", ownerId: repId, dueAt: new Date(Date.now() - 86_400_000).toISOString() });
+      await salesHeadAgent.post("/api/v1/leads").send({ fullName: "Rep's Lead", ownerId: repId });
+
+      const outsideManagerEmail = `sh-outside-mgr-${Date.now()}@e2e.local`;
+      const outsideManagerRes = await ownerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Outside Manager", email: outsideManagerEmail, role: "MANAGER" });
+      outsideManagerAgent = request.agent(server());
+      await outsideManagerAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email: outsideManagerEmail, password: outsideManagerRes.body.temporaryPassword });
+    });
+
+    it("blocks a plain Manager from the sales-head directory (Sales Head and above only)", async () => {
+      await outsideManagerAgent.get("/api/v1/sales-head/employees").expect(403);
+    });
+
+    it("returns the directory scoped to the Sales Head's subtree, with open/overdue counts joined in", async () => {
+      const res = await salesHeadAgent.get("/api/v1/sales-head/employees").expect(200);
+      const rep = res.body.find((e: { id: string }) => e.id === repId);
+      expect(rep).toBeDefined();
+      expect(rep.overdueAssignments).toBeGreaterThanOrEqual(1);
+      expect(rep.openLeads).toBeGreaterThanOrEqual(1);
+    });
+
+    it("returns full employee detail for someone in scope", async () => {
+      const res = await salesHeadAgent.get(`/api/v1/sales-head/employees/${repId}`).expect(200);
+      expect(res.body.employee.id).toBe(repId);
+      expect(res.body.assignments.length).toBeGreaterThanOrEqual(1);
+      expect(res.body.leads.length).toBeGreaterThanOrEqual(1);
+      expect(res.body.attendance.state).toBe("logged_out");
+    });
+
+    it("blocks employee detail for someone outside the Sales Head's subtree", async () => {
+      // ownerId here is the org owner (MASTER_OWNER) — outranks the Sales
+      // Head and is not in their reporting subtree either way.
+      const ownerMe = await ownerAgent.get("/api/v1/employees/me").expect(200);
+      await salesHeadAgent.get(`/api/v1/sales-head/employees/${ownerMe.body.id}`).expect(403);
     });
   });
 

@@ -36,9 +36,10 @@ Full plan: `~/.claude/plans/gleaming-watching-koala.md`. Update checkboxes as wo
 - [x] Verified live end-to-end through the real Next.js proxy (not just curl direct-to-backend): login, `/me/home`, `/me/tasks`, `/me/quality-audits`, `/workflows/definitions` all confirmed working with real session cookies. Full Playwright browser/screenshot verification at 375/768/1440px was **not** possible this session — no system Chrome, no sudo, and the Playwright MCP server's browser env var was misconfigured (fixed in `~/.claude/settings.json`, needs a session restart to take effect). Typecheck/lint/build all green on both apps as the next-best verification.
 
 ## Phase 3 — Sales Head workspace
-- [ ] Extend `salesDashboard()` with scope filtering, drill-down record IDs, trend data
-- [ ] `apps/backend/src/sales-head/` module: employee directory, employee detail tabs, assign/reassign task
-- [ ] Frontend: Sales Head dashboard (graphs + drill-down), employee directory, employee detail (7 tabs), Assign Task dialog
+- [x] Extend `salesDashboard()` with scope filtering (landed in Phase 1), drill-down record IDs (`opportunityIds` on stageBreakdown/byOwner), and a 14-day won/lost/new-leads trend
+- [x] `apps/backend/src/sales-head/` module: employee directory (scope-filtered, open/overdue task + lead counts joined in) + employee detail (assignments/leads/opportunities/attendance/quality/recent-audit in one endpoint). Skipped separate assign/reassign wrapper endpoints — the existing scope-checked `POST /assignments` and `POST /assignments/:id/assign` already do the job (Phase 1); a duplicate `/sales-head/assignments` wrapper would just be dead weight.
+- [x] 5 new e2e tests (dashboard drill-down/trend shape, directory scope+counts, detail in/out of scope) — 68/68 passing; caught and fixed a real timezone bug in the trend bucketing (local `setHours` mixed with UTC `toISOString()` shifted day boundaries under IST) via the test, not by inspection
+- [ ] Frontend: Sales Head dashboard (graphs + drill-down), employee directory, employee detail, Assign Task dialog — next
 
 ## Phase 4 — Docs & report
 - [ ] README.md: tech stack section + security section

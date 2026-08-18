@@ -24,6 +24,7 @@ import { AuditModule } from "./audit/audit.module";
 import { QualityAuditsModule } from "./quality-audits/quality-audits.module";
 import { WorkflowsModule } from "./workflows/workflows.module";
 import { MeModule } from "./me/me.module";
+import { SalesHeadModule } from "./sales-head/sales-head.module";
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { MeModule } from "./me/me.module";
     QualityAuditsModule,
     WorkflowsModule,
     MeModule,
+    SalesHeadModule,
   ],
   providers: [
     // Global safety net: every route requires an authenticated session
