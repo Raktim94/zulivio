@@ -215,8 +215,10 @@ full operational control over the organization from the Employees page:
   Employee/Manager-of-a-team see only their own or their direct reports').
 
 All of the above are enforced server-side, tested in
-`apps/backend/test/app.e2e-spec.ts` (26/26 passing), and never gated only
-by hiding a button in the UI.
+`apps/backend/test/app.e2e-spec.ts` (48/48 passing, including a dedicated
+cross-tenant isolation suite — see
+[`SECURITY_AUDIT_REPORT.md`](./SECURITY_AUDIT_REPORT.md)), and never gated
+only by hiding a button in the UI.
 
 ## Core features
 
@@ -367,12 +369,16 @@ DATABASE_URL="postgresql://postgres:test@localhost:55432/zulivio_test" \
 docker rm -f zulivio-test-pg
 ```
 
-At last run: **26/26 tests passing** — bootstrap/login/logout, privilege
+At last run: **48/48 tests passing** — bootstrap/login/logout, privilege
 escalation blocked (on both create and edit), cross-employee report access
-blocked, owner edit/reset-password/remove on subordinates, the full
-attendance state machine (including rejecting a second concurrent
-session/break), and the full assignment lifecycle (including rejecting
-invalid transitions and mutations on a terminal state).
+blocked, owner edit/reset-password/remove on subordinates, a dedicated
+cross-tenant isolation suite (two independent organizations, ID-guessing
+across the boundary blocked on every employee/assignment/lead/
+opportunity/attendance/audit-log route), the full attendance state machine
+(including rejecting a second concurrent session/break), and the full
+assignment lifecycle (including rejecting invalid transitions and
+mutations on a terminal state). Full findings from the latest security
+pass: [`SECURITY_AUDIT_REPORT.md`](./SECURITY_AUDIT_REPORT.md).
 
 ```bash
 cd apps/web

@@ -305,6 +305,120 @@ describe("Zulivio (e2e)", () => {
     });
   });
 
+  describe("cross-tenant isolation", () => {
+    // SECURITY.md states tenant isolation is 100% application-layer (no
+    // Postgres RLS) — every service scopes its queries by
+    // actor.organizationId, but nothing had ever proven that under ID
+    // tampering across two real organizations. This builds two fully
+    // separate orgs and confirms Org B can never reach Org A's records by
+    // guessing/reusing an ID, even when Org B's actor outranks the target
+    // within their own org (role rank alone must never substitute for
+    // org membership).
+    let orgAOwnerAgent: ReturnType<typeof request.agent>;
+    let orgBOwnerAgent: ReturnType<typeof request.agent>;
+    let orgAEmployeeId: string;
+    let orgAAssignmentId: string;
+    let orgALeadId: string;
+    let orgAOpportunityId: string;
+    let orgAAuditEventId: string;
+
+    beforeAll(async () => {
+      orgAOwnerAgent = request.agent(server());
+      const orgAEmail = `tenant-a-owner-${Date.now()}@e2e.local`;
+      await orgAOwnerAgent.post("/api/v1/bootstrap").send({
+        organizationName: "Tenant A",
+        fullName: "Tenant A Owner",
+        email: orgAEmail,
+        password: orgPassword,
+      });
+      await orgAOwnerAgent.post("/api/v1/auth/sessions").send({ email: orgAEmail, password: orgPassword });
+
+      const empRes = await orgAOwnerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Tenant A Employee", email: `tenant-a-emp-${Date.now()}@e2e.local`, role: "EMPLOYEE" });
+      orgAEmployeeId = empRes.body.id;
+      orgAAuditEventId = empRes.body.id; // employee.created event's targetId
+
+      const assignmentRes = await orgAOwnerAgent
+        .post("/api/v1/assignments")
+        .send({ title: "Tenant A only", ownerId: orgAEmployeeId });
+      orgAAssignmentId = assignmentRes.body.id;
+
+      const leadRes = await orgAOwnerAgent
+        .post("/api/v1/leads")
+        .send({ fullName: "Tenant A Lead", email: "tenant-a-lead@example.com" });
+      orgALeadId = leadRes.body.id;
+
+      const oppRes = await orgAOwnerAgent
+        .post("/api/v1/opportunities")
+        .send({ title: "Tenant A Opportunity" });
+      orgAOpportunityId = oppRes.body.id;
+
+      orgBOwnerAgent = request.agent(server());
+      const orgBEmail = `tenant-b-owner-${Date.now()}@e2e.local`;
+      await orgBOwnerAgent.post("/api/v1/bootstrap").send({
+        organizationName: "Tenant B",
+        fullName: "Tenant B Owner",
+        email: orgBEmail,
+        password: orgPassword,
+      });
+      await orgBOwnerAgent.post("/api/v1/auth/sessions").send({ email: orgBEmail, password: orgPassword });
+    });
+
+    it("404s a cross-org employee edit, reset-password, and remove — despite Org B's actor outranking the target", async () => {
+      await orgBOwnerAgent.patch(`/api/v1/employees/${orgAEmployeeId}`).send({ department: "Nope" }).expect(404);
+      await orgBOwnerAgent.post(`/api/v1/employees/${orgAEmployeeId}/reset-password`).expect(404);
+      await orgBOwnerAgent
+        .delete(`/api/v1/employees/${orgAEmployeeId}`)
+        .send({ reason: "cross-tenant probe" })
+        .expect(404);
+    });
+
+    it("excludes Org A employees from Org B's directory listing", async () => {
+      const res = await orgBOwnerAgent.get("/api/v1/employees").expect(200);
+      expect(res.body.map((e: { id: string }) => e.id)).not.toContain(orgAEmployeeId);
+    });
+
+    it("404s cross-org assignment assign and transition", async () => {
+      const orgBEmployeeRes = await orgBOwnerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Tenant B Employee", email: `tenant-b-emp-${Date.now()}@e2e.local`, role: "EMPLOYEE" });
+
+      await orgBOwnerAgent
+        .post(`/api/v1/assignments/${orgAAssignmentId}/assign`)
+        .send({ employeeId: orgBEmployeeRes.body.id })
+        .expect(404);
+      await orgBOwnerAgent
+        .post(`/api/v1/assignments/${orgAAssignmentId}/transitions`)
+        .send({ toStatus: "IN_PROGRESS" })
+        .expect(404);
+    });
+
+    it("404s a cross-org lead read", async () => {
+      await orgBOwnerAgent.get(`/api/v1/leads/${orgALeadId}`).expect(404);
+    });
+
+    it("404s cross-org opportunity stage-transition and forecast-category", async () => {
+      await orgBOwnerAgent
+        .post(`/api/v1/opportunities/${orgAOpportunityId}/stage-transitions`)
+        .send({ stageId: "does-not-matter-in-org-b" })
+        .expect(404);
+      await orgBOwnerAgent
+        .post(`/api/v1/opportunities/${orgAOpportunityId}/forecast-category`)
+        .send({ category: "COMMITTED", reason: "cross-tenant probe" })
+        .expect(404);
+    });
+
+    it("404s a cross-org attendance report request", async () => {
+      await orgBOwnerAgent.get(`/api/v1/work-sessions/report/${orgAEmployeeId}`).expect(404);
+    });
+
+    it("excludes Org A's audit events from Org B's audit log", async () => {
+      const res = await orgBOwnerAgent.get("/api/v1/audit-events").expect(200);
+      expect(res.body.map((e: { targetId: string }) => e.targetId)).not.toContain(orgAAuditEventId);
+    });
+  });
+
   describe("attendance state machine", () => {
     let agent: ReturnType<typeof request.agent>;
     let sessionId: string;
