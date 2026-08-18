@@ -4,12 +4,14 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { AssignmentStatus, Role } from "@prisma/client";
+import { AssignmentStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
 import { CreateAssignmentDto } from "./dto/create-assignment.dto";
+import { isManagerOrAbove } from "../common/roles";
 
-const MANAGER_RANK: Role[] = [Role.MANAGER, Role.SALES_HEAD, Role.COMPANY_ADMIN, Role.MASTER_OWNER];
+const UNIQUE_CONSTRAINT_VIOLATION = "P2002";
+const MAX_ASSIGNMENT_NUMBER_RETRIES = 5;
 
 const ALLOWED_TRANSITIONS: Record<AssignmentStatus, AssignmentStatus[]> = {
   ASSIGNED: [AssignmentStatus.IN_PROGRESS, AssignmentStatus.CANCELED],
@@ -29,10 +31,6 @@ const ALLOWED_TRANSITIONS: Record<AssignmentStatus, AssignmentStatus[]> = {
 export class AssignmentsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private isManagerOrAbove(role: Role): boolean {
-    return MANAGER_RANK.includes(role);
-  }
-
   async create(actor: AuthenticatedEmployee, dto: CreateAssignmentDto) {
     if (dto.ownerId) {
       const owner = await this.prisma.employee.findFirst({
@@ -43,39 +41,59 @@ export class AssignmentsService {
       }
     }
 
-    const existingCount = await this.prisma.assignment.count({
-      where: { organizationId: actor.organizationId },
-    });
-
-    return this.prisma.$transaction(async (tx) => {
-      const assignment = await tx.assignment.create({
-        data: {
-          organizationId: actor.organizationId,
-          assignmentNumber: existingCount + 1,
-          title: dto.title,
-          description: dto.description,
-          ownerId: dto.ownerId,
-          priority: dto.priority ?? "normal",
-          dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
-          createdById: actor.id,
-        },
+    // assignmentNumber is a per-organization sequential number with a
+    // @@unique([organizationId, assignmentNumber]) constraint, not a DB
+    // sequence — under concurrent creates, two requests can both read the
+    // same count() and collide on that unique constraint. Retry with a
+    // fresh count on conflict rather than surfacing a spurious 500.
+    for (let attempt = 0; attempt < MAX_ASSIGNMENT_NUMBER_RETRIES; attempt += 1) {
+      const existingCount = await this.prisma.assignment.count({
+        where: { organizationId: actor.organizationId },
       });
 
-      await tx.assignmentEvent.create({
-        data: {
-          assignmentId: assignment.id,
-          toStatus: AssignmentStatus.ASSIGNED,
-          actorId: actor.id,
-          reason: dto.ownerId ? "Created and assigned" : "Created unassigned",
-        },
-      });
+      try {
+        return await this.prisma.$transaction(async (tx) => {
+          const assignment = await tx.assignment.create({
+            data: {
+              organizationId: actor.organizationId,
+              assignmentNumber: existingCount + 1,
+              title: dto.title,
+              description: dto.description,
+              ownerId: dto.ownerId,
+              priority: dto.priority ?? "normal",
+              dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
+              createdById: actor.id,
+            },
+          });
 
-      return assignment;
-    });
+          await tx.assignmentEvent.create({
+            data: {
+              assignmentId: assignment.id,
+              toStatus: AssignmentStatus.ASSIGNED,
+              actorId: actor.id,
+              reason: dto.ownerId ? "Created and assigned" : "Created unassigned",
+            },
+          });
+
+          return assignment;
+        });
+      } catch (error) {
+        const isAssignmentNumberConflict =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === UNIQUE_CONSTRAINT_VIOLATION &&
+          (error.meta?.target as string[] | undefined)?.includes("assignmentNumber");
+
+        if (!isAssignmentNumberConflict || attempt === MAX_ASSIGNMENT_NUMBER_RETRIES - 1) {
+          throw error;
+        }
+      }
+    }
+    // Unreachable: the loop above always returns or throws.
+    throw new Error("Failed to allocate an assignment number");
   }
 
   async assign(actor: AuthenticatedEmployee, assignmentId: string, employeeId: string, reason?: string) {
-    if (!this.isManagerOrAbove(actor.role)) {
+    if (!isManagerOrAbove(actor.role)) {
       throw new ForbiddenException("Only managers and above can assign work");
     }
 
@@ -127,7 +145,7 @@ export class AssignmentsService {
 
     const isOwner = assignment.ownerId === actor.id;
     const isCreator = assignment.createdById === actor.id;
-    if (!isOwner && !isCreator && !this.isManagerOrAbove(actor.role)) {
+    if (!isOwner && !isCreator && !isManagerOrAbove(actor.role)) {
       throw new ForbiddenException("Not authorized to update this assignment");
     }
 
@@ -164,7 +182,7 @@ export class AssignmentsService {
   }
 
   async list(actor: AuthenticatedEmployee, filters: { status?: AssignmentStatus; ownerId?: string }) {
-    const scoped = !this.isManagerOrAbove(actor.role);
+    const scoped = !isManagerOrAbove(actor.role);
 
     return this.prisma.assignment.findMany({
       where: {

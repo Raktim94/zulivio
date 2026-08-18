@@ -6,26 +6,10 @@ import {
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
 import { Role } from "@prisma/client";
+import type { Request } from "express";
 import { ROLES_KEY } from "../decorators/roles.decorator";
 import { AuthenticatedEmployee } from "./auth.guard";
-
-/**
- * Roles form a strict hierarchy for authorization purposes:
- * MASTER_OWNER > COMPANY_ADMIN > SALES_HEAD > MANAGER > EMPLOYEE.
- * A route decorated with @Roles(Role.MANAGER) is satisfied by MANAGER
- * and everything above it, never below.
- */
-const HIERARCHY: Role[] = [
-  Role.EMPLOYEE,
-  Role.MANAGER,
-  Role.SALES_HEAD,
-  Role.COMPANY_ADMIN,
-  Role.MASTER_OWNER,
-];
-
-function rank(role: Role): number {
-  return HIERARCHY.indexOf(role);
-}
+import { rank } from "../roles";
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -41,7 +25,7 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const request = context.switchToHttp().getRequest();
+    const request: Request = context.switchToHttp().getRequest();
     const employee: AuthenticatedEmployee | undefined = request.employee;
 
     if (!employee) {

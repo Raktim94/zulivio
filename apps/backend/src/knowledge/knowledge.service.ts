@@ -2,13 +2,13 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { randomUUID } from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { DocumentStatus, Role } from "@prisma/client";
+import { DocumentStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
+import { isManagerOrAbove } from "../common/roles";
 import { CreateDocumentDto } from "./dto/create-document.dto";
 import { CreateTrainingAssignmentDto } from "./dto/create-training-assignment.dto";
 
-const MANAGER_RANK: Role[] = [Role.MANAGER, Role.SALES_HEAD, Role.COMPANY_ADMIN, Role.MASTER_OWNER];
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const UPLOAD_ROOT = process.env.UPLOADS_DIR ?? path.join(process.cwd(), "uploads");
 
@@ -17,7 +17,7 @@ export class KnowledgeService {
   constructor(private readonly prisma: PrismaService) {}
 
   private requireManager(actor: AuthenticatedEmployee) {
-    if (!MANAGER_RANK.includes(actor.role)) {
+    if (!isManagerOrAbove(actor.role)) {
       throw new ForbiddenException("Only managers and above can manage knowledge documents");
     }
   }
@@ -67,7 +67,7 @@ export class KnowledgeService {
   }
 
   async list(actor: AuthenticatedEmployee) {
-    const isManager = MANAGER_RANK.includes(actor.role);
+    const isManager = isManagerOrAbove(actor.role);
     return this.prisma.knowledgeDocument.findMany({
       where: {
         organizationId: actor.organizationId,

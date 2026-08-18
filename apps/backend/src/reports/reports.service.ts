@@ -1,10 +1,10 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
-import { AssignmentStatus, LeadStatus, OpportunityStatus, Role } from "@prisma/client";
+import { AssignmentStatus, LeadStatus, OpportunityStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AttendanceService } from "../attendance/attendance.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
+import { isManagerOrAbove } from "../common/roles";
 
-const MANAGER_RANK: Role[] = [Role.MANAGER, Role.SALES_HEAD, Role.COMPANY_ADMIN, Role.MASTER_OWNER];
 
 @Injectable()
 export class ReportsService {
@@ -15,7 +15,7 @@ export class ReportsService {
 
   /** Org-wide "master database view" dashboard: headcount, assignment mix, live attendance, overdue work. */
   async dashboard(actor: AuthenticatedEmployee) {
-    if (!MANAGER_RANK.includes(actor.role)) {
+    if (!isManagerOrAbove(actor.role)) {
       throw new ForbiddenException("Dashboard is restricted to managers and above");
     }
 
@@ -76,7 +76,7 @@ export class ReportsService {
 
   /** Full "employee total report": hours, breaks, assignment outcomes — everything a manager needs in one view. */
   async employeeTotalReport(actor: AuthenticatedEmployee, employeeId: string, from?: Date, to?: Date) {
-    if (employeeId !== actor.id && !MANAGER_RANK.includes(actor.role)) {
+    if (employeeId !== actor.id && !isManagerOrAbove(actor.role)) {
       throw new ForbiddenException("Cannot view another employee's report");
     }
 
@@ -115,7 +115,7 @@ export class ReportsService {
 
   /** Sales dashboard: pipeline value by stage, lead funnel, forecast rollup, overdue leads. */
   async salesDashboard(actor: AuthenticatedEmployee) {
-    if (!MANAGER_RANK.includes(actor.role)) {
+    if (!isManagerOrAbove(actor.role)) {
       throw new ForbiddenException("Sales dashboard is restricted to managers and above");
     }
 

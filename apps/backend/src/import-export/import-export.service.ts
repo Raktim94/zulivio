@@ -3,15 +3,15 @@ import { parse } from "csv-parse/sync";
 import { Prisma, Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
+import { isManagerOrAbove } from "../common/roles";
 import { EmployeesService } from "../employees/employees.service";
 import { AssignmentsService } from "../assignments/assignments.service";
 import { LeadsService } from "../leads/leads.service";
 import { OpportunitiesService } from "../opportunities/opportunities.service";
 import { GoogleSheetsService } from "./google-sheets.service";
-import { toCsv } from "./csv.util";
+import { sanitizeCsvCell, toCsv } from "./csv.util";
 import { GoogleSheetsSyncDto } from "./dto/google-sheets-sync.dto";
 
-const MANAGER_RANK: Role[] = [Role.MANAGER, Role.SALES_HEAD, Role.COMPANY_ADMIN, Role.MASTER_OWNER];
 const EMPLOYEE_COLUMNS = ["employeeNumber", "fullName", "email", "role", "department", "employmentStatus"];
 const ASSIGNMENT_COLUMNS = ["assignmentNumber", "title", "status", "priority", "owner", "dueAt"];
 const LEAD_COLUMNS = ["fullName", "email", "phone", "company", "source", "territory", "status", "owner"];
@@ -65,7 +65,7 @@ export class ImportExportService {
   ) {}
 
   private requireManager(actor: AuthenticatedEmployee) {
-    if (!MANAGER_RANK.includes(actor.role)) {
+    if (!isManagerOrAbove(actor.role)) {
       throw new ForbiddenException("Import/export is restricted to managers and above");
     }
   }
@@ -134,7 +134,7 @@ export class ImportExportService {
 
     let records: Record<string, string>[];
     try {
-      records = parse(fileContent, { columns: true, skip_empty_lines: true, trim: true });
+      records = parse(fileContent, { columns: true, skip_empty_lines: true, trim: true }) as Record<string, string>[];
     } catch (err) {
       throw new BadRequestException(`Malformed CSV: ${(err as Error).message}`);
     }
@@ -190,7 +190,7 @@ export class ImportExportService {
 
     let records: Record<string, string>[];
     try {
-      records = parse(fileContent, { columns: true, skip_empty_lines: true, trim: true });
+      records = parse(fileContent, { columns: true, skip_empty_lines: true, trim: true }) as Record<string, string>[];
     } catch (err) {
       throw new BadRequestException(`Malformed CSV: ${(err as Error).message}`);
     }
@@ -235,7 +235,7 @@ export class ImportExportService {
 
     let records: Record<string, string>[];
     try {
-      records = parse(fileContent, { columns: true, skip_empty_lines: true, trim: true });
+      records = parse(fileContent, { columns: true, skip_empty_lines: true, trim: true }) as Record<string, string>[];
     } catch (err) {
       throw new BadRequestException(`Malformed CSV: ${(err as Error).message}`);
     }
@@ -290,21 +290,18 @@ export class ImportExportService {
       const employees = await this.employeesService.list(actor);
       const rows = [
         EMPLOYEE_COLUMNS,
-        ...employees.map((e) => EMPLOYEE_COLUMNS.map((col) => String((e as Record<string, unknown>)[col] ?? ""))),
+        ...employees.map((e) => EMPLOYEE_COLUMNS.map((col) => sanitizeCsvCell((e as Record<string, unknown>)[col]))),
       ];
       await this.googleSheets.writeRange(dto.spreadsheetId, dto.range, rows);
     } else {
       const assignments = await this.assignmentsService.list(actor, {});
       const rows = [
         ASSIGNMENT_COLUMNS,
-        ...assignments.map((a) => [
-          String(a.assignmentNumber),
-          a.title,
-          a.status,
-          a.priority,
-          a.owner?.fullName ?? "",
-          a.dueAt ? a.dueAt.toISOString() : "",
-        ]),
+        ...assignments.map((a) =>
+          [a.assignmentNumber, a.title, a.status, a.priority, a.owner?.fullName ?? "", a.dueAt ?? ""].map(
+            sanitizeCsvCell,
+          ),
+        ),
       ];
       await this.googleSheets.writeRange(dto.spreadsheetId, dto.range, rows);
     }

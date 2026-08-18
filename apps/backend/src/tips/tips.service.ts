@@ -1,17 +1,16 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
+import { isManagerOrAbove } from "../common/roles";
 import { CreateTipDto } from "./dto/create-tip.dto";
 
-const MANAGER_RANK: Role[] = [Role.MANAGER, Role.SALES_HEAD, Role.COMPANY_ADMIN, Role.MASTER_OWNER];
 
 @Injectable()
 export class TipsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(actor: AuthenticatedEmployee, dto: CreateTipDto) {
-    if (!MANAGER_RANK.includes(actor.role)) {
+    if (!isManagerOrAbove(actor.role)) {
       throw new ForbiddenException("Only managers and above can publish tips");
     }
 

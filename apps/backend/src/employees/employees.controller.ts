@@ -30,7 +30,7 @@ export class EmployeesController {
   }
 
   @Get("me")
-  async me(@CurrentEmployee() actor: AuthenticatedEmployee) {
+  me(@CurrentEmployee() actor: AuthenticatedEmployee) {
     return actor;
   }
 

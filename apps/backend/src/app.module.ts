@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
+import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
+import { AuthGuard } from "./common/guards/auth.guard";
 import { PrismaModule } from "./prisma/prisma.module";
 import { HealthModule } from "./health/health.module";
 import { BootstrapModule } from "./bootstrap/bootstrap.module";
@@ -40,6 +42,13 @@ import { AuditModule } from "./audit/audit.module";
     OpportunitiesModule,
     BackupModule,
     AuditModule,
+  ],
+  providers: [
+    // Global safety net: every route requires an authenticated session
+    // unless explicitly opted out with @Public(). Previously AuthGuard was
+    // applied per-controller, so a new controller that forgot @UseGuards
+    // was silently unprotected — see SECURITY_AUDIT_REPORT.md.
+    { provide: APP_GUARD, useClass: AuthGuard },
   ],
 })
 export class AppModule {}

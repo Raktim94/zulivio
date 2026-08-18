@@ -4,25 +4,17 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { Role } from "@prisma/client";
+import { Prisma, Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthService } from "../auth/auth.service";
 import { formatEmployeeNumber, generateTemporaryPassword } from "../common/credentials";
 import { CreateEmployeeDto } from "./dto/create-employee.dto";
 import { UpdateEmployeeDto } from "./dto/update-employee.dto";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
+import { rank, rolesBelow } from "../common/roles";
 
-const HIERARCHY: Role[] = [
-  Role.EMPLOYEE,
-  Role.MANAGER,
-  Role.SALES_HEAD,
-  Role.COMPANY_ADMIN,
-  Role.MASTER_OWNER,
-];
-
-function rank(role: Role): number {
-  return HIERARCHY.indexOf(role);
-}
+const UNIQUE_CONSTRAINT_VIOLATION = "P2002";
+const MAX_EMPLOYEE_NUMBER_RETRIES = 5;
 
 @Injectable()
 export class EmployeesService {
@@ -52,52 +44,97 @@ export class EmployeesService {
       }
     }
 
-    const existingCount = await this.prisma.employee.count({
-      where: { organizationId: actor.organizationId },
-    });
-    const employeeNumber = formatEmployeeNumber(existingCount + 1);
+    const email = dto.email.toLowerCase();
+
+    // Login and bootstrap both resolve an employee by email alone, with no
+    // organizationId in the lookup, so email is a de facto global identifier
+    // even though the DB only enforces @@unique([organizationId, email]).
+    // Without this check, two orgs could each create an employee with the
+    // same email and login would non-deterministically resolve to whichever
+    // row the DB returns first. This narrows but doesn't eliminate the race
+    // (see SECURITY_AUDIT_REPORT.md — full fix needs a global unique index,
+    // deferred pending a migration).
+    const existingEmail = await this.prisma.employee.findFirst({ where: { email } });
+    if (existingEmail) {
+      throw new BadRequestException("An account with this email already exists");
+    }
 
     const temporaryPassword = generateTemporaryPassword();
     const passwordHash = await this.authService.hashPassword(temporaryPassword);
 
-    const employee = await this.prisma.$transaction(async (tx) => {
-      const created = await tx.employee.create({
-        data: {
-          organizationId: actor.organizationId,
-          employeeNumber,
-          fullName: dto.fullName,
-          email: dto.email.toLowerCase(),
-          passwordHash,
-          role: dto.role,
-          department: dto.department,
-          managerId: dto.managerId,
-          mustChangePassword: true,
-        },
+    // employeeNumber is a per-organization sequential number with a
+    // @@unique([organizationId, employeeNumber]) constraint, not a DB
+    // sequence — under concurrent creates, two requests can both read the
+    // same count() and collide. Retry with a fresh count on conflict,
+    // same pattern as AssignmentsService.create's assignmentNumber.
+    for (let attempt = 0; attempt < MAX_EMPLOYEE_NUMBER_RETRIES; attempt += 1) {
+      const existingCount = await this.prisma.employee.count({
+        where: { organizationId: actor.organizationId },
       });
+      const employeeNumber = formatEmployeeNumber(existingCount + 1);
 
-      await tx.auditEvent.create({
-        data: {
-          organizationId: actor.organizationId,
-          actorId: actor.id,
-          action: "employee.created",
-          targetType: "employee",
-          targetId: created.id,
-          metadata: { role: dto.role, employeeNumber },
-        },
-      });
+      try {
+        const employee = await this.prisma.$transaction(async (tx) => {
+          const created = await tx.employee.create({
+            data: {
+              organizationId: actor.organizationId,
+              employeeNumber,
+              fullName: dto.fullName,
+              email,
+              passwordHash,
+              role: dto.role,
+              department: dto.department,
+              managerId: dto.managerId,
+              mustChangePassword: true,
+            },
+          });
 
-      return created;
-    });
+          await tx.auditEvent.create({
+            data: {
+              organizationId: actor.organizationId,
+              actorId: actor.id,
+              action: "employee.created",
+              targetType: "employee",
+              targetId: created.id,
+              metadata: { role: dto.role, employeeNumber },
+            },
+          });
 
-    return {
-      id: employee.id,
-      employeeNumber: employee.employeeNumber,
-      fullName: employee.fullName,
-      email: employee.email,
-      role: employee.role,
-      // Returned exactly once, at creation time — never stored or retrievable again.
-      temporaryPassword,
-    };
+          return created;
+        });
+
+        return {
+          id: employee.id,
+          employeeNumber: employee.employeeNumber,
+          fullName: employee.fullName,
+          email: employee.email,
+          role: employee.role,
+          // Returned exactly once, at creation time — never stored or retrievable again.
+          temporaryPassword,
+        };
+      } catch (error) {
+        const target = error instanceof Prisma.PrismaClientKnownRequestError
+          ? (error.meta?.target as string[] | undefined)
+          : undefined;
+        const isEmployeeNumberConflict =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === UNIQUE_CONSTRAINT_VIOLATION &&
+          target?.includes("employeeNumber");
+        const isEmailConflict =
+          error instanceof Prisma.PrismaClientKnownRequestError &&
+          error.code === UNIQUE_CONSTRAINT_VIOLATION &&
+          target?.includes("email");
+
+        if (isEmailConflict) {
+          throw new BadRequestException("An account with this email already exists");
+        }
+        if (!isEmployeeNumberConflict || attempt === MAX_EMPLOYEE_NUMBER_RETRIES - 1) {
+          throw error;
+        }
+      }
+    }
+    // Unreachable: the loop above always returns or throws.
+    throw new Error("Failed to allocate an employee number");
   }
 
   /**
@@ -107,7 +144,7 @@ export class EmployeesService {
    * never visible to someone who couldn't also act on it.
    */
   async list(actor: AuthenticatedEmployee) {
-    const lowerRanks = HIERARCHY.slice(0, rank(actor.role));
+    const lowerRanks = rolesBelow(actor.role);
 
     const employees = await this.prisma.employee.findMany({
       where: {

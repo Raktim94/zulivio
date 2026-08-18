@@ -4,9 +4,12 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
 import { createHash } from "node:crypto";
+import type { Request } from "express";
 import { PrismaService } from "../../prisma/prisma.service";
 import { EmploymentStatus, Role } from "@prisma/client";
+import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
 
 export interface AuthenticatedEmployee {
   id: string;
@@ -21,11 +24,22 @@ const SESSION_COOKIE = "ndcrm_session";
 
 @Injectable()
 export class AuthGuard implements CanActivate {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reflector: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
-    const rawToken: string | undefined = request.cookies?.[SESSION_COOKIE];
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isPublic) {
+      return true;
+    }
+
+    const request: Request = context.switchToHttp().getRequest();
+    const rawToken = request.cookies?.[SESSION_COOKIE] as string | undefined;
 
     if (!rawToken) {
       throw new UnauthorizedException("Not authenticated");

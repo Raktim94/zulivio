@@ -3,7 +3,11 @@ import { Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthService } from "../auth/auth.service";
 import { formatEmployeeNumber } from "../common/credentials";
+import { InMemoryRateLimiter } from "../common/rate-limiter";
 import { BootstrapDto } from "./dto/bootstrap.dto";
+
+const MAX_BOOTSTRAP_ATTEMPTS = 5;
+const BOOTSTRAP_WINDOW_MS = 60 * 60 * 1000; // 1h
 
 /**
  * Creates a brand new Organization plus its first MASTER_OWNER employee.
@@ -17,15 +21,27 @@ import { BootstrapDto } from "./dto/bootstrap.dto";
  */
 @Injectable()
 export class BootstrapService {
+  // Self-service org creation is a second account-enumeration surface
+  // beyond login (the "email already exists" check below), plus a spam/DoS
+  // vector (unbounded Organization + Employee creation). Rate-limited by
+  // caller IP, same in-memory-per-instance caveat as the login limiter.
+  private readonly limiter = new InMemoryRateLimiter(
+    MAX_BOOTSTRAP_ATTEMPTS,
+    BOOTSTRAP_WINDOW_MS,
+    "Too many organization-creation attempts from this address. Try again later.",
+  );
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly authService: AuthService,
   ) {}
 
-  async bootstrap(dto: BootstrapDto) {
+  async bootstrap(dto: BootstrapDto, ipAddress?: string) {
     if (process.env.BOOTSTRAP_DISABLED === "true") {
       throw new ForbiddenException("Self-service organization creation is disabled on this instance");
     }
+
+    this.limiter.assert(ipAddress ?? "unknown");
 
     const existing = await this.prisma.employee.findFirst({ where: { email: dto.email.toLowerCase() } });
     if (existing) {

@@ -1,14 +1,14 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { LeadStatus, Role } from "@prisma/client";
+import { LeadStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
+import { isManagerOrAbove } from "../common/roles";
 import { AssignmentRulesService } from "../assignment-rules/assignment-rules.service";
 import { PipelinesService } from "../pipelines/pipelines.service";
 import { CreateLeadDto } from "./dto/create-lead.dto";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { ConvertLeadDto } from "./dto/convert-lead.dto";
 
-const MANAGER_RANK: Role[] = [Role.MANAGER, Role.SALES_HEAD, Role.COMPANY_ADMIN, Role.MASTER_OWNER];
 
 // A lead can be contacted, then qualified or disqualified; a qualified
 // lead converts into an opportunity via a dedicated endpoint, not a
@@ -29,9 +29,6 @@ export class LeadsService {
     private readonly pipelines: PipelinesService,
   ) {}
 
-  private isManagerOrAbove(role: Role) {
-    return MANAGER_RANK.includes(role);
-  }
 
   async create(actor: AuthenticatedEmployee, dto: CreateLeadDto) {
     if (dto.ownerId) {
@@ -72,7 +69,7 @@ export class LeadsService {
   }
 
   async list(actor: AuthenticatedEmployee, filters: { status?: LeadStatus; overdue?: boolean }) {
-    const scoped = !this.isManagerOrAbove(actor.role);
+    const scoped = !isManagerOrAbove(actor.role);
 
     return this.prisma.lead.findMany({
       where: {
@@ -100,7 +97,7 @@ export class LeadsService {
     });
     if (!lead) throw new NotFoundException("Lead not found");
 
-    const scoped = !this.isManagerOrAbove(actor.role);
+    const scoped = !isManagerOrAbove(actor.role);
     if (scoped && lead.ownerId !== actor.id && lead.createdById !== actor.id) {
       throw new ForbiddenException("Not authorized to view this lead");
     }

@@ -6,45 +6,51 @@ import * as argon2 from "argon2";
 import { createHash, randomBytes } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmploymentStatus } from "@prisma/client";
+import { InMemoryRateLimiter } from "../common/rate-limiter";
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000; // 12h, matches attendance shift assumptions
 const MAX_LOGIN_ATTEMPTS = 8;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
-interface LoginAttemptRecord {
-  count: number;
-  windowStart: number;
-}
+// Explicit params rather than library defaults, so a future argon2 upgrade
+// can't silently change hashing cost. m=19456 KiB (~19 MiB), t=2, p=1 is
+// OWASP's "second choice" Argon2id preset — sized for modest self-hosted
+// hardware (CasaOS/home NAS boxes) rather than a beefy server fleet.
+const ARGON2_OPTIONS = {
+  type: argon2.argon2id,
+  memoryCost: 19456,
+  timeCost: 2,
+  parallelism: 1,
+} as const;
 
 @Injectable()
 export class AuthService {
-  // In-memory best-effort rate limiting. Adequate for a single-instance
-  // deployment; a distributed deployment should move this to Redis.
-  private readonly attempts = new Map<string, LoginAttemptRecord>();
+  private readonly loginLimiter = new InMemoryRateLimiter(
+    MAX_LOGIN_ATTEMPTS,
+    LOGIN_WINDOW_MS,
+    "Too many login attempts. Try again later.",
+  );
+  private readonly changePasswordLimiter = new InMemoryRateLimiter(
+    MAX_LOGIN_ATTEMPTS,
+    LOGIN_WINDOW_MS,
+    "Too many password-change attempts. Try again later.",
+  );
+
+  // Lazily computed hash of a random, never-reused secret, used to give a
+  // "no such employee" login the exact same argon2 cost as a real verify —
+  // computed via hashPassword() itself (not a hardcoded string) so it can
+  // never drift out of sync with ARGON2_OPTIONS if those params change.
+  private dummyHashPromise: Promise<string> | undefined;
 
   constructor(private readonly prisma: PrismaService) {}
 
   async hashPassword(plain: string): Promise<string> {
-    return argon2.hash(plain, { type: argon2.argon2id });
+    return argon2.hash(plain, ARGON2_OPTIONS);
   }
 
-  private assertNotRateLimited(key: string) {
-    const now = Date.now();
-    const record = this.attempts.get(key);
-    if (!record || now - record.windowStart > LOGIN_WINDOW_MS) {
-      this.attempts.set(key, { count: 1, windowStart: now });
-      return;
-    }
-    if (record.count >= MAX_LOGIN_ATTEMPTS) {
-      throw new UnauthorizedException(
-        "Too many login attempts. Try again later.",
-      );
-    }
-    record.count += 1;
-  }
-
-  private clearAttempts(key: string) {
-    this.attempts.delete(key);
+  private getDummyHash(): Promise<string> {
+    this.dummyHashPromise ??= this.hashPassword(randomBytes(32).toString("hex"));
+    return this.dummyHashPromise;
   }
 
   async login(
@@ -53,17 +59,16 @@ export class AuthService {
     context: { userAgent?: string; ipAddress?: string },
   ) {
     const key = email.toLowerCase();
-    this.assertNotRateLimited(key);
+    this.loginLimiter.assert(key);
 
     const employee = await this.prisma.employee.findFirst({
       where: { email: key },
     });
 
-    // Constant-shape response: verify against a dummy hash when the
-    // employee doesn't exist, so login timing doesn't reveal enumeration.
-    const hashToVerify =
-      employee?.passwordHash ??
-      "$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQAAAAAAAAAAA$invalidinvalidinvalidinvalidinvalidinva";
+    // Constant-shape response: verify against a dummy hash (same argon2
+    // cost as a real one) when the employee doesn't exist, so login timing
+    // doesn't reveal enumeration.
+    const hashToVerify = employee?.passwordHash ?? (await this.getDummyHash());
 
     const valid = await argon2.verify(hashToVerify, password).catch(() => false);
 
@@ -75,7 +80,7 @@ export class AuthService {
       throw new UnauthorizedException("Account is not active");
     }
 
-    this.clearAttempts(key);
+    this.loginLimiter.clear(key);
 
     const rawToken = randomBytes(32).toString("base64url");
     const tokenHash = createHash("sha256").update(rawToken).digest("hex");
@@ -116,6 +121,8 @@ export class AuthService {
     currentPassword: string,
     newPassword: string,
   ) {
+    this.changePasswordLimiter.assert(employeeId);
+
     const employee = await this.prisma.employee.findUniqueOrThrow({
       where: { id: employeeId },
     });
@@ -124,6 +131,7 @@ export class AuthService {
     if (!valid) {
       throw new UnauthorizedException("Current password is incorrect");
     }
+    this.changePasswordLimiter.clear(employeeId);
 
     const newHash = await this.hashPassword(newPassword);
     await this.prisma.employee.update({

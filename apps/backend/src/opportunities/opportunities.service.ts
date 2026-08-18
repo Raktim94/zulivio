@@ -1,13 +1,13 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { OpportunityStatus, Role } from "@prisma/client";
+import { OpportunityStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
+import { isManagerOrAbove } from "../common/roles";
 import { PipelinesService } from "../pipelines/pipelines.service";
 import { CreateOpportunityDto } from "./dto/create-opportunity.dto";
 import { MoveStageDto } from "./dto/move-stage.dto";
 import { SetForecastCategoryDto } from "./dto/set-forecast-category.dto";
 
-const MANAGER_RANK: Role[] = [Role.MANAGER, Role.SALES_HEAD, Role.COMPANY_ADMIN, Role.MASTER_OWNER];
 
 @Injectable()
 export class OpportunitiesService {
@@ -16,9 +16,6 @@ export class OpportunitiesService {
     private readonly pipelines: PipelinesService,
   ) {}
 
-  private isManagerOrAbove(role: Role) {
-    return MANAGER_RANK.includes(role);
-  }
 
   async create(actor: AuthenticatedEmployee, dto: CreateOpportunityDto) {
     const pipeline = dto.pipelineId
@@ -68,7 +65,7 @@ export class OpportunitiesService {
   }
 
   async list(actor: AuthenticatedEmployee, filters: { pipelineId?: string; status?: OpportunityStatus }) {
-    const scoped = !this.isManagerOrAbove(actor.role);
+    const scoped = !isManagerOrAbove(actor.role);
 
     return this.prisma.opportunity.findMany({
       where: {
@@ -92,7 +89,7 @@ export class OpportunitiesService {
     });
     if (!opportunity) throw new NotFoundException("Opportunity not found");
 
-    const scoped = !this.isManagerOrAbove(actor.role);
+    const scoped = !isManagerOrAbove(actor.role);
     if (scoped && opportunity.ownerId !== actor.id && opportunity.createdById !== actor.id) {
       throw new ForbiddenException("Not authorized to view this opportunity");
     }
@@ -145,7 +142,7 @@ export class OpportunitiesService {
 
   /** Manager+ override of the automatic forecast rollup, with a full audit trail. */
   async setForecastCategory(actor: AuthenticatedEmployee, id: string, dto: SetForecastCategoryDto) {
-    if (!this.isManagerOrAbove(actor.role)) {
+    if (!isManagerOrAbove(actor.role)) {
       throw new ForbiddenException("Only managers and above can adjust the forecast");
     }
 

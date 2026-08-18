@@ -1,11 +1,11 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { AssignmentRuleMode, LeadStatus, Role } from "@prisma/client";
+import { AssignmentRuleMode, LeadStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
+import { isManagerOrAbove } from "../common/roles";
 import { CreateAssignmentRuleDto } from "./dto/create-assignment-rule.dto";
 import { UpdateAssignmentRuleDto } from "./dto/update-assignment-rule.dto";
 
-const MANAGER_RANK: Role[] = [Role.MANAGER, Role.SALES_HEAD, Role.COMPANY_ADMIN, Role.MASTER_OWNER];
 const OPEN_LEAD_STATUSES: LeadStatus[] = [LeadStatus.NEW, LeadStatus.CONTACTED, LeadStatus.QUALIFIED];
 
 @Injectable()
@@ -13,7 +13,7 @@ export class AssignmentRulesService {
   constructor(private readonly prisma: PrismaService) {}
 
   private requireManager(actor: AuthenticatedEmployee) {
-    if (!MANAGER_RANK.includes(actor.role)) {
+    if (!isManagerOrAbove(actor.role)) {
       throw new ForbiddenException("Only managers and above can manage assignment rules");
     }
   }

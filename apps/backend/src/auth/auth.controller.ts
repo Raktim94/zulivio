@@ -12,6 +12,7 @@ import { LoginDto } from "./dto/login.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { AuthGuard, SESSION_COOKIE } from "../common/guards/auth.guard";
 import { CurrentEmployee } from "../common/decorators/current-employee.decorator";
+import { Public } from "../common/decorators/public.decorator";
 import type { AuthenticatedEmployee } from "../common/guards/auth.guard";
 
 // Independent from NODE_ENV: this app is self-hosted (CasaOS/ZimaOS,
@@ -29,6 +30,7 @@ const cookieSecure = process.env.COOKIE_SECURE === "true";
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  @Public()
   @Post("sessions")
   async login(
     @Body() dto: LoginDto,
@@ -57,7 +59,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    await this.authService.logout((req as unknown as { sessionId: string }).sessionId);
+    await this.authService.logout(req.sessionId!);
     res.clearCookie(SESSION_COOKIE, { path: "/" });
     return { ok: true };
   }

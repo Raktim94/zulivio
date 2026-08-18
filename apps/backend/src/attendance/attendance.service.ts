@@ -1,9 +1,8 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
-import { Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
+import { isManagerOrAbove } from "../common/roles";
 
-const MANAGER_RANK: Role[] = [Role.MANAGER, Role.SALES_HEAD, Role.COMPANY_ADMIN, Role.MASTER_OWNER];
 
 @Injectable()
 export class AttendanceService {
@@ -100,7 +99,7 @@ export class AttendanceService {
 
   /** Employee report: total sessions, net working time, break time, for a date range. Managers may query any employee in scope. */
   async report(actor: AuthenticatedEmployee, employeeId: string, from?: Date, to?: Date) {
-    if (employeeId !== actor.id && !MANAGER_RANK.includes(actor.role)) {
+    if (employeeId !== actor.id && !isManagerOrAbove(actor.role)) {
       throw new ForbiddenException("Cannot view another employee's attendance report");
     }
 
