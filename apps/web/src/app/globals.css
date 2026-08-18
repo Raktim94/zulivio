@@ -11,13 +11,22 @@
   --color-navy: #102635;
   --color-canvas: #f6f7f4;
   --color-surface: #ffffff;
-  --color-emerald: #168b65;
-  --color-emerald-dark: #106e51;
+  /* Former value #168b65 measured 4.27:1 as both white-on-emerald (every
+     primary Button, sitewide) and emerald-text-on-white (8+ links) — under
+     WCAG AA's 4.5:1 (axe-core scan, see TODO.md). This is the former
+     --color-emerald-dark shade promoted to default (passes at ~6.2:1);
+     emerald-dark shifted one step further down so the hover-darken effect
+     still reads as a real state change. */
+  --color-emerald: #106e51;
+  --color-emerald-dark: #0d5841;
   --color-coral: #e66e58;
   --color-amber: #d99a2b;
   --color-indigo: #5b5bd6;
   --color-ink: #17262e;
-  --color-muted: #64748b;
+  /* #64748b (Tailwind slate-500) measured 4.42:1 against --color-canvas —
+     just under WCAG AA's 4.5:1 for normal text (caught by an axe-core scan,
+     see TODO.md). slate-600 clears it (~7:1) while staying a muted gray. */
+  --color-muted: #475569;
   --color-border: #e2e5e0;
 }
 

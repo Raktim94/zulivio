@@ -108,19 +108,25 @@ export default function EmployeesPage() {
           className="grid grid-cols-1 gap-3 md:grid-cols-4"
         >
           <Input
+            aria-label="Full name"
             placeholder="Full name"
             value={form.fullName}
             onChange={(e) => setForm({ ...form, fullName: e.target.value })}
             required
           />
           <Input
+            aria-label="Email"
             type="email"
             placeholder="Email"
             value={form.email}
             onChange={(e) => setForm({ ...form, email: e.target.value })}
             required
           />
-          <Select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
+          <Select
+            aria-label="Role"
+            value={form.role}
+            onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
+          >
             {ROLES.map((r) => (
               <option key={r} value={r}>
                 {r.replace("_", " ")}
@@ -128,6 +134,7 @@ export default function EmployeesPage() {
             ))}
           </Select>
           <Input
+            aria-label="Department (optional)"
             placeholder="Department (optional)"
             value={form.department}
             onChange={(e) => setForm({ ...form, department: e.target.value })}

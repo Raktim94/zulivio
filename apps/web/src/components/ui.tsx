@@ -251,7 +251,7 @@ export function Tabs({
   }
 
   return (
-    <div role="tablist" className="flex gap-1 border-b border-border">
+    <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border">
       {tabs.map((tab, i) => {
         const selected = tab.id === active;
         return (
@@ -268,7 +268,7 @@ export function Tabs({
             onClick={() => onChange(tab.id)}
             onKeyDown={(e) => onKeyDown(e, i)}
             className={clsx(
-              "-mb-px border-b-2 px-3 py-2 text-sm font-medium transition",
+              "-mb-px shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition",
               selected ? "border-emerald text-emerald-dark" : "border-transparent text-muted hover:text-ink",
             )}
           >

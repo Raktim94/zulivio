@@ -82,7 +82,7 @@ function NavLinks({ pathname, isManager, isSalesHead, isOwner, onNavigate }: {
         if (items.length === 0) return null;
         return (
           <div key={group.label}>
-            <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/40">
+            <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wide text-white/60">
               {group.label}
             </p>
             <div className="flex flex-col gap-1">
@@ -154,7 +154,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </Dialog>
 
-      <div className="flex min-h-screen flex-1 flex-col bg-canvas">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col bg-canvas">
         <TopBar
           title={pageTitle}
           employee={employee}
@@ -169,7 +169,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </button>
           }
         />
-        <main className="flex-1 px-4 py-6 md:px-8">{children}</main>
+        <main className="min-w-0 flex-1 px-4 py-6 md:px-8">{children}</main>
       </div>
     </div>
   );

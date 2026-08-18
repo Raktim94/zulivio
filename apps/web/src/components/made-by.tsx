@@ -2,7 +2,7 @@ import clsx from "clsx";
 
 export function MadeBy({ className, onDark = false }: { className?: string; onDark?: boolean }) {
   return (
-    <p className={clsx("text-[11px]", onDark ? "text-white/40" : "text-muted", className)}>
+    <p className={clsx("text-[11px]", onDark ? "text-white/60" : "text-muted", className)}>
       Zulivio · made by{" "}
       <a
         href="https://www.nodedr.com/"
