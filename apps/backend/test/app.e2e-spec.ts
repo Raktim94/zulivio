@@ -419,6 +419,132 @@ describe("Zulivio (e2e)", () => {
     });
   });
 
+  describe("CRM/reporting scope (Manager vs Sales Head vs Admin)", () => {
+    // Builds a real org chart: Owner -> SalesHead -> {ManagerA, ManagerB},
+    // each Manager -> one direct-report Employee. Exercises
+    // EmployeeScopeService (common/scope.service.ts): MANAGER is scoped to
+    // direct reports only, SALES_HEAD to their whole reporting subtree,
+    // COMPANY_ADMIN/MASTER_OWNER to the full org — for assignment
+    // reassignment, employee report access, and the sales dashboard's
+    // owner-filtered records.
+    let ownerAgent: ReturnType<typeof request.agent>;
+    let salesHeadAgent: ReturnType<typeof request.agent>;
+    let managerAAgent: ReturnType<typeof request.agent>;
+    let managerBAgent: ReturnType<typeof request.agent>;
+    let employeeA1Id: string;
+    let employeeB1Id: string;
+
+    beforeAll(async () => {
+      ownerAgent = request.agent(server());
+      await ownerAgent.post("/api/v1/auth/sessions").send({ email: orgEmail, password: orgPassword });
+
+      const salesHeadEmail = `scope-sh-${Date.now()}@e2e.local`;
+      const salesHeadRes = await ownerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Scope Sales Head", email: salesHeadEmail, role: "SALES_HEAD" });
+      salesHeadAgent = request.agent(server());
+      await salesHeadAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email: salesHeadEmail, password: salesHeadRes.body.temporaryPassword });
+
+      const managerAEmail = `scope-mgra-${Date.now()}@e2e.local`;
+      const managerARes = await salesHeadAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Scope Manager A", email: managerAEmail, role: "MANAGER", managerId: salesHeadRes.body.id });
+      managerAAgent = request.agent(server());
+      await managerAAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email: managerAEmail, password: managerARes.body.temporaryPassword });
+
+      const managerBEmail = `scope-mgrb-${Date.now()}@e2e.local`;
+      const managerBRes = await salesHeadAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Scope Manager B", email: managerBEmail, role: "MANAGER", managerId: salesHeadRes.body.id });
+      managerBAgent = request.agent(server());
+      await managerBAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email: managerBEmail, password: managerBRes.body.temporaryPassword });
+
+      const employeeA1Res = await managerAAgent.post("/api/v1/employees").send({
+        fullName: "Scope Employee A1",
+        email: `scope-empa1-${Date.now()}@e2e.local`,
+        role: "EMPLOYEE",
+        managerId: managerARes.body.id,
+      });
+      employeeA1Id = employeeA1Res.body.id;
+
+      const employeeB1Res = await managerBAgent.post("/api/v1/employees").send({
+        fullName: "Scope Employee B1",
+        email: `scope-empb1-${Date.now()}@e2e.local`,
+        role: "EMPLOYEE",
+        managerId: managerBRes.body.id,
+      });
+      employeeB1Id = employeeB1Res.body.id;
+    });
+
+    it("lets a Manager assign work to their own direct report", async () => {
+      const assignmentRes = await managerAAgent.post("/api/v1/assignments").send({ title: "Scope test: A1 work" });
+      await managerAAgent
+        .post(`/api/v1/assignments/${assignmentRes.body.id}/assign`)
+        .send({ employeeId: employeeA1Id })
+        .expect(201);
+    });
+
+    it("blocks a Manager from assigning work to another Manager's report, despite same org and same rank-gate", async () => {
+      const assignmentRes = await managerAAgent.post("/api/v1/assignments").send({ title: "Scope test: cross-team" });
+      await managerAAgent
+        .post(`/api/v1/assignments/${assignmentRes.body.id}/assign`)
+        .send({ employeeId: employeeB1Id })
+        .expect(403);
+    });
+
+    it("lets a Sales Head assign work anywhere in their reporting subtree, including a grandchild", async () => {
+      const assignmentRes = await salesHeadAgent
+        .post("/api/v1/assignments")
+        .send({ title: "Scope test: Sales Head reach" });
+      await salesHeadAgent
+        .post(`/api/v1/assignments/${assignmentRes.body.id}/assign`)
+        .send({ employeeId: employeeB1Id })
+        .expect(201);
+    });
+
+    it("lets a Manager view their direct report's total report, but not another manager's report", async () => {
+      await managerAAgent.get(`/api/v1/reports/employees/${employeeA1Id}`).expect(200);
+      await managerAAgent.get(`/api/v1/reports/employees/${employeeB1Id}`).expect(403);
+    });
+
+    it("lets a Sales Head view every report in their subtree", async () => {
+      await salesHeadAgent.get(`/api/v1/reports/employees/${employeeA1Id}`).expect(200);
+      await salesHeadAgent.get(`/api/v1/reports/employees/${employeeB1Id}`).expect(200);
+    });
+
+    it("scopes the sales dashboard's owned records to Manager's direct reports, not the whole org", async () => {
+      await ownerAgent
+        .post("/api/v1/opportunities")
+        .send({ title: "Scope test: A1's deal", ownerId: employeeA1Id, amountMinor: 100000 })
+        .expect(201);
+      await ownerAgent
+        .post("/api/v1/opportunities")
+        .send({ title: "Scope test: B1's deal", ownerId: employeeB1Id, amountMinor: 200000 })
+        .expect(201);
+
+      const managerADashboard = await managerAAgent.get("/api/v1/reports/sales-dashboard").expect(200);
+      const managerAOwnerIds = managerADashboard.body.byOwner.map((o: { ownerId: string }) => o.ownerId);
+      expect(managerAOwnerIds).toContain(employeeA1Id);
+      expect(managerAOwnerIds).not.toContain(employeeB1Id);
+
+      const salesHeadDashboard = await salesHeadAgent.get("/api/v1/reports/sales-dashboard").expect(200);
+      const salesHeadOwnerIds = salesHeadDashboard.body.byOwner.map((o: { ownerId: string }) => o.ownerId);
+      expect(salesHeadOwnerIds).toContain(employeeA1Id);
+      expect(salesHeadOwnerIds).toContain(employeeB1Id);
+
+      const ownerDashboard = await ownerAgent.get("/api/v1/reports/sales-dashboard").expect(200);
+      const ownerOwnerIds = ownerDashboard.body.byOwner.map((o: { ownerId: string }) => o.ownerId);
+      expect(ownerOwnerIds).toContain(employeeA1Id);
+      expect(ownerOwnerIds).toContain(employeeB1Id);
+    });
+  });
+
   describe("attendance state machine", () => {
     let agent: ReturnType<typeof request.agent>;
     let sessionId: string;

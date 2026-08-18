@@ -1,9 +1,10 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
-import { AssignmentStatus, LeadStatus, OpportunityStatus } from "@prisma/client";
+import { AssignmentStatus, LeadStatus, OpportunityStatus, Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AttendanceService } from "../attendance/attendance.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
 import { isManagerOrAbove } from "../common/roles";
+import { EmployeeScopeService } from "../common/scope.service";
 
 
 @Injectable()
@@ -11,6 +12,7 @@ export class ReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly attendanceService: AttendanceService,
+    private readonly employeeScope: EmployeeScopeService,
   ) {}
 
   /** Org-wide "master database view" dashboard: headcount, assignment mix, live attendance, overdue work. */
@@ -76,7 +78,7 @@ export class ReportsService {
 
   /** Full "employee total report": hours, breaks, assignment outcomes — everything a manager needs in one view. */
   async employeeTotalReport(actor: AuthenticatedEmployee, employeeId: string, from?: Date, to?: Date) {
-    if (employeeId !== actor.id && !isManagerOrAbove(actor.role)) {
+    if (employeeId !== actor.id && !(await this.employeeScope.isInScope(actor, employeeId))) {
       throw new ForbiddenException("Cannot view another employee's report");
     }
 
@@ -121,13 +123,23 @@ export class ReportsService {
 
     const orgId = actor.organizationId;
 
+    // COMPANY_ADMIN/MASTER_OWNER see the whole org, including unassigned
+    // records — no owner filter. MANAGER (direct reports) and SALES_HEAD
+    // (full reporting subtree) are scoped to their authorized team's owned
+    // records — previously this was org-wide for any manager+, letting one
+    // team's manager see every other team's pipeline and revenue data.
+    const isFullOrgScope = actor.role === Role.COMPANY_ADMIN || actor.role === Role.MASTER_OWNER;
+    const ownerFilter = isFullOrgScope
+      ? {}
+      : { ownerId: { in: await this.employeeScope.authorizedEmployeeIds(actor) } };
+
     const [pipeline, openOpportunities, leadsByStatus, overdueLeads, wonCount, lostCount] = await Promise.all([
       this.prisma.pipeline.findFirst({
         where: { organizationId: orgId, isDefault: true },
         include: { stages: { orderBy: { sortOrder: "asc" } } },
       }),
       this.prisma.opportunity.findMany({
-        where: { organizationId: orgId, status: OpportunityStatus.OPEN },
+        where: { organizationId: orgId, status: OpportunityStatus.OPEN, ...ownerFilter },
         include: {
           stage: { select: { id: true, name: true, sortOrder: true, probability: true } },
           owner: { select: { id: true, fullName: true } },
@@ -135,7 +147,7 @@ export class ReportsService {
       }),
       this.prisma.lead.groupBy({
         by: ["status"],
-        where: { organizationId: orgId },
+        where: { organizationId: orgId, ...ownerFilter },
         _count: { _all: true },
       }),
       this.prisma.lead.count({
@@ -144,10 +156,15 @@ export class ReportsService {
           respondBySlaAt: { lt: new Date() },
           firstRespondedAt: null,
           status: { in: [LeadStatus.NEW, LeadStatus.CONTACTED] },
+          ...ownerFilter,
         },
       }),
-      this.prisma.opportunity.count({ where: { organizationId: orgId, status: OpportunityStatus.WON } }),
-      this.prisma.opportunity.count({ where: { organizationId: orgId, status: OpportunityStatus.LOST } }),
+      this.prisma.opportunity.count({
+        where: { organizationId: orgId, status: OpportunityStatus.WON, ...ownerFilter },
+      }),
+      this.prisma.opportunity.count({
+        where: { organizationId: orgId, status: OpportunityStatus.LOST, ...ownerFilter },
+      }),
     ]);
 
     const stageBreakdown = (pipeline?.stages ?? []).map((stage) => {

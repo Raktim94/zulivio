@@ -18,10 +18,10 @@ Full plan: `~/.claude/plans/gleaming-watching-koala.md`. Update checkboxes as wo
 - [ ] Open: `BackupConfig` S3 credentials plaintext-in-DB — accepted risk, not addressed this pass (see report)
 
 ## Phase 1 — Backend RBAC rework
-- [ ] `common/roles.ts` single source of truth
-- [ ] Scope-resolution helper (`common/scope.service.ts`) — Employee/Manager/Sales Head/Admin+Owner visibility rules
-- [ ] Thread scope helper through employees/reports/assignments services
-- [ ] Authorization regression tests (Sales Head scope, manager-peer block, employee isolation)
+- [x] `common/roles.ts` single source of truth (landed in Phase 0)
+- [x] Scope-resolution helper (`common/scope.service.ts` + `common/scope.module.ts`) — Employee (self)/Manager (direct reports)/Sales Head (full subtree)/Admin+Owner (full org)
+- [x] Thread scope helper through `reports.service.ts` (`salesDashboard` owner-filtering, `employeeTotalReport` access check) and `assignments.service.ts` (`assign` target validation). `employees.service.ts`'s directory listing deliberately stays rank-based, not subtree-based — see the doc comment on `EmployeeScopeService` for why (it's a different, HR-style visibility concern from CRM/reporting scope).
+- [x] Authorization regression tests (6 new: Manager→direct-report allowed, Manager→other-manager's-report blocked despite same rank-gate, Sales-Head→subtree-grandchild allowed, employee-report access scoped the same way, sales-dashboard owner-filtering verified per role) — verified to fail pre-fix, pass post-fix
 
 ## Phase 2 — Employee workspace
 - [ ] Backend `apps/backend/src/me/` module: `/me/home`, `/me/tasks`, `/me/quality-audits`, `/me/reports`

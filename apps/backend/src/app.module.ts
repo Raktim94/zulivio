@@ -3,6 +3,7 @@ import { APP_GUARD } from "@nestjs/core";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
 import { AuthGuard } from "./common/guards/auth.guard";
+import { ScopeModule } from "./common/scope.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { HealthModule } from "./health/health.module";
 import { BootstrapModule } from "./bootstrap/bootstrap.module";
@@ -26,6 +27,7 @@ import { AuditModule } from "./audit/audit.module";
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
     PrismaModule,
+    ScopeModule,
     HealthModule,
     BootstrapModule,
     AuthModule,

@@ -9,6 +9,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
 import { CreateAssignmentDto } from "./dto/create-assignment.dto";
 import { isManagerOrAbove } from "../common/roles";
+import { EmployeeScopeService } from "../common/scope.service";
 
 const UNIQUE_CONSTRAINT_VIOLATION = "P2002";
 const MAX_ASSIGNMENT_NUMBER_RETRIES = 5;
@@ -29,7 +30,10 @@ const ALLOWED_TRANSITIONS: Record<AssignmentStatus, AssignmentStatus[]> = {
 
 @Injectable()
 export class AssignmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly employeeScope: EmployeeScopeService,
+  ) {}
 
   async create(actor: AuthenticatedEmployee, dto: CreateAssignmentDto) {
     if (dto.ownerId) {
@@ -108,6 +112,12 @@ export class AssignmentsService {
 
     if (!assignment) throw new NotFoundException("Assignment not found");
     if (!employee) throw new BadRequestException("Target employee not in this organization");
+    // A Manager may only assign work to their own direct reports; a Sales
+    // Head may assign anywhere in their reporting subtree. Being in the
+    // same org isn't enough — that's the org-membership check above.
+    if (!(await this.employeeScope.isInScope(actor, employeeId))) {
+      throw new ForbiddenException("Target employee is outside your authorized scope");
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.assignment.update({
