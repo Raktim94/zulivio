@@ -42,6 +42,7 @@ services:
       BOOTSTRAP_DISABLED: "false"
       GOOGLE_SHEETS_CLIENT_EMAIL: ""
       GOOGLE_SHEETS_PRIVATE_KEY: ""
+      FIELD_ENCRYPTION_KEY: ""
       S3_BACKUP_ENDPOINT: ""
       S3_BACKUP_BUCKET: ""
       S3_BACKUP_ACCESS_KEY_ID: ""
@@ -78,6 +79,12 @@ services:
         - container: GOOGLE_SHEETS_PRIVATE_KEY
           description:
             en_US: Optional — paired with GOOGLE_SHEETS_CLIENT_EMAIL above. Leave blank to keep Google Sheets sync disabled.
+        - container: FIELD_ENCRYPTION_KEY
+          description:
+            en_US: >-
+              Required only if you set S3 backup credentials from Settings > Backups in the app (stored in
+              Postgres) rather than the S3_BACKUP_* fields below. Encrypts that stored secret access key at rest.
+              32 raw bytes, base64-encoded — generate with: openssl rand -base64 32
         - container: S3_BACKUP_ENDPOINT
           description:
             en_US: Optional — S3-compatible endpoint URL (e.g. https://s3.example.com) for automatic backups. Leave blank to keep backups disabled.

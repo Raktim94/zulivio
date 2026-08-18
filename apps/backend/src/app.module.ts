@@ -4,6 +4,7 @@ import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
 import { AuthGuard } from "./common/guards/auth.guard";
 import { ScopeModule } from "./common/scope.module";
+import { FieldEncryptionModule } from "./common/crypto/field-encryption.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { HealthModule } from "./health/health.module";
 import { BootstrapModule } from "./bootstrap/bootstrap.module";
@@ -32,6 +33,7 @@ import { SalesHeadModule } from "./sales-head/sales-head.module";
     ScheduleModule.forRoot(),
     PrismaModule,
     ScopeModule,
+    FieldEncryptionModule,
     HealthModule,
     BootstrapModule,
     AuthModule,

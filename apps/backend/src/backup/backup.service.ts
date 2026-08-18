@@ -11,6 +11,7 @@ import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } fro
 import { Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
+import { FieldEncryptionService } from "../common/crypto/field-encryption.service";
 import { SetBackupConfigDto } from "./dto/set-backup-config.dto";
 
 const execFileAsync = promisify(execFile);
@@ -47,7 +48,10 @@ function mask(value: string): string {
 export class BackupService {
   private readonly logger = new Logger(BackupService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly fieldEncryption: FieldEncryptionService,
+  ) {}
 
   private async getConfig(): Promise<EffectiveConfig | null> {
     const row = await this.prisma.backupConfig.findUnique({ where: { id: CONFIG_ID } });
@@ -56,7 +60,10 @@ export class BackupService {
         endpoint: row.endpoint,
         bucket: row.bucket,
         accessKeyId: row.accessKeyId,
-        secretAccessKey: row.secretAccessKey,
+        // Rows written before FieldEncryptionService existed are legacy
+        // plaintext; decrypt() passes those through unchanged and they get
+        // re-encrypted the next time setConfig() runs.
+        secretAccessKey: this.fieldEncryption.decrypt(row.secretAccessKey),
         region: row.region,
         intervalDays: row.intervalDays,
         retainCount: row.retainCount,
@@ -158,6 +165,7 @@ export class BackupService {
 
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { source: _source, ...persisted } = candidate;
+    persisted.secretAccessKey = this.fieldEncryption.encrypt(persisted.secretAccessKey);
     await this.prisma.backupConfig.upsert({
       where: { id: CONFIG_ID },
       create: { id: CONFIG_ID, ...persisted, updatedById: actor.id },

@@ -15,7 +15,7 @@ Full plan: `~/.claude/plans/gleaming-watching-koala.md`. Update checkboxes as wo
 - [x] Fix: helmet + CSRF mitigation in `main.ts`
 - [x] Add: cross-tenant isolation e2e tests (7 tests, verified to fail pre-fix)
 - [x] `Employee.email` global-uniqueness migration (`@@unique([email])`) — applied via migration `20260818095045_employee_email_global_unique` (`prisma migrate deploy`, non-interactive; SQL generated with `prisma migrate diff` since `migrate dev`'s confirmation prompt needs a TTY this session doesn't have). Verified live via `pg_indexes`; 68/68 e2e tests still pass.
-- [ ] Open: `BackupConfig` S3 credentials plaintext-in-DB — accepted risk, not addressed this pass (see report)
+- [x] Fix: `BackupConfig` S3 credentials plaintext-in-DB — envelope-encrypted at rest via new `FieldEncryptionService` (AES-256-GCM, key from `FIELD_ENCRYPTION_KEY` env var), no schema migration needed, legacy plaintext rows auto-upgrade on next save. 74/74 e2e tests pass (6 new, covering the encryption primitive). See `SECURITY_AUDIT_REPORT.md` finding #10.
 
 ## Phase 1 — Backend RBAC rework
 - [x] `common/roles.ts` single source of truth (landed in Phase 0)
