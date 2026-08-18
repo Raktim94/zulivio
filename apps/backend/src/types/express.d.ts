@@ -8,6 +8,7 @@ declare module "express" {
   interface Request {
     employee?: AuthenticatedEmployee;
     sessionId?: string;
+    apiKeyId?: string;
   }
 }
 

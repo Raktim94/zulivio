@@ -56,6 +56,24 @@ export interface GoogleSheetsStatusData {
   clientEmail: string | null;
 }
 
+export interface ApiKeySummary {
+  id: string;
+  name: string;
+  lastFour: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}
+
+export interface ApiKeyCreated {
+  id: string;
+  name: string;
+  /** Only ever present in the create response — shown once, never retrievable again. */
+  token: string;
+  lastFour: string;
+  createdAt: string;
+}
+
 export interface EmployeeSummary {
   id: string;
   employeeNumber: string;

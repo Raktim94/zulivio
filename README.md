@@ -16,7 +16,7 @@ Developed by [NodeDR Infotech Private Limited](https://www.nodedr.com/)
 [![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)](package.json)
 [![NestJS](https://img.shields.io/badge/backend-NestJS%2011-E0234E?logo=nestjs&logoColor=white)](apps/backend)
 [![Next.js](https://img.shields.io/badge/frontend-Next.js%2015-000000?logo=next.js&logoColor=white)](apps/web)
-[![Tests](https://img.shields.io/badge/e2e%20tests-26%2F26%20passing-brightgreen)](apps/backend/test/app.e2e-spec.ts)
+[![Tests](https://img.shields.io/badge/e2e%20tests-82%2F82%20passing-brightgreen)](apps/backend/test)
 
 </div>
 
@@ -57,6 +57,8 @@ switch install methods later.
 - [Roles and access](#roles-and-access)
 - [Core features](#core-features)
 - [Google Sheets integration](#google-sheets-integration)
+- [MCP server](#mcp-server)
+- [User manual](#user-manual)
 - [Environment variables](#environment-variables)
 - [Common operations](#common-operations)
 - [Local development](#local-development-without-docker)
@@ -324,6 +326,86 @@ live import/export. Without credentials configured,
 `GET /api/v1/integrations/google-sheets/status` returns
 `{ configured: false }` and the UI clearly says so — it never pretends the
 integration works.
+
+## MCP server
+
+Zulivio exposes a [Model Context Protocol](https://modelcontextprotocol.io)
+server so an AI assistant (Claude, ChatGPT, or any other MCP-capable client)
+can act on your Zulivio account directly — read your tasks, check the sales
+dashboard, log attendance, create a lead, and so on.
+
+**Security model:** each connection is a personal API key, not a shared
+credential. A key carries no permissions of its own — it just resolves to
+the employee who created it, so the assistant can only ever do what that
+employee could already do in the app (the exact same role/RBAC/scope checks
+the REST API enforces apply to every MCP call). The tool list is a
+deliberately curated subset of the API, not a full mirror: nothing
+destructive is reachable this way — no deleting employees, no role changes,
+no backup restore, no bulk operations.
+
+**1. Generate a key** — Settings → API Keys → Create key. Copy the token
+immediately; it's shown exactly once.
+
+**2. Test the connection** (replace both placeholders):
+
+```bash
+curl -X POST https://<your-zulivio-domain>/api/v1/mcp \
+  -H "Authorization: Bearer <your-api-key>" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
+```
+
+A working connection returns a JSON-RPC response listing the tools below.
+
+**3. Connect a client.** The endpoint is `https://<your-zulivio-domain>/api/v1/mcp`,
+authenticated with an `Authorization: Bearer <your-api-key>` header — how
+you supply that depends on the client:
+
+- **Claude.ai / ChatGPT connectors** (native remote-MCP support): add a
+  connector, paste the endpoint URL, and set the `Authorization` header to
+  `Bearer <your-api-key>` in its custom-headers field.
+- **Claude Desktop / other config-file clients** (via
+  [`mcp-remote`](https://www.npmjs.com/package/mcp-remote), since these
+  don't speak Streamable HTTP directly):
+  ```json
+  {
+    "mcpServers": {
+      "zulivio": {
+        "command": "npx",
+        "args": [
+          "-y", "mcp-remote",
+          "https://<your-zulivio-domain>/api/v1/mcp",
+          "--header", "Authorization:Bearer ${ZULIVIO_API_KEY}"
+        ],
+        "env": { "ZULIVIO_API_KEY": "<your-api-key>" }
+      }
+    }
+  }
+  ```
+
+**Tools exposed:**
+
+| Tool | Type | Notes |
+| --- | --- | --- |
+| `list_employees` | Read | Scoped by caller's role, same as the Employees page |
+| `my_attendance_status` | Read | logged_out / working / on_break |
+| `start_attendance` / `end_attendance` | Write | Clock in/out |
+| `list_my_tasks` | Read | Assignments owned by the caller |
+| `update_task_status` | Write | Guarded by the same status state machine and ownership checks as the app |
+| `list_leads` | Read | Caller's own leads, or all if Manager+ |
+| `create_lead` | Write | Optional `autoAssign` to run the org's assignment rule |
+| `sales_dashboard` | Read | Manager+ only, scoped to the caller's reporting subtree |
+
+Revoke a key any time from Settings → API Keys — it stops working
+immediately, no restart needed.
+
+## User manual
+
+A full step-by-step guide to every major action in the app — creating
+employees, running quality audits, connecting the MCP server, and more —
+with real screenshots, is published as `docs/zulivio-user-manual.pdf` in
+this repo and linked from the in-app `/docs` page.
 
 ## Environment variables
 

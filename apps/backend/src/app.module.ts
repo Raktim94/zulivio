@@ -26,6 +26,8 @@ import { QualityAuditsModule } from "./quality-audits/quality-audits.module";
 import { WorkflowsModule } from "./workflows/workflows.module";
 import { MeModule } from "./me/me.module";
 import { SalesHeadModule } from "./sales-head/sales-head.module";
+import { ApiKeysModule } from "./api-keys/api-keys.module";
+import { McpModule } from "./mcp/mcp.module";
 
 @Module({
   imports: [
@@ -54,6 +56,8 @@ import { SalesHeadModule } from "./sales-head/sales-head.module";
     WorkflowsModule,
     MeModule,
     SalesHeadModule,
+    ApiKeysModule,
+    McpModule,
   ],
   providers: [
     // Global safety net: every route requires an authenticated session

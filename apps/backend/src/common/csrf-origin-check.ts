@@ -23,12 +23,20 @@ function originFromReferer(referer: string | undefined): string | undefined {
  * rejection it writes the same JSON error shape as AllExceptionsFilter
  * directly, rather than throwing a NestJS HttpException that filter can't
  * intercept at this stage of the pipeline.
+ *
+ * Exempts `Authorization: Bearer` requests (API keys, see mcp/ and
+ * api-keys/): CSRF is only a risk when auth rides along automatically with
+ * the browser (cookies) — a bearer token is never attached by a browser to
+ * a cross-site request on its own, so there's nothing for this check to
+ * defend against there, and enforcing it would make the MCP server
+ * unreachable for every real external client (Claude, ChatGPT, curl, none
+ * of which send an Origin header matching this app's own front-end).
  */
 export function createCsrfOriginCheck(allowedOrigins: string[]): RequestHandler {
   const allowed = new Set(allowedOrigins);
 
   return (req: Request, res: Response, next: NextFunction) => {
-    if (SAFE_METHODS.has(req.method)) {
+    if (SAFE_METHODS.has(req.method) || req.headers.authorization?.startsWith("Bearer ")) {
       next();
       return;
     }

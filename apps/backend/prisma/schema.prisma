@@ -88,6 +88,7 @@ model Employee {
   separatedAt      DateTime?
 
   sessions             Session[]
+  apiKeys              ApiKey[]
   assignmentsOwned     Assignment[]        @relation("AssignmentOwner")
   assignmentsCreated   Assignment[]        @relation("AssignmentCreatedBy")
   workSessions         WorkSession[]
@@ -125,6 +126,29 @@ model Session {
 
   @@index([employeeId])
   @@map("sessions")
+}
+
+// Personal access tokens, primarily for the MCP server (mcp/) so an AI
+// client (Claude, ChatGPT, etc.) can call the API as a specific employee —
+// same tokenHash-lookup pattern as Session above (random token shown once
+// at creation, only its SHA-256 hash stored). A key carries no permissions
+// of its own: AuthGuard resolves it to its owning employee, so every
+// existing role/RBAC/scope check applies unchanged to key-authenticated
+// requests, exactly as if that employee were logged in. lastFour is
+// display-only (e.g. "zlv_••••ab12"), never used for lookup.
+model ApiKey {
+  id         String    @id @default(uuid())
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id])
+  name       String
+  tokenHash  String    @unique
+  lastFour   String
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+
+  @@index([employeeId])
+  @@map("api_keys")
 }
 
 model Assignment {

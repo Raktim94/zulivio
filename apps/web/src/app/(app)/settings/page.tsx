@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  ApiKeyCreated,
+  ApiKeySummary,
   AuditEventSummary,
   BackupRecord,
   BackupStatusData,
@@ -37,6 +39,7 @@ export default function SettingsPage() {
     { id: "profile", label: "Profile" },
     { id: "team", label: "Team" },
     { id: "password", label: "Password" },
+    { id: "api-keys", label: "API Keys" },
     ...(owner ? [{ id: "backups", label: "Backups & Activity" }] : []),
     ...(owner ? [{ id: "integrations", label: "Integrations" }] : []),
   ];
@@ -58,6 +61,9 @@ export default function SettingsPage() {
       </TabPanel>
       <TabPanel id="password" active={tab}>
         <PasswordTab />
+      </TabPanel>
+      <TabPanel id="api-keys" active={tab}>
+        <ApiKeysTab />
       </TabPanel>
       {owner && (
         <TabPanel id="backups" active={tab}>
@@ -178,6 +184,148 @@ function PasswordTab() {
         </Button>
       </form>
     </Card>
+  );
+}
+
+function ApiKeysTab() {
+  const queryClient = useQueryClient();
+  const { push } = useToast();
+
+  const { data: keys, isLoading, error: listError } = useQuery<ApiKeySummary[]>({
+    queryKey: ["api-keys"],
+    queryFn: () => api.get<ApiKeySummary[]>("/api/v1/api-keys"),
+  });
+
+  const [name, setName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [justCreated, setJustCreated] = useState<ApiKeyCreated | null>(null);
+
+  const createKey = useMutation({
+    mutationFn: () => api.post<ApiKeyCreated>("/api/v1/api-keys", { name }),
+    onSuccess: (created) => {
+      setCreateError(null);
+      setName("");
+      setJustCreated(created);
+      queryClient.invalidateQueries({ queryKey: ["api-keys"] });
+    },
+    onError: (err) => setCreateError(err instanceof ApiError ? err.message : "Could not create that key"),
+  });
+
+  const revokeKey = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/api-keys/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["api-keys"] }),
+  });
+
+  async function copyToken(token: string) {
+    try {
+      await navigator.clipboard.writeText(token);
+      push("Copied to clipboard.", "success");
+    } catch {
+      push("Could not copy — select and copy the key manually.", "error");
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <Card className="max-w-2xl">
+        <h2 className="mb-1 text-sm font-medium text-ink">API keys</h2>
+        <p className="mb-4 text-sm text-muted">
+          Personal access tokens that act as you — used to connect an MCP client (Claude, ChatGPT, etc.) to
+          Zulivio. See the README&apos;s &quot;MCP server&quot; section for the connection command. Anyone with a
+          key can do anything your account can do, so treat it like a password and revoke it if it&apos;s ever
+          exposed.
+        </p>
+
+        {justCreated && (
+          <div className="mb-4 rounded-lg border border-emerald/30 bg-emerald/5 p-3">
+            <p className="mb-2 text-sm font-medium text-ink">
+              &quot;{justCreated.name}&quot; created — copy it now, it won&apos;t be shown again:
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <code className="min-w-0 flex-1 break-all rounded-md bg-surface px-2 py-1.5 text-xs">
+                {justCreated.token}
+              </code>
+              <Button
+                variant="secondary"
+                className="px-3 py-1.5 text-xs"
+                onClick={() => copyToken(justCreated.token)}
+              >
+                Copy
+              </Button>
+              <button
+                type="button"
+                className="text-xs text-muted underline"
+                onClick={() => setJustCreated(null)}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        )}
+
+        {createError && <ErrorState message={createError} />}
+        <form
+          className="mb-6 flex flex-wrap gap-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setCreateError(null);
+            createKey.mutate();
+          }}
+        >
+          <Input
+            aria-label="Key name"
+            placeholder="Key name, e.g. Claude Desktop"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="max-w-xs"
+            required
+          />
+          <Button type="submit" disabled={createKey.isPending}>
+            {createKey.isPending ? "Creating..." : "Create key"}
+          </Button>
+        </form>
+
+        <h3 className="mb-2 text-xs font-medium text-muted">Your keys</h3>
+        {isLoading ? (
+          <Spinner />
+        ) : listError ? (
+          <ErrorState message="Could not load your API keys." />
+        ) : !keys || keys.length === 0 ? (
+          <p className="text-sm text-muted">No API keys yet.</p>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {keys.map((key) => (
+              <li
+                key={key.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm"
+              >
+                <div>
+                  <p className="text-ink">
+                    {key.name} <span className="text-muted">(····{key.lastFour})</span>
+                  </p>
+                  <p className="text-xs text-muted">
+                    Created {new Date(key.createdAt).toLocaleDateString()}
+                    {key.lastUsedAt && ` · last used ${new Date(key.lastUsedAt).toLocaleString()}`}
+                  </p>
+                </div>
+                {key.revokedAt ? (
+                  <Badge tone="neutral">Revoked</Badge>
+                ) : (
+                  <Button
+                    variant="danger"
+                    className="px-3 py-1.5 text-xs"
+                    disabled={revokeKey.isPending}
+                    onClick={() => revokeKey.mutate(key.id)}
+                  >
+                    Revoke
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </Card>
+    </div>
   );
 }
 
