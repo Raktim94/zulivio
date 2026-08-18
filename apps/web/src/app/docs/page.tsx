@@ -42,7 +42,9 @@ export default function DocsPage() {
             quality audits, connecting the MCP server below, and more — with real screenshots.
           </p>
           <a
-            href="/zulivio-user-manual.pdf"
+            href="https://raw.githubusercontent.com/Raktim94/zulivio/main/docs/zulivio-user-manual.pdf"
+            target="_blank"
+            rel="noreferrer"
             className="mt-4 inline-flex items-center rounded-lg bg-emerald px-4 py-2 text-sm font-medium text-white shadow-sm shadow-emerald/20 transition-all hover:bg-emerald-dark"
           >
             Download the PDF user manual
