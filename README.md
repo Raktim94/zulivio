@@ -263,6 +263,29 @@ only by hiding a button in the UI.
     manager-level (forecast-category overrides with a full audit trail via
     `forecast_adjustments`), and company-level (org-wide pipeline value and
     weighted forecast rollup) views.
+- **Employee workspace** — Home (today's assignment summary + attendance
+  state + active-work list), Start Work (attendance widget + today's
+  queue), Tasks (Pending/Completed/All/Workflow-Runs tabs), Quality
+  Audits (published reviewer feedback, self-acknowledged, with a
+  Manager+ scoring/authoring panel), Agent Assist (phone/lead/campaign
+  lookup returning the record's real current status, valid next
+  transitions, and matching Knowledge/Tips — no AI, no generated text,
+  by design), and Helpdesk (published step-by-step runbooks employees
+  run themselves, with a Manager+ author panel). Settings is split into
+  Profile/Team/Password tabs available to every employee, plus a
+  Master-Owner-only Backups & Activity tab.
+- **Sales Head workspace** — a Sales Head's authorized visibility is
+  their full reporting subtree (recursive through the org chart), versus
+  a line Manager's direct reports only — enforced by a shared
+  `EmployeeScopeService` on both the Sales dashboard's owner-filtered
+  data and every endpoint below, not just a UI-level filter. Sales
+  dashboard gained a 14-day won/lost/new-leads trend chart and
+  click-to-drill-down (a pipeline-stage bar or a rep row opens the
+  actual underlying deals, not just the aggregate number). Team
+  Directory lists everyone in scope with live open/overdue-work and
+  pipeline-value counts; clicking through to an employee's detail page
+  shows their tasks, sales activity, quality history, and recent audit
+  events, with an Assign Task action.
 - **Automated S3 backups** (Settings, Master Owner only) — a full
   instance backup (Postgres via `pg_dump --format=custom`, plus the
   uploads volume) to any S3-compatible bucket, on a rolling schedule

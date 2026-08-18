@@ -22,12 +22,42 @@
 > and company-level views. **Not yet built** from Section 5.2: product/
 > skill-based routing, multiple pipelines per org, and a contacts/accounts
 > layer (leads and opportunities still stand alone, with no shared
-> contact/company record). Everything else in this document — the
-> remaining departmental workspaces, the automation engine, marketing/
-> service/success/delivery/field-service modules, AI features — is the
-> plan, not a claim about current functionality. Treat section numbers and
-> stage names below as the aspirational sequence this project is built
-> toward, not a status report.
+> contact/company record).
+>
+> **Shipped** (touches Section 5.9/5.10 "People operations" and Section
+> 5.2/5.14 "Sales CRM"/"Reporting", ahead of their Stage 10/Stage 3-4
+> sequencing below — pulled forward as a standalone security-audit-plus-
+> workspace engagement, not a full Stage 10 delivery): an Employee
+> workspace (Home, Start Work, Tasks, Quality Audits, Agent Assist,
+> Helpdesk, and a self-service Profile/Team/Password Settings split); a
+> Quality Audit system (Manager+-authored scoring templates and results,
+> draft until published, self-acknowledged); a Helpdesk/Workflow runner
+> (Manager+-authored step-by-step runbooks, published-only for
+> employees); and a Sales Head workspace (a Sales Head's authorized scope
+> is now their full reporting subtree, distinct from a line Manager's
+> direct-reports-only scope — enforced by a shared scope-resolution
+> service, not just a UI filter — plus a Team Directory, per-employee
+> detail view, and a dashboard trend chart with click-to-drill-down).
+> **Agent Assist is deliberately non-AI**: it looks up the real CRM
+> record and returns its actual current status, valid next transitions,
+> and matching Knowledge/Tips — no generated text, ever. This is a
+> distinct, permanent design decision, not a placeholder for Section
+> 5.17's "next-best-action suggestion" or Stage 12 "Governed AI
+> assistance" below — those remain real future AI work, sequenced last,
+> exactly as this document already specifies.
+>
+> A parallel security audit landed alongside this: a global auth guard,
+> CSRF/security-header hardening, rate limiting, a cross-tenant isolation
+> test suite, and a role-hierarchy consolidation — see
+> [SECURITY_AUDIT_REPORT.md](SECURITY_AUDIT_REPORT.md) for the full
+> findings list, including what's still open.
+>
+> Everything else in this document — the remaining departmental
+> workspaces, the automation engine, marketing/service/success/delivery/
+> field-service modules, real AI features — is the plan, not a claim
+> about current functionality. Treat section numbers and stage names
+> below as the aspirational sequence this project is built toward, not a
+> status report.
 
 Document type: Business-first product roadmap
 Scope: Product features, departmental workspaces, rollout, adoption and integrations
@@ -537,7 +567,12 @@ Success criteria
 
 ### 5.17 Future AI features
 
-AI is added only after sufficient clean, permissioned data exists.
+AI is added only after sufficient clean, permissioned data exists. The
+shipped **Agent Assist** feature (see the callout at the top of this
+document) is not an early version of this section — it is a permanent,
+non-AI, knowledge/CRM-lookup tool. "Lead scoring explanation and
+next-best-action suggestion" and "Knowledge assistant with document
+citation" below remain genuinely unbuilt future AI work.
 
 - Meeting/call summary with editable decisions and tasks.
 - Email/WhatsApp draft requiring human approval.
