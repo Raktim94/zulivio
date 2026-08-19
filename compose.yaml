@@ -43,6 +43,11 @@ services:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
+      args:
+        # Set to a real tag (e.g. `git describe --tags`) at build/CI time so
+        # the running app can report its own version for the "update
+        # available" check in the sidebar. Left at "dev" it never shows one.
+        APP_VERSION: "${APP_VERSION:-dev}"
     container_name: zulivio-backend
     restart: unless-stopped
     environment:

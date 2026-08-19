@@ -7,6 +7,7 @@ import { ScopeModule } from "./common/scope.module";
 import { FieldEncryptionModule } from "./common/crypto/field-encryption.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { HealthModule } from "./health/health.module";
+import { SystemModule } from "./system/system.module";
 import { BootstrapModule } from "./bootstrap/bootstrap.module";
 import { AuthModule } from "./auth/auth.module";
 import { EmployeesModule } from "./employees/employees.module";
@@ -37,6 +38,7 @@ import { McpModule } from "./mcp/mcp.module";
     ScopeModule,
     FieldEncryptionModule,
     HealthModule,
+    SystemModule,
     BootstrapModule,
     AuthModule,
     EmployeesModule,

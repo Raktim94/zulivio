@@ -36,6 +36,11 @@ RUN apk add --no-cache openssl postgresql16-client tar
 RUN addgroup -S nodedr && adduser -S nodedr -G nodedr
 WORKDIR /repo
 ENV NODE_ENV=production
+# Baked in at build time (compose.yaml passes APP_VERSION as a build arg,
+# e.g. from `git describe --tags`) so the running app can report its own
+# version for the "update available" check — see src/system/version.*.
+ARG APP_VERSION=dev
+ENV APP_VERSION=$APP_VERSION
 
 COPY --from=builder /repo/node_modules ./node_modules
 COPY --from=builder /repo/apps/backend/node_modules ./apps/backend/node_modules

@@ -54,6 +54,10 @@ fi
 
 # --- 3. Build the images and start the stack --------------------------------
 echo "Building Zulivio images and starting the stack (this can take a few minutes on first run)..."
+# Bakes the checked-out git tag into the backend image so the app can report
+# its own version (used by the "update available" check) — falls back to
+# "dev" outside a git checkout or on a commit with no tag.
+export APP_VERSION="$(git describe --tags --always 2>/dev/null || echo dev)"
 docker compose up -d --build
 
 # --- 4. Wait for the app to report healthy ----------------------------------
