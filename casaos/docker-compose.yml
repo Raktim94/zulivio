@@ -43,6 +43,7 @@ services:
       GOOGLE_SHEETS_CLIENT_EMAIL: ""
       GOOGLE_SHEETS_PRIVATE_KEY: ""
       FIELD_ENCRYPTION_KEY: ""
+      FIELD_ENCRYPTION_KEY_PATH: "/data/secrets/field-encryption.key"
       S3_BACKUP_ENDPOINT: ""
       S3_BACKUP_BUCKET: ""
       S3_BACKUP_ACCESS_KEY_ID: ""
@@ -54,6 +55,9 @@ services:
       - type: bind
         source: /DATA/AppData/$AppID/uploads
         target: /data/uploads
+      - type: bind
+        source: /DATA/AppData/$AppID/secrets
+        target: /data/secrets
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,9 +91,11 @@ services:
         - container: FIELD_ENCRYPTION_KEY
           description:
             en_US: >-
-              Required only if you set S3 backup credentials or a Google Sheets service account from Settings
-              in the app (stored in Postgres) rather than the env fields below. Encrypts those stored secrets
-              at rest. 32 raw bytes, base64-encoded — generate with: openssl rand -base64 32
+              Optional. Encrypts S3 backup credentials / a Google Sheets service account saved from Settings
+              (stored in Postgres) at rest. Leave blank — the app auto-generates and persists its own key in
+              the volume below, no setup needed. Only set this manually to pin a specific key (e.g. restoring
+              a Postgres backup onto a fresh volume without its matching secrets volume). 32 raw bytes,
+              base64-encoded — generate with: openssl rand -base64 32
         - container: S3_BACKUP_ENDPOINT
           description:
             en_US: Optional — S3-compatible endpoint URL (e.g. https://s3.example.com) for automatic backups. Leave blank to keep backups disabled.
@@ -112,6 +118,12 @@ services:
         - container: /data/uploads
           description:
             en_US: Uploaded knowledge-base PDFs — back this up.
+        - container: /data/secrets
+          description:
+            en_US: >-
+              Auto-generated encryption key protecting any S3 backup / Google Sheets credentials saved from
+              Settings. Back this up alongside the database — losing it makes those saved secrets unrecoverable
+              (you'd just need to re-enter them from Settings).
 
   web:
     image: ghcr.io/raktim94/zulivio-web:1.4.0

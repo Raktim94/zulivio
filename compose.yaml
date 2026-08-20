@@ -60,7 +60,12 @@ services:
       BOOTSTRAP_DISABLED: "${BOOTSTRAP_DISABLED:-false}"
       GOOGLE_SHEETS_CLIENT_EMAIL: "${GOOGLE_SHEETS_CLIENT_EMAIL:-}"
       GOOGLE_SHEETS_PRIVATE_KEY: "${GOOGLE_SHEETS_PRIVATE_KEY:-}"
+      # Only needed to pin the key explicitly (e.g. multi-instance, or
+      # restoring a backup onto a fresh volume). Left unset, the backend
+      # auto-generates one on first use and persists it at
+      # FIELD_ENCRYPTION_KEY_PATH below — no manual setup required.
       FIELD_ENCRYPTION_KEY: "${FIELD_ENCRYPTION_KEY:-}"
+      FIELD_ENCRYPTION_KEY_PATH: "/data/secrets/field-encryption.key"
       S3_BACKUP_ENDPOINT: "${S3_BACKUP_ENDPOINT:-}"
       S3_BACKUP_BUCKET: "${S3_BACKUP_BUCKET:-}"
       S3_BACKUP_ACCESS_KEY_ID: "${S3_BACKUP_ACCESS_KEY_ID:-}"
@@ -80,6 +85,10 @@ services:
       - "4100"
     volumes:
       - uploads_data:/data/uploads
+      # Holds the auto-generated FIELD_ENCRYPTION_KEY_PATH key file. Must be
+      # persisted like uploads_data — losing it makes already-stored S3/
+      # Google Sheets secrets undecryptable.
+      - secrets_data:/data/secrets
       # docker.sock lets the backend spawn that one-shot helper container
       # (the backend can't safely recreate itself). The repo bind mount is
       # deliberately at /host-repo, NOT /repo — this image's own WORKDIR is
@@ -134,3 +143,4 @@ services:
 volumes:
   pg_data:
   uploads_data:
+  secrets_data:

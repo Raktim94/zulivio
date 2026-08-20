@@ -1,3 +1,6 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { FieldEncryptionService } from "../src/common/crypto/field-encryption.service";
 
 // Not a real e2e test (no app/DB needed) — named *.e2e-spec.ts anyway since
@@ -7,15 +10,21 @@ import { FieldEncryptionService } from "../src/common/crypto/field-encryption.se
 // finding #10) directly, rather than through a full S3-dependent flow.
 describe("FieldEncryptionService", () => {
   const originalKey = process.env.FIELD_ENCRYPTION_KEY;
+  const originalKeyPath = process.env.FIELD_ENCRYPTION_KEY_PATH;
+  let tmpDir: string;
   let service: FieldEncryptionService;
 
   beforeAll(() => {
+    tmpDir = mkdtempSync(path.join(tmpdir(), "field-encryption-test-"));
+    process.env.FIELD_ENCRYPTION_KEY_PATH = path.join(tmpDir, "field-encryption.key");
     process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
     service = new FieldEncryptionService();
   });
 
   afterAll(() => {
     process.env.FIELD_ENCRYPTION_KEY = originalKey;
+    process.env.FIELD_ENCRYPTION_KEY_PATH = originalKeyPath;
+    rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it("round-trips a value through encrypt/decrypt", () => {
@@ -42,9 +51,18 @@ describe("FieldEncryptionService", () => {
     expect(() => service.decrypt(tampered)).toThrow();
   });
 
-  it("throws a clear error when FIELD_ENCRYPTION_KEY is missing", () => {
+  it("auto-generates and persists a key when FIELD_ENCRYPTION_KEY is missing", () => {
     delete process.env.FIELD_ENCRYPTION_KEY;
-    expect(() => service.encrypt("x")).toThrow(/FIELD_ENCRYPTION_KEY/);
+    const freshService = new FieldEncryptionService();
+
+    const encrypted = freshService.encrypt("no-env-var-needed");
+    expect(freshService.decrypt(encrypted)).toBe("no-env-var-needed");
+
+    // A second instance picks up the same persisted key from disk, so
+    // values encrypted before a restart still decrypt after one.
+    const restartedService = new FieldEncryptionService();
+    expect(restartedService.decrypt(encrypted)).toBe("no-env-var-needed");
+
     process.env.FIELD_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
   });
 

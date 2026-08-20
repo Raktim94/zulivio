@@ -79,7 +79,7 @@ COPY --from=builder /repo/apps/backend/dist ./apps/backend/dist
 COPY --from=builder /repo/apps/backend/prisma ./apps/backend/prisma
 COPY --from=builder /repo/apps/backend/package.json ./apps/backend/package.json
 
-RUN mkdir -p /data/uploads
+RUN mkdir -p /data/uploads /data/secrets
 # Runs as root — a deliberate consequence of the self-update feature, not
 # an oversight: docker.sock access already grants host-root-equivalent
 # control regardless of the container's own UID, so a separate
