@@ -54,8 +54,9 @@ Findings are ordered by severity. Each entry: Location, Impact, Root cause, Fix,
 ### 6. `helmet` / security headers missing
 - **Location:** `main.ts`
 - **Impact:** no `X-Content-Type-Options`, `X-Frame-Options`, HSTS, etc. by default.
-- **Fix:** `helmet()` added, with CSP and HSTS opt-in via `ENABLE_CSP`/`COOKIE_SECURE` env vars rather than forced on — self-hosted deployments commonly sit behind a plain-HTTP LAN reverse proxy (documented precedent: `COOKIE_SECURE` in `auth.controller.ts`), and forcing HSTS/CSP on by default would break those setups without an opt-out.
+- **Fix:** `helmet()` added. CSP is on by default (`DISABLE_CSP` opts out); HSTS stays opt-in via `COOKIE_SECURE`, since forcing HSTS on would break a plain-HTTP LAN reverse proxy (documented precedent: `COOKIE_SECURE` in `auth.controller.ts`) — CSP has no such conflict, it only governs allowed script/style/resource origins, not HTTP vs HTTPS transport.
 - **Status:** Fixed.
+- **2026-08-21 correction:** CodeQL flagged this as an insecure Helmet config (`main.ts:43`) — the original fix had CSP off by default too, conflating it with HSTS's genuine opt-in requirement. Corrected to on-by-default; see `main.ts`.
 
 ### 7. Bootstrap endpoint: no rate limiting, account-existence enumeration
 - **Location:** `bootstrap.service.ts`

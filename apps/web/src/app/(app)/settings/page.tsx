@@ -795,23 +795,29 @@ function BackupsAndActivityTab() {
               )}
             </p>
             {version.currentVersion === "dev" && (
-              <p className="text-xs text-muted">Running a dev build — version comparison isn&apos;t meaningful here.</p>
+              <p className="text-xs text-muted">
+                Running a dev build — can&apos;t tell if you&apos;re behind the latest release, but you can still
+                pull and rebuild from the latest commit on <code className="rounded bg-canvas px-1">main</code>.
+              </p>
             )}
             {version.releaseUrl && (
               <a href={version.releaseUrl} target="_blank" rel="noreferrer" className="text-xs text-muted underline">
                 View release notes
               </a>
             )}
-            {version.updateAvailable && !applyConfirming && (
+            {(version.updateAvailable || version.currentVersion === "dev") && !applyConfirming && (
               <div>
-                <Button onClick={() => setApplyConfirming(true)}>Update now</Button>
+                <Button onClick={() => setApplyConfirming(true)}>
+                  {version.updateAvailable ? "Update now" : "Pull latest & rebuild"}
+                </Button>
               </div>
             )}
             {applyConfirming && (
               <div className="flex flex-col gap-2 border-t border-border pt-3">
                 <p className="text-xs text-coral">
-                  This pulls the latest release and rebuilds/restarts every service. The app will be briefly
-                  unreachable while it restarts — this page reloads automatically once it&apos;s back.
+                  This pulls the latest {version.updateAvailable ? "release" : "commit on main"} and
+                  rebuilds/restarts every service. The app will be briefly unreachable while it restarts — this
+                  page reloads automatically once it&apos;s back.
                 </p>
                 <div className="flex items-center gap-2">
                   <Button

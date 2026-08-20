@@ -36,12 +36,21 @@ async function bootstrap() {
     logger: ["error", "warn", "log"],
   });
 
-  // Self-hosted deployments commonly sit behind a plain-HTTP LAN reverse proxy
-  // (see the COOKIE_SECURE comment in auth.controller.ts), so CSP/HSTS are
-  // opt-in via env rather than forced on, to avoid breaking those setups.
+  // CSP only restricts which script/style/resource origins responses may
+  // reference — unlike HSTS it has nothing to do with HTTP vs HTTPS
+  // transport, so there's no reason to disable it for a plain-HTTP LAN
+  // reverse proxy. On by default (Helmet's own sane defaults); DISABLE_CSP
+  // is an escape hatch for an install that needs to load something Helmet's
+  // default policy would block (flagged by CodeQL as an insecure Helmet
+  // config while this was off by default — see SECURITY_AUDIT_REPORT.md #6).
+  //
+  // HSTS is different: it forces browsers to upgrade this origin to HTTPS
+  // going forward, which genuinely breaks a plain-HTTP LAN reverse proxy
+  // (see the COOKIE_SECURE comment in auth.controller.ts) — so that one
+  // stays opt-in, tied to the same flag that marks an HTTPS deployment.
   app.use(
     helmet({
-      contentSecurityPolicy: process.env.ENABLE_CSP === "true" ? undefined : false,
+      contentSecurityPolicy: process.env.DISABLE_CSP === "true" ? false : undefined,
       hsts: process.env.COOKIE_SECURE === "true",
     }),
   );

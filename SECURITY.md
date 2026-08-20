@@ -27,9 +27,10 @@ acknowledge within a few days.
   Proven by a dedicated cross-tenant e2e test suite (two independent
   organizations, ID-guessing across the boundary asserted to `404` on every
   employee/assignment/lead/opportunity/attendance/audit-log route).
-- `helmet` security headers on every response; CSP/HSTS are opt-in via
-  `ENABLE_CSP`/`COOKIE_SECURE` for self-hosted LAN deployments behind
-  plain-HTTP reverse proxies.
+- `helmet` security headers on every response, including CSP (on by
+  default; `DISABLE_CSP` is an escape hatch). HSTS stays opt-in via
+  `COOKIE_SECURE`, since forcing it on would break self-hosted LAN
+  deployments behind a plain-HTTP reverse proxy.
 - CSRF defense in depth: the session cookie is `SameSite=lax` (blocks
   cross-site state-changing requests in modern browsers), backed by an
   Origin/Referer allowlist check on every state-changing request as a
