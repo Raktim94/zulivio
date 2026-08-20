@@ -631,7 +631,6 @@ function BackupsAndActivityTab() {
               {uploadError && <ErrorState message={uploadError} />}
               <input
                 type="file"
-                accept=".gz,.tar.gz,application/gzip"
                 onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
                 className="text-sm text-muted"
               />
