@@ -68,6 +68,11 @@ services:
       S3_BACKUP_REGION: "${S3_BACKUP_REGION:-auto}"
       S3_BACKUP_INTERVAL_DAYS: "${S3_BACKUP_INTERVAL_DAYS:-3}"
       S3_BACKUP_RETAIN_COUNT: "${S3_BACKUP_RETAIN_COUNT:-2}"
+      # Self-update (POST /api/v1/system/update/apply, see
+      # src/system/update.service.ts) needs to know where its mounted repo
+      # checkout lives so it can `git pull && docker compose up --build -d`
+      # from a one-shot helper container it spawns via docker.sock.
+      REPO_DIR: "/host-repo"
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -75,6 +80,17 @@ services:
       - "4100"
     volumes:
       - uploads_data:/data/uploads
+      # docker.sock lets the backend spawn that one-shot helper container
+      # (the backend can't safely recreate itself). The repo bind mount is
+      # deliberately at /host-repo, NOT /repo — this image's own WORKDIR is
+      # /repo (node_modules, dist, the Alpine/musl-built Prisma engine all
+      # live there), so mounting the host repo there would shadow the
+      # running app with the host's own build artifacts (wrong OS/libc —
+      # breaks Prisma's native engine; hit this exact bug building the
+      # identical feature in nodedr-restaurant-pos). /host-repo is a
+      # separate path used only as the update helper's working directory.
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/host-repo
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:4100/api/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s

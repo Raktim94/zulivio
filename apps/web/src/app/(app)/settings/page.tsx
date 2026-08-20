@@ -406,6 +406,65 @@ function BackupsAndActivityTab() {
     onError: (err) => setRestoreError(err instanceof ApiError ? err.message : "Restore failed"),
   });
 
+  const toast = useToast();
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadConfirmText, setUploadConfirmText] = useState("");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const restoreUpload = useMutation({
+    mutationFn: () => {
+      if (!uploadFile) throw new Error("Choose a backup file first");
+      return api.upload("/api/v1/backups/restore-upload", uploadFile, { confirm: uploadConfirmText });
+    },
+    onSuccess: () => {
+      setUploadFile(null);
+      setUploadConfirmText("");
+      setUploadError(null);
+      toast.push("Restored from the uploaded backup.", "success");
+      queryClient.invalidateQueries({ queryKey: ["backups"] });
+    },
+    onError: (err) => setUploadError(err instanceof ApiError ? err.message : "Restore failed"),
+  });
+
+  const { data: version } = useQuery<{
+    currentVersion: string;
+    latestVersion: string | null;
+    updateAvailable: boolean;
+    releaseUrl: string | null;
+  }>({
+    queryKey: ["system", "version"],
+    queryFn: () => api.get("/api/v1/system/version"),
+    staleTime: 5 * 60 * 1000,
+  });
+  const [applying, setApplying] = useState(false);
+  const [applyConfirming, setApplyConfirming] = useState(false);
+  const applyUpdate = useMutation({
+    mutationFn: () => api.post<{ status: string; message: string }>("/api/v1/system/update/apply"),
+    onSuccess: (result) => {
+      toast.push(result.message, "success");
+      const start = Date.now();
+      const poll = setInterval(async () => {
+        if (Date.now() - start > 3 * 60 * 1000) {
+          clearInterval(poll);
+          toast.push("Still not back after 3 minutes — check the server directly.", "error");
+          return;
+        }
+        try {
+          const res = await fetch("/api/health/live", { cache: "no-store" });
+          if (res.ok) {
+            clearInterval(poll);
+            window.location.reload();
+          }
+        } catch {
+          // expected while the container is restarting
+        }
+      }, 3000);
+    },
+    onError: (err) => {
+      setApplying(false);
+      toast.push(err instanceof ApiError ? err.message : "Could not start the update", "error");
+    },
+  });
+
   return (
     <div className="flex flex-col gap-6">
       <Card>
@@ -558,10 +617,58 @@ function BackupsAndActivityTab() {
             </div>
 
             {triggerError && <ErrorState message={triggerError} />}
-            <div>
+            <div className="flex flex-wrap gap-3">
               <Button onClick={() => triggerBackup.mutate()} disabled={triggerBackup.isPending}>
                 {triggerBackup.isPending ? "Backing up..." : "Back up now"}
               </Button>
+              <a href="/api/v1/backups/download">
+                <Button variant="secondary">Download backup</Button>
+              </a>
+            </div>
+
+            <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+              <h3 className="text-xs font-medium text-muted">Restore from a local file</h3>
+              {uploadError && <ErrorState message={uploadError} />}
+              <input
+                type="file"
+                accept=".gz,.tar.gz,application/gzip"
+                onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+                className="text-sm text-muted"
+              />
+              {uploadFile && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-coral">
+                    This overwrites the entire database and uploaded files with this file&apos;s contents, for
+                    every organization on this instance. This cannot be undone. Type{" "}
+                    <code className="rounded bg-canvas px-1">RESTORE</code> to confirm.
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      className="w-40"
+                      value={uploadConfirmText}
+                      onChange={(e) => setUploadConfirmText(e.target.value)}
+                      placeholder="RESTORE"
+                    />
+                    <Button
+                      variant="danger"
+                      disabled={uploadConfirmText !== "RESTORE" || restoreUpload.isPending}
+                      onClick={() => restoreUpload.mutate()}
+                    >
+                      {restoreUpload.isPending ? "Restoring..." : "Confirm restore"}
+                    </Button>
+                    <button
+                      type="button"
+                      className="text-xs text-muted underline"
+                      onClick={() => {
+                        setUploadFile(null);
+                        setUploadConfirmText("");
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div>
@@ -664,6 +771,73 @@ function BackupsAndActivityTab() {
               </li>
             ))}
           </ul>
+        )}
+      </Card>
+
+      <Card>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-medium text-ink">Application update</h2>
+          {version && (
+            <Badge tone={version.updateAvailable ? "success" : "neutral"}>
+              {version.updateAvailable ? "Update available" : "Up to date"}
+            </Badge>
+          )}
+        </div>
+        {version ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-muted">
+              Running <span className="text-ink">{version.currentVersion}</span>
+              {version.latestVersion && (
+                <>
+                  {" "}
+                  · latest is <span className="text-ink">{version.latestVersion}</span>
+                </>
+              )}
+            </p>
+            {version.currentVersion === "dev" && (
+              <p className="text-xs text-muted">Running a dev build — version comparison isn&apos;t meaningful here.</p>
+            )}
+            {version.releaseUrl && (
+              <a href={version.releaseUrl} target="_blank" rel="noreferrer" className="text-xs text-muted underline">
+                View release notes
+              </a>
+            )}
+            {version.updateAvailable && !applyConfirming && (
+              <div>
+                <Button onClick={() => setApplyConfirming(true)}>Update now</Button>
+              </div>
+            )}
+            {applyConfirming && (
+              <div className="flex flex-col gap-2 border-t border-border pt-3">
+                <p className="text-xs text-coral">
+                  This pulls the latest release and rebuilds/restarts every service. The app will be briefly
+                  unreachable while it restarts — this page reloads automatically once it&apos;s back.
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="danger"
+                    disabled={applying}
+                    onClick={() => {
+                      setApplying(true);
+                      applyUpdate.mutate();
+                    }}
+                  >
+                    {applying ? "Updating..." : "Confirm update"}
+                  </Button>
+                  <button
+                    type="button"
+                    className="text-xs text-muted underline"
+                    onClick={() => setApplyConfirming(false)}
+                    disabled={applying}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <Spinner />
         )}
       </Card>
     </div>

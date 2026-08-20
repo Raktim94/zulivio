@@ -220,30 +220,41 @@ export class BackupService {
     }
   }
 
+  /**
+   * Produces the two local files every backup is built from — shared by
+   * the S3 path (runBackup) and the local-download path (createLocalDownload)
+   * so both always dump/tar the exact same way.
+   */
+  private async dumpToFiles(workDir: string): Promise<{ dbDumpPath: string; uploadsArchivePath: string | null }> {
+    const dbDumpPath = path.join(workDir, "db.dump");
+    // Custom format: compressed single file, restorable with
+    // `pg_restore --clean --if-exists` for a clean overwrite on restore.
+    await execFileAsync("pg_dump", ["--format=custom", "--file", dbDumpPath, process.env.DATABASE_URL!]);
+
+    const uploadsExist = fsSync.existsSync(UPLOAD_ROOT);
+    if (!uploadsExist) {
+      return { dbDumpPath, uploadsArchivePath: null };
+    }
+    const uploadsArchivePath = path.join(workDir, "uploads.tar.gz");
+    await execFileAsync("tar", [
+      "-czf",
+      uploadsArchivePath,
+      "-C",
+      path.dirname(UPLOAD_ROOT),
+      path.basename(UPLOAD_ROOT),
+    ]);
+    return { dbDumpPath, uploadsArchivePath };
+  }
+
   private async runBackup(config: EffectiveConfig, triggeredBy: string) {
     const record = await this.prisma.backupRecord.create({ data: { triggeredBy, status: "PENDING" } });
     const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "zulivio-backup-"));
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const dbDumpPath = path.join(workDir, "db.dump");
-    const uploadsArchivePath = path.join(workDir, "uploads.tar.gz");
 
     try {
       await this.prisma.backupRecord.update({ where: { id: record.id }, data: { status: "UPLOADING" } });
 
-      // Custom format: compressed single file, restorable with
-      // `pg_restore --clean --if-exists` for a clean overwrite on restore.
-      await execFileAsync("pg_dump", ["--format=custom", "--file", dbDumpPath, process.env.DATABASE_URL!]);
-
-      const uploadsExist = fsSync.existsSync(UPLOAD_ROOT);
-      if (uploadsExist) {
-        await execFileAsync("tar", [
-          "-czf",
-          uploadsArchivePath,
-          "-C",
-          path.dirname(UPLOAD_ROOT),
-          path.basename(UPLOAD_ROOT),
-        ]);
-      }
+      const { dbDumpPath, uploadsArchivePath } = await this.dumpToFiles(workDir);
 
       const s3 = this.s3Client(config);
       const dbKey = `${timestamp}/db.dump`;
@@ -253,7 +264,7 @@ export class BackupService {
 
       let uploadsKey: string | undefined;
       let totalSize = dbBuffer.length;
-      if (uploadsExist) {
+      if (uploadsArchivePath) {
         uploadsKey = `${timestamp}/uploads.tar.gz`;
         const uploadsBuffer = await fs.readFile(uploadsArchivePath);
         await s3.send(new PutObjectCommand({ Bucket: config.bucket, Key: uploadsKey, Body: uploadsBuffer }));
@@ -271,7 +282,7 @@ export class BackupService {
       if (createHash("sha256").update(downloadedDb).digest("hex") !== sha256) {
         throw new Error("Verification failed: downloaded db backup does not match the uploaded content");
       }
-      if (uploadsKey) {
+      if (uploadsKey && uploadsArchivePath) {
         const uploadsBuffer = await fs.readFile(uploadsArchivePath);
         const downloadedUploads = await this.downloadBuffer(s3, config.bucket, uploadsKey);
         if (downloadedUploads.length !== uploadsBuffer.length) {
@@ -323,8 +334,38 @@ export class BackupService {
   }
 
   /**
-   * Destructive: drops and recreates the entire database from the backup,
-   * then replaces the uploads volume. Gated to Master Owner plus an
+   * The actual destructive apply: pg_restore over the live database, then
+   * replace the uploads volume from the archive. Shared by every restore
+   * source (S3-stored backup, or a locally uploaded backup bundle) so
+   * there is exactly one implementation of "how a backup gets applied."
+   */
+  private async applyRestoreFiles(dbDumpPath: string, uploadsArchivePath: string | null) {
+    await execFileAsync("pg_restore", [
+      "--clean",
+      "--if-exists",
+      "--no-owner",
+      "--dbname",
+      process.env.DATABASE_URL!,
+      dbDumpPath,
+    ]);
+
+    if (uploadsArchivePath) {
+      // Empty UPLOAD_ROOT's contents rather than removing the directory
+      // itself: the container's non-root user owns everything inside it
+      // but not necessarily its parent, so an rmdir/mkdir round-trip on
+      // UPLOAD_ROOT itself can fail with EACCES. tar then recreates the
+      // same tree from the archive, merging into the now-empty directory.
+      const existingEntries = await fs.readdir(UPLOAD_ROOT).catch(() => []);
+      await Promise.all(
+        existingEntries.map((entry) => fs.rm(path.join(UPLOAD_ROOT, entry), { recursive: true, force: true })),
+      );
+      await execFileAsync("tar", ["-xzf", uploadsArchivePath, "-C", path.dirname(UPLOAD_ROOT)]);
+    }
+  }
+
+  /**
+   * Destructive: drops and recreates the entire database from an S3-stored
+   * backup, then replaces the uploads volume. Gated to Master Owner plus an
    * explicit confirmation string so it can never fire from a stray click.
    */
   async restore(actor: AuthenticatedEmployee, backupId: string, confirm: string) {
@@ -350,30 +391,99 @@ export class BackupService {
 
     try {
       await this.downloadTo(s3, config.bucket, record.dbKey, dbDumpPath);
-      await execFileAsync("pg_restore", [
-        "--clean",
-        "--if-exists",
-        "--no-owner",
-        "--dbname",
-        process.env.DATABASE_URL!,
-        dbDumpPath,
-      ]);
-
+      let uploadsPath: string | null = null;
       if (record.uploadsKey) {
         await this.downloadTo(s3, config.bucket, record.uploadsKey, uploadsArchivePath);
-        // Empty UPLOAD_ROOT's contents rather than removing the directory
-        // itself: the container's non-root user owns everything inside it
-        // but not necessarily its parent, so an rmdir/mkdir round-trip on
-        // UPLOAD_ROOT itself can fail with EACCES. tar then recreates the
-        // same tree from the archive, merging into the now-empty directory.
-        const existingEntries = await fs.readdir(UPLOAD_ROOT).catch(() => []);
-        await Promise.all(
-          existingEntries.map((entry) => fs.rm(path.join(UPLOAD_ROOT, entry), { recursive: true, force: true })),
-        );
-        await execFileAsync("tar", ["-xzf", uploadsArchivePath, "-C", path.dirname(UPLOAD_ROOT)]);
+        uploadsPath = uploadsArchivePath;
+      }
+      await this.applyRestoreFiles(dbDumpPath, uploadsPath);
+      return { ok: true, restoredFrom: record.id };
+    } finally {
+      await fs.rm(workDir, { recursive: true, force: true });
+    }
+  }
+
+  /**
+   * Builds a single downloadable bundle (a .tar.gz containing manifest.json,
+   * db.dump, and uploads.tar.gz if present) for the "Download backup"
+   * button — a local copy the admin can keep outside S3 entirely. Reuses
+   * dumpToFiles so it's byte-for-byte the same dump/tar the S3 path
+   * produces, just packaged as one file instead of two separate S3 objects.
+   */
+  async createLocalDownload(actor: AuthenticatedEmployee): Promise<{ buffer: Buffer; filename: string }> {
+    this.requireMasterOwner(actor, "download a backup");
+    const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "zulivio-download-"));
+    try {
+      const { dbDumpPath, uploadsArchivePath } = await this.dumpToFiles(workDir);
+      const dbSha256 = createHash("sha256").update(await fs.readFile(dbDumpPath)).digest("hex");
+      const manifest = { product: "zulivio", backupVersion: 1, createdAt: new Date().toISOString(), dbSha256 };
+      await fs.writeFile(path.join(workDir, "manifest.json"), JSON.stringify(manifest, null, 2));
+
+      const bundlePath = path.join(os.tmpdir(), `zulivio-bundle-${Date.now()}.tar.gz`);
+      const entries = ["manifest.json", "db.dump", ...(uploadsArchivePath ? ["uploads.tar.gz"] : [])];
+      await execFileAsync("tar", ["-czf", bundlePath, "-C", workDir, ...entries]);
+
+      const buffer = await fs.readFile(bundlePath);
+      await fs.rm(bundlePath, { force: true });
+      const filename = `zulivio-backup-${new Date().toISOString().replace(/[:.]/g, "-")}.tar.gz`;
+      return { buffer, filename };
+    } finally {
+      await fs.rm(workDir, { recursive: true, force: true });
+    }
+  }
+
+  /**
+   * Restores from a locally uploaded bundle (the exact format
+   * createLocalDownload produces) instead of an S3-stored backup — same
+   * Master-Owner + typed-confirmation guard, same applyRestoreFiles.
+   */
+  async restoreFromUpload(actor: AuthenticatedEmployee, fileBuffer: Buffer, confirm: string) {
+    this.requireMasterOwner(actor, "restore a backup");
+    if (confirm !== "RESTORE") {
+      throw new BadRequestException('This is destructive. Pass confirm: "RESTORE" to proceed.');
+    }
+
+    const workDir = await fs.mkdtemp(path.join(os.tmpdir(), "zulivio-restore-upload-"));
+    const bundlePath = path.join(workDir, "bundle.tar.gz");
+    try {
+      await fs.writeFile(bundlePath, fileBuffer);
+      try {
+        await execFileAsync("tar", ["-xzf", bundlePath, "-C", workDir]);
+      } catch (err) {
+        throw new BadRequestException(`Not a valid backup bundle: ${(err as Error).message}`);
       }
 
-      return { ok: true, restoredFrom: record.id };
+      const manifestPath = path.join(workDir, "manifest.json");
+      if (!fsSync.existsSync(manifestPath)) {
+        throw new BadRequestException("Invalid backup bundle: missing manifest.json");
+      }
+      const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8")) as {
+        product?: string;
+        backupVersion?: number;
+        dbSha256?: string;
+      };
+      if (manifest.product !== "zulivio") {
+        throw new BadRequestException("This is not a Zulivio backup bundle");
+      }
+      if ((manifest.backupVersion ?? 0) > 1) {
+        throw new BadRequestException("This backup was created by a newer, incompatible version of Zulivio");
+      }
+
+      const dbDumpPath = path.join(workDir, "db.dump");
+      if (!fsSync.existsSync(dbDumpPath)) {
+        throw new BadRequestException("Invalid backup bundle: missing db.dump");
+      }
+      if (manifest.dbSha256) {
+        const actualSha256 = createHash("sha256").update(await fs.readFile(dbDumpPath)).digest("hex");
+        if (actualSha256 !== manifest.dbSha256) {
+          throw new BadRequestException("Backup integrity check failed — refusing to restore a corrupted backup");
+        }
+      }
+      const uploadsArchivePath = path.join(workDir, "uploads.tar.gz");
+      const uploadsPath = fsSync.existsSync(uploadsArchivePath) ? uploadsArchivePath : null;
+
+      await this.applyRestoreFiles(dbDumpPath, uploadsPath);
+      return { ok: true, restoredFrom: "upload" };
     } finally {
       await fs.rm(workDir, { recursive: true, force: true });
     }

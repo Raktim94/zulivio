@@ -23,6 +23,35 @@ COPY apps/backend apps/backend
 RUN pnpm --filter backend exec prisma generate
 RUN pnpm --filter backend build
 
+# Docker CLI (optional in-container "update & restart" against mounted
+# docker.sock — see src/system/update.service.ts). Pulled from the official
+# docker:cli image rather than Alpine's community docker-cli package so the
+# binary is guaranteed present/current across both amd64 and arm64 builds.
+FROM docker:cli AS dockercli
+
+# Fetches the docker-compose CLI plugin binary in its own throwaway stage —
+# deliberately NOT via `apk add curl` in the runtime stage itself. Alpine's
+# package resolver can pull in a newer transitive openssl than the one
+# already pinned there, and the Prisma query engine binary (downloaded at
+# `prisma generate` time in the builder stage, matched to a specific
+# musl/openssl ABI) then fails at startup with "could not locate the Query
+# Engine for runtime linux-musl..." (hit and fixed this exact way in
+# nodedr-restaurant-pos's identical self-update feature). Isolating the
+# fetch here keeps the runtime stage's apk install byte-for-byte what it
+# was before self-update existed.
+FROM alpine:3.20 AS compose-fetch
+ARG TARGETARCH=amd64
+RUN apk add --no-cache curl \
+  && case "$TARGETARCH" in \
+       amd64) DARCH=x86_64 ;; \
+       arm64) DARCH=aarch64 ;; \
+       *) DARCH=$TARGETARCH ;; \
+     esac \
+  && curl -fsSL --retry 3 --retry-delay 2 \
+     "https://github.com/docker/compose/releases/download/v2.32.4/docker-compose-linux-${DARCH}" \
+     -o /docker-compose \
+  && chmod +x /docker-compose
+
 # --- runtime: slim image, only what's needed to run ---
 # Keeps the SAME directory depth as the workspace (/repo/apps/backend, not a
 # flattened /app) — pnpm's per-package node_modules/.bin/* entries are
@@ -33,7 +62,9 @@ FROM node:24-alpine AS runtime
 # everywhere in this app) provides pg_dump/pg_restore for the backup
 # feature; tar is used to archive the uploads volume alongside the DB dump.
 RUN apk add --no-cache openssl postgresql16-client tar
-RUN addgroup -S nodedr && adduser -S nodedr -G nodedr
+RUN mkdir -p /usr/local/lib/docker/cli-plugins
+COPY --from=dockercli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=compose-fetch /docker-compose /usr/local/lib/docker/cli-plugins/docker-compose
 WORKDIR /repo
 ENV NODE_ENV=production
 # Baked in at build time (compose.yaml passes APP_VERSION as a build arg,
@@ -48,8 +79,12 @@ COPY --from=builder /repo/apps/backend/dist ./apps/backend/dist
 COPY --from=builder /repo/apps/backend/prisma ./apps/backend/prisma
 COPY --from=builder /repo/apps/backend/package.json ./apps/backend/package.json
 
-RUN mkdir -p /data/uploads && chown -R nodedr:nodedr /data/uploads /repo
-USER nodedr
+RUN mkdir -p /data/uploads
+# Runs as root — a deliberate consequence of the self-update feature, not
+# an oversight: docker.sock access already grants host-root-equivalent
+# control regardless of the container's own UID, so a separate
+# unprivileged user provides no real additional isolation once that mount
+# exists (same reasoning as Submify's identical Dockerfile decision).
 
 WORKDIR /repo/apps/backend
 EXPOSE 4100
