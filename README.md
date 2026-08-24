@@ -76,20 +76,26 @@ sample data) — not mockups.
 
 | | |
 |---|---|
-| **Master dashboard** — live headcount, assignment mix, who's on the clock | **Employee directory** — add/edit/reset-password/remove, all rank-guarded |
-| ![Master dashboard](docs/screenshots/dashboard.png) | ![Employees](docs/screenshots/employees.png) |
-| **Employee front page** — "My Work", today's tips, shift controls | **Assignments** — status pipeline with guarded transitions |
-| ![Employee front page](docs/screenshots/employee-front-page.png) | ![Assignments](docs/screenshots/assignments.png) |
+| **My Day** — the telecaller's queue: what to call, what's due, what's hot | **Lead board** — drag and drop across the telecalling pipeline |
+| ![My Day](docs/screenshots/my-day.png) | ![Lead board](docs/screenshots/lead-board.png) |
+| **Lead workspace** — call, qualify, log the outcome and schedule the follow-up on one screen | **Call disposition** — single-tap outcome, no long form |
+| ![Lead workspace](docs/screenshots/lead-workspace.png) | ![Call disposition](docs/screenshots/disposition.png) |
 
 <details>
-<summary>More screenshots (Sales CRM, Settings, attendance, knowledge base, data hub, sign in)</summary>
+<summary>More screenshots (follow-ups, CRM reports, workforce core, deals, data hub)</summary>
 
 | | |
 |---|---|
-| **Leads** — qualification pipeline, CSV import, territory/capacity assignment rules | **Pipeline** — Kanban board across the default 6-stage pipeline |
-| ![Leads](docs/screenshots/leads.png) | ![Pipeline](docs/screenshots/pipeline.png) |
-| **Sales dashboard** — pipeline value, lead funnel, forecast by category and by rep | **Settings** — S3 backup connection, schedule, and history (Master Owner) |
-| ![Sales dashboard](docs/screenshots/sales-dashboard.png) | ![Settings](docs/screenshots/settings.png) |
+| **Follow-ups** — overdue / due now / today / tomorrow, completed and rescheduled inline | **CRM reports** — leads by stage and source, conversion, revenue |
+| ![Follow-ups](docs/screenshots/follow-ups.png) | ![CRM reports](docs/screenshots/crm-reports.png) |
+| **Telecaller performance** — calls, connect rate, meetings, follow-ups, revenue per rep | **CRM overview** — org-wide funnel, pipeline value, follow-up health |
+| ![Telecaller performance](docs/screenshots/team-performance.png) | ![CRM overview](docs/screenshots/crm-overview.png) |
+| **Master dashboard** — live headcount, assignment mix, who's on the clock | **Employee directory** — add/edit/reset-password/remove, all rank-guarded |
+| ![Master dashboard](docs/screenshots/dashboard.png) | ![Employees](docs/screenshots/employees.png) |
+| **Deal pipeline** — Kanban board across the opportunity pipeline | **Sales dashboard** — pipeline value, lead funnel, forecast by category and by rep |
+| ![Pipeline](docs/screenshots/pipeline.png) | ![Sales dashboard](docs/screenshots/sales-dashboard.png) |
+| **Employee front page** — "My Work", today's tips, shift controls | **Assignments** — status pipeline with guarded transitions |
+| ![Employee front page](docs/screenshots/employee-front-page.png) | ![Assignments](docs/screenshots/assignments.png) |
 | ![Attendance](docs/screenshots/attendance.png) | ![Knowledge base](docs/screenshots/knowledge.png) |
 | ![Data Hub](docs/screenshots/data-hub.png) | ![Sign in](docs/screenshots/login.png) |
 

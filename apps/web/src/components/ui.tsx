@@ -203,7 +203,11 @@ export function Dialog({
         onClose();
       }}
       className={clsx(
-        "w-[calc(100vw-2rem)] max-w-lg rounded-xl border border-border bg-surface p-0 text-ink shadow-xl backdrop:bg-ink/40 backdrop:backdrop-blur-sm",
+        // `m-auto` is load-bearing, not cosmetic: a showModal() dialog is
+        // centred by the UA's own `margin: auto`, and Tailwind's preflight
+        // resets margin to 0 on every element — which pinned every modal in
+        // the app to the top-left corner.
+        "m-auto w-[calc(100vw-2rem)] max-w-lg rounded-xl border border-border bg-surface p-0 text-ink shadow-xl backdrop:bg-ink/40 backdrop:backdrop-blur-sm",
         className,
       )}
     >

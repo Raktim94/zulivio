@@ -51,10 +51,26 @@ const TOOLTIP_STYLE = {
   },
 } as const;
 
-function isoDaysAgo(days: number) {
+/**
+ * Local calendar date as YYYY-MM-DD, for the two <input type="date"> fields.
+ *
+ * Deliberately not `toISOString().slice(0, 10)`: that yields the *UTC* date,
+ * while the range below is parsed back as local time. In any timezone ahead
+ * of UTC the two disagree for part of the evening — under IST, opening this
+ * page after 5:30 PM produced a "to" bound earlier than the records created
+ * moments before, so the whole report rendered as zeroes.
+ */
+function localDate(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function localDateDaysAgo(days: number) {
   const date = new Date();
   date.setDate(date.getDate() - days);
-  return date.toISOString().slice(0, 10);
+  return localDate(date);
 }
 
 /**
@@ -68,8 +84,8 @@ export default function CrmReportsPage() {
   const isAdmin = employee?.role === "COMPANY_ADMIN" || employee?.role === "MASTER_OWNER";
 
   const [tab, setTab] = useState("team");
-  const [from, setFrom] = useState(isoDaysAgo(30));
-  const [to, setTo] = useState(new Date().toISOString().slice(0, 10));
+  const [from, setFrom] = useState(localDateDaysAgo(30));
+  const [to, setTo] = useState(localDate());
 
   if (authLoading) return <Spinner />;
   if (!authorized) return null; // redirecting
