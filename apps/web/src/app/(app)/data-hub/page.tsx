@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
@@ -31,7 +32,7 @@ export default function DataHubPage() {
         <h1 className="text-xl font-semibold text-ink">Data Hub</h1>
         <p className="text-sm text-muted">
           CSV and Google Sheets import/export for employees, assignments, leads, and opportunities. Lead-specific
-          import lives on the <a href="/leads" className="text-emerald underline">Leads</a> page, next to lead
+          import lives on the <Link href="/leads" className="text-emerald underline">Leads</Link> page, next to lead
           management.
         </p>
       </div>

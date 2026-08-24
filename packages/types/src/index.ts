@@ -378,3 +378,282 @@ export interface SalesDashboardData {
   winLoss: { won: number; lost: number };
   dailyTrend: { date: string; won: number; lost: number; newLeads: number }[];
 }
+
+// ---------------------------------------------------------------------
+// Telecalling CRM
+// ---------------------------------------------------------------------
+
+export type LeadPriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+
+export type LeadLossReason =
+  | "NOT_INTERESTED"
+  | "NO_BUDGET"
+  | "WRONG_NUMBER"
+  | "DUPLICATE"
+  | "COMPETITOR"
+  | "NOT_NOW"
+  | "LOST";
+
+export type PurchaseIntent = "HIGH" | "MEDIUM" | "LOW" | "UNKNOWN";
+
+export type LeadScoreBand = "HOT" | "WARM" | "COLD";
+
+export type PipelineKind = "OPPORTUNITY" | "LEAD";
+
+export type CallOutcome = "CONNECTED" | "NOT_CONNECTED";
+
+export type CallDisposition =
+  | "INTERESTED"
+  | "QUALIFIED"
+  | "MEETING_BOOKED"
+  | "CALLBACK"
+  | "PROPOSAL_REQUESTED"
+  | "NOT_INTERESTED"
+  | "NO_BUDGET"
+  | "COMPETITOR"
+  | "WRONG_PERSON"
+  | "NO_ANSWER"
+  | "BUSY"
+  | "SWITCHED_OFF"
+  | "INVALID_NUMBER"
+  | "OUT_OF_COVERAGE";
+
+export type LeadActivityType =
+  | "CALL"
+  | "NOTE"
+  | "MESSAGE"
+  | "MEETING"
+  | "STAGE_CHANGE"
+  | "STATUS_CHANGE"
+  | "QUALIFICATION_UPDATED"
+  | "ASSIGNMENT_CHANGED"
+  | "FOLLOW_UP_SCHEDULED"
+  | "FOLLOW_UP_COMPLETED"
+  | "FOLLOW_UP_RESCHEDULED";
+
+export type FollowUpStatus = "PENDING" | "COMPLETED" | "CANCELED";
+
+/**
+ * The telecalling fields added to LeadSummary. Kept as a separate
+ * interface that LeadSummary extends, so it reads at a glance which
+ * fields predate the CRM work (and are therefore part of the external
+ * integration contract) and which were added.
+ */
+export interface LeadTelecallingFields {
+  pipelineId: string | null;
+  stageId: string | null;
+  stage?: PipelineStageSummary | null;
+  stageChangedAt: string | null;
+  jobTitle: string | null;
+  website: string | null;
+  campaign: string | null;
+  tags: string[];
+  priority: LeadPriority;
+  lastContactedAt: string | null;
+  nextFollowUpAt: string | null;
+  callCount: number;
+  lossReason: LeadLossReason | null;
+  lossNotes: string | null;
+  budgetMinor: number | null;
+  timelineDays: number | null;
+  isDecisionMaker: boolean | null;
+  requirement: string | null;
+  requirementUrgent: boolean | null;
+  businessType: string | null;
+  existingSolution: string | null;
+  purchaseIntent: PurchaseIntent | null;
+  goodBusinessFit: boolean | null;
+  score: number;
+  qualifiedAt: string | null;
+}
+
+export interface LeadRecord extends LeadSummary, LeadTelecallingFields {}
+
+export interface LeadSearchResult {
+  items: LeadRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface LeadActivitySummary {
+  id: string;
+  leadId: string;
+  type: LeadActivityType;
+  body: string | null;
+  metadata: Record<string, unknown> | null;
+  callOutcome: CallOutcome | null;
+  callDisposition: CallDisposition | null;
+  callDurationSeconds: number | null;
+  createdAt: string;
+  actor: { id: string; fullName: string; employeeNumber: string };
+}
+
+export interface FollowUpSummary {
+  id: string;
+  leadId: string;
+  assigneeId: string;
+  dueAt: string;
+  note: string | null;
+  status: FollowUpStatus;
+  outcome: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  lead: {
+    id: string;
+    fullName: string;
+    company: string | null;
+    phone: string | null;
+    email: string | null;
+    status: LeadStatus;
+    score: number;
+    priority: LeadPriority;
+    stageId: string | null;
+  };
+  assignee: { id: string; fullName: string; employeeNumber: string };
+}
+
+export interface ScoreBreakdownEntry {
+  key: string;
+  label: string;
+  weight: number;
+  earned: boolean;
+}
+
+export interface LeadScoreConfigSummary {
+  id: string;
+  organizationId: string;
+  budgetAvailableWeight: number;
+  decisionMakerWeight: number;
+  urgentRequirementWeight: number;
+  clearRequirementWeight: number;
+  shortTimelineWeight: number;
+  goodBusinessFitWeight: number;
+  shortTimelineDays: number;
+  hotThreshold: number;
+  warmThreshold: number;
+  updatedAt: string;
+}
+
+export interface LeadDetailData {
+  lead: LeadRecord & { createdBy: { id: string; fullName: string; employeeNumber: string } };
+  scoreBand: LeadScoreBand;
+  scoreBreakdown: ScoreBreakdownEntry[];
+  stages: PipelineStageSummary[];
+  activities: LeadActivitySummary[];
+  followUps: FollowUpSummary[];
+  nextAllowedStatuses: LeadStatus[];
+  dialUri: string | null;
+}
+
+export type FollowUpBucket = "overdue" | "dueNow" | "dueToday" | "tomorrow" | "upcoming";
+
+export interface FollowUpDashboardData {
+  generatedAt: string;
+  buckets: Record<FollowUpBucket, FollowUpSummary[]>;
+  counts: Record<FollowUpBucket | "completedThisWeek" | "overdueTotal", number>;
+}
+
+export type NextLeadReason =
+  | "overdue_follow_up"
+  | "scheduled_callback"
+  | "hot_lead"
+  | "new_lead"
+  | "oldest_untouched"
+  | "queue_empty";
+
+export interface NextLeadData {
+  reason: NextLeadReason;
+  lead: LeadRecord | null;
+}
+
+export interface MyDayData {
+  generatedAt: string;
+  toContact: LeadRecord[];
+  hotLeads: LeadRecord[];
+  recentlyAssigned: LeadRecord[];
+  followUps: FollowUpDashboardData;
+  stats: { callsToday: number; connectedToday: number; meetingsToday: number; openLeads: number };
+}
+
+export interface PlaceCallResult {
+  mode: "manual" | "bridged";
+  dialUri: string | null;
+  externalCallId: string | null;
+  provider: string;
+}
+
+export interface TeamPerformanceRow {
+  employeeId: string;
+  employeeNumber: string;
+  fullName: string;
+  role: Role;
+  employmentStatus: string;
+  calls: number;
+  connected: number;
+  connectRate: number;
+  leadsHandled: number;
+  leadsQualified: number;
+  leadsConverted: number;
+  followUpsCompleted: number;
+  followUpsOverdue: number;
+  meetingsBooked: number;
+  dealsWon: number;
+  revenueMinor: number;
+  conversionRate: number;
+}
+
+export interface TeamPerformanceData {
+  generatedAt: string;
+  window: { from: string; to: string };
+  kpis: {
+    totalLeads: number;
+    new: number;
+    contacted: number;
+    qualified: number;
+    disqualified: number;
+    converted: number;
+    connected: number;
+    meetingsBooked: number;
+    proposalsSent: number;
+    negotiation: number;
+    won: number;
+    lost: number;
+    revenueMinor: number;
+    conversionRate: number;
+  };
+  leadsByStage: { stageId: string; stageName: string; count: number }[];
+  leadsBySource: { source: string; count: number }[];
+  perEmployee: TeamPerformanceRow[];
+  stageNames: string[];
+}
+
+export interface CrmOverviewData {
+  generatedAt: string;
+  window: { from: string; to: string };
+  totals: {
+    totalLeads: number;
+    activeEmployees: number;
+    leadsInWindow: number;
+    revenueMinor: number;
+    openPipelineMinor: number;
+    weightedPipelineMinor: number;
+    won: number;
+    lost: number;
+    conversionRate: number;
+  };
+  leadsByStage: { stageId: string; stageName: string; sortOrder: number; count: number }[];
+  leadsBySource: { source: string; count: number }[];
+  funnel: { label: string; count: number }[];
+  pipelineValueByStage: {
+    stageId: string;
+    stageName: string;
+    sortOrder: number;
+    valueMinor: number;
+    count: number;
+  }[];
+  assignmentDistribution: { ownerId: string | null; ownerName: string; openLeads: number }[];
+  followUpPerformance: { completed: number; pending: number; canceled: number; overdue: number };
+  dailyTrend: { date: string; newLeads: number; converted: number; revenueMinor: number }[];
+}

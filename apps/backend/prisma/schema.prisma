@@ -64,6 +64,9 @@ model Organization {
   qualityAuditResults     QualityAuditResult[]
   workflowDefinitions     WorkflowDefinition[]
   workflowRuns            WorkflowRun[]
+  leadActivities          LeadActivity[]
+  leadFollowUps           LeadFollowUp[]
+  leadScoreConfig         LeadScoreConfig?
 
   @@map("organizations")
 }
@@ -101,6 +104,9 @@ model Employee {
   qualityAuditsAsSubject  QualityAuditResult[] @relation("QualityAuditSubject")
   qualityAuditsAsReviewer QualityAuditResult[] @relation("QualityAuditReviewer")
   workflowRuns            WorkflowRun[]
+  leadActivities          LeadActivity[]       @relation("LeadActivityActor")
+  followUpsAssigned       LeadFollowUp[]       @relation("FollowUpAssignee")
+  followUpsCreated        LeadFollowUp[]       @relation("FollowUpCreatedBy")
 
   @@unique([organizationId, employeeNumber])
   // Global, not per-org: login and bootstrap both resolve an employee by
@@ -385,12 +391,47 @@ model GoogleSheetsConfig {
   @@map("google_sheets_config")
 }
 
+// Coarse lifecycle status. Deliberately unchanged by the telecalling CRM
+// work: an existing live integration (Submify) creates leads through
+// POST /api/v1/leads and reads this enum back, and the granular
+// telecalling progression (New → Contacted → Connected → Interested →
+// Qualified → Meeting Booked → Proposal Sent → Negotiation → Won) is
+// modelled on the configurable PipelineStage rows instead, with each stage
+// deriving one of these five values. Never remove or rename a member here.
 enum LeadStatus {
   NEW
   CONTACTED
   QUALIFIED
   DISQUALIFIED
   CONVERTED
+}
+
+enum LeadPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+// Granular loss reasons for a lead. LeadStatus only has the single coarse
+// DISQUALIFIED value, which can't answer "why did we lose this?" in a
+// report — this records that alongside it rather than fragmenting the
+// status enum every existing consumer depends on.
+enum LeadLossReason {
+  NOT_INTERESTED
+  NO_BUDGET
+  WRONG_NUMBER
+  DUPLICATE
+  COMPETITOR
+  NOT_NOW
+  LOST
+}
+
+enum PurchaseIntent {
+  HIGH
+  MEDIUM
+  LOW
+  UNKNOWN
 }
 
 model Lead {
@@ -416,11 +457,195 @@ model Lead {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
+  // --- Telecalling CRM additions (all optional/defaulted, so every
+  // existing row and every existing API caller keeps working unchanged) ---
+
+  // Where this lead sits on the configurable telecalling board. Reuses the
+  // existing Pipeline/PipelineStage models (kind = LEAD) rather than a
+  // second, parallel stage system.
+  pipelineId     String?
+  pipeline       Pipeline?      @relation("LeadPipeline", fields: [pipelineId], references: [id])
+  stageId        String?
+  stage          PipelineStage? @relation("LeadStage", fields: [stageId], references: [id])
+  stageChangedAt DateTime?
+
+  jobTitle        String?
+  website         String?
+  campaign        String?
+  tags            String[]     @default([])
+  priority        LeadPriority @default(NORMAL)
+  lastContactedAt DateTime?
+  nextFollowUpAt  DateTime?
+  callCount       Int          @default(0)
+
+  lossReason LeadLossReason?
+  lossNotes  String?
+
+  // Qualification. Scored into `score` by LeadScoringService using the
+  // org's LeadScoreConfig weights — never a hardcoded formula.
+  budgetMinor       Int?
+  timelineDays      Int?
+  isDecisionMaker   Boolean?
+  requirement       String?
+  requirementUrgent Boolean?
+  businessType      String?
+  existingSolution  String?
+  purchaseIntent    PurchaseIntent?
+  goodBusinessFit   Boolean?
+  score             Int             @default(0)
+  qualifiedAt       DateTime?
+
   opportunities  Opportunity[] @relation("OpportunityFromLead")
+  activities     LeadActivity[]
+  followUps      LeadFollowUp[]
 
   @@index([organizationId, status])
   @@index([organizationId, ownerId])
+  @@index([organizationId, stageId])
+  @@index([organizationId, nextFollowUpAt])
+  @@index([organizationId, score])
   @@map("leads")
+}
+
+// Distinguishes the deal board (opportunities, the pre-existing use) from
+// the telecalling lead board added by the CRM work. Defaults to
+// OPPORTUNITY so every existing row keeps its meaning, and
+// GET /api/v1/pipelines still returns only OPPORTUNITY pipelines unless a
+// kind is asked for — the web pipeline page takes pipelines[0], so leaking
+// a lead pipeline into that list would silently break it.
+enum PipelineKind {
+  OPPORTUNITY
+  LEAD
+}
+
+// Single-tap call outcome. CONNECTED/NOT_CONNECTED splits the disposition
+// list into the two groups a telecaller actually picks between.
+enum CallOutcome {
+  CONNECTED
+  NOT_CONNECTED
+}
+
+enum CallDisposition {
+  // CONNECTED
+  INTERESTED
+  QUALIFIED
+  MEETING_BOOKED
+  CALLBACK
+  PROPOSAL_REQUESTED
+  NOT_INTERESTED
+  NO_BUDGET
+  COMPETITOR
+  WRONG_PERSON
+  // NOT_CONNECTED
+  NO_ANSWER
+  BUSY
+  SWITCHED_OFF
+  INVALID_NUMBER
+  OUT_OF_COVERAGE
+}
+
+enum LeadActivityType {
+  CALL
+  NOTE
+  MESSAGE
+  MEETING
+  STAGE_CHANGE
+  STATUS_CHANGE
+  QUALIFICATION_UPDATED
+  ASSIGNMENT_CHANGED
+  FOLLOW_UP_SCHEDULED
+  FOLLOW_UP_COMPLETED
+  FOLLOW_UP_RESCHEDULED
+}
+
+enum FollowUpStatus {
+  PENDING
+  COMPLETED
+  CANCELED
+}
+
+// One chronological entry on a lead's timeline — a call (with duration and
+// disposition), a note, a stage change, a scheduled follow-up, and so on.
+// Append-only: entries are never edited or deleted, so the timeline stays a
+// truthful record of what happened.
+model LeadActivity {
+  id             String           @id @default(uuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  leadId         String
+  lead           Lead             @relation(fields: [leadId], references: [id])
+  type           LeadActivityType
+  actorId        String
+  actor          Employee         @relation("LeadActivityActor", fields: [actorId], references: [id])
+  body           String?
+  // Type-specific detail, e.g. { fromStageId, toStageId } for STAGE_CHANGE
+  // or { scoreBefore, scoreAfter } for QUALIFICATION_UPDATED.
+  metadata       Json?
+  callOutcome         CallOutcome?
+  callDisposition     CallDisposition?
+  callDurationSeconds Int?
+  createdAt      DateTime         @default(now())
+
+  @@index([leadId, createdAt])
+  @@index([organizationId, actorId, createdAt])
+  @@index([organizationId, type, createdAt])
+  @@map("lead_activities")
+}
+
+// A real, due-dated follow-up record. Before this, "follow-up" existed only
+// as an AssignmentStatus value on the unrelated Assignment model, which
+// carried no due date of its own and couldn't answer "what is overdue right
+// now" for a telecaller.
+model LeadFollowUp {
+  id             String         @id @default(uuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  leadId         String
+  lead           Lead           @relation(fields: [leadId], references: [id])
+  assigneeId     String
+  assignee       Employee       @relation("FollowUpAssignee", fields: [assigneeId], references: [id])
+  createdById    String
+  createdBy      Employee       @relation("FollowUpCreatedBy", fields: [createdById], references: [id])
+  dueAt          DateTime
+  note           String?
+  status         FollowUpStatus @default(PENDING)
+  outcome        String?
+  completedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([organizationId, assigneeId, status, dueAt])
+  @@index([leadId, dueAt])
+  @@map("lead_follow_ups")
+}
+
+// Per-organization lead-scoring weights. Deliberately a table rather than
+// constants in code: the brief's numbers (budget +25, decision maker +20,
+// …) are a starting point every sales org tunes, and hardcoding them would
+// mean a redeploy to change one. One row per organization, created lazily
+// with the defaults below on first use.
+model LeadScoreConfig {
+  id             String       @id @default(uuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  budgetAvailableWeight   Int @default(25)
+  decisionMakerWeight     Int @default(20)
+  urgentRequirementWeight Int @default(20)
+  clearRequirementWeight  Int @default(15)
+  shortTimelineWeight     Int @default(10)
+  goodBusinessFitWeight   Int @default(10)
+
+  /// A timelineDays value strictly below this counts as a short timeline.
+  shortTimelineDays Int @default(30)
+  /// score >= hotThreshold is HOT; >= warmThreshold is WARM; else COLD.
+  hotThreshold      Int @default(80)
+  warmThreshold     Int @default(50)
+
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("lead_score_configs")
 }
 
 model Pipeline {
@@ -429,11 +654,14 @@ model Pipeline {
   organization   Organization   @relation(fields: [organizationId], references: [id])
   name           String
   isDefault      Boolean        @default(false)
+  kind           PipelineKind   @default(OPPORTUNITY)
   createdAt      DateTime       @default(now())
 
   stages         PipelineStage[]
   opportunities  Opportunity[]
+  leads          Lead[]         @relation("LeadPipeline")
 
+  @@index([organizationId, kind])
   @@map("pipelines")
 }
 
@@ -448,6 +676,7 @@ model PipelineStage {
   isLost      Boolean  @default(false)
 
   opportunities Opportunity[]
+  leads         Lead[]   @relation("LeadStage")
 
   @@index([pipelineId, sortOrder])
   @@map("pipeline_stages")

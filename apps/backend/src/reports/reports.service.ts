@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable } from "@nestjs/common";
-import { AssignmentStatus, LeadStatus, OpportunityStatus, Role } from "@prisma/client";
+import { AssignmentStatus, LeadStatus, OpportunityStatus, PipelineKind, Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AttendanceService } from "../attendance/attendance.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
@@ -150,7 +150,7 @@ export class ReportsService {
       leadsInWindow,
     ] = await Promise.all([
       this.prisma.pipeline.findFirst({
-        where: { organizationId: orgId, isDefault: true },
+        where: { organizationId: orgId, isDefault: true, kind: PipelineKind.OPPORTUNITY },
         include: { stages: { orderBy: { sortOrder: "asc" } } },
       }),
       this.prisma.opportunity.findMany({

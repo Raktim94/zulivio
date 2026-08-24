@@ -19,6 +19,9 @@ import {
   Users,
   Workflow,
   BarChart3,
+  PieChart,
+  CalendarClock,
+  Sun,
   Contact,
   UserCog,
   Database,
@@ -67,8 +70,11 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Sales",
     items: [
+      { href: "/my-day", label: "My Day", icon: Sun },
       { href: "/leads", label: "Leads", icon: Users },
+      { href: "/follow-ups", label: "Follow-ups", icon: CalendarClock },
       { href: "/pipeline", label: "Pipeline", icon: Workflow },
+      { href: "/reports", label: "CRM Reports", icon: PieChart, managerOnly: true },
       { href: "/sales-dashboard", label: "Sales Dashboard", icon: BarChart3, managerOnly: true },
       { href: "/sales-head/employees", label: "Team Directory", icon: Contact, salesHeadOnly: true },
     ],

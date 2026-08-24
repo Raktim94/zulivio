@@ -1102,7 +1102,11 @@ describe("Zulivio (e2e)", () => {
     await prisma.forecastAdjustment.deleteMany({});
     await prisma.opportunityEvent.deleteMany({});
     await prisma.opportunity.deleteMany({});
+    // Must precede leads — both hold a FK onto Lead.
+    await prisma.leadActivity.deleteMany({});
+    await prisma.leadFollowUp.deleteMany({});
     await prisma.lead.deleteMany({});
+    await prisma.leadScoreConfig.deleteMany({});
     await prisma.pipelineStage.deleteMany({});
     await prisma.pipeline.deleteMany({});
     await prisma.assignmentRule.deleteMany({});

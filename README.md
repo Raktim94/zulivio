@@ -216,9 +216,18 @@ full operational control over the organization from the Employees page:
   the organization (Manager rank and above is unrestricted by scope;
   Employee/Manager-of-a-team see only their own or their direct reports').
 
+CRM records (leads, assignments, opportunities, reports) are scoped by the
+**org chart**, not by rank: an Employee sees their own, a Manager their
+direct reports', a Sales Head their whole reporting subtree, and Company
+Admin/Master Owner the whole organization. A lead nobody owns yet stays
+visible to Manager and above, so the people who route leads can still see
+them. This is narrower than the general employee directory, which stays
+rank-based for HR-style actions like reset-password — see the doc comment
+on `EmployeeScopeService` for why the two differ.
+
 All of the above are enforced server-side, tested in
-`apps/backend/test/app.e2e-spec.ts` (48/48 passing, including a dedicated
-cross-tenant isolation suite — see
+`apps/backend/test/` (142/142 passing, including a dedicated cross-tenant
+isolation suite — see
 [`SECURITY_AUDIT_REPORT.md`](./SECURITY_AUDIT_REPORT.md)), and never gated
 only by hiding a button in the UI.
 
@@ -260,6 +269,42 @@ only by hiding a button in the UI.
     back to round robin on no match), and capacity (routes to whichever
     member holds the fewest open leads, skipping anyone at their configured
     cap). Each rule carries a response SLA and feeds the overdue queue.
+- **Telecalling CRM** — the phone-first loop on top of the Sales CRM
+  above: a drag-and-drop lead board on a configurable 10-stage telecalling
+  pipeline (New → Contacted → Connected → Interested → Qualified → Meeting
+  Booked → Proposal Sent → Negotiation → Won, plus Lost with granular loss
+  reasons), and a single-screen lead workspace — contact header with
+  Call/WhatsApp/Email, stage strip, qualification fields, activity
+  timeline, and a prominent next action.
+  - **Call dispositions** — single-tap outcome (connected / not connected)
+    and disposition, with duration and notes. The pair is validated
+    server-side, so a not-connected call can't be marked "meeting booked"
+    and skew connect-rate reporting. A swappable `CallProvider` seam is in
+    place for a future dialer; today's provider hands the device a `tel:`
+    URI. No telephony vendor, no call recording.
+  - **Follow-ups** — real due-dated records (not a status flag), bucketed
+    into overdue / due now / today / tomorrow / upcoming, completed and
+    rescheduled inline from the queue.
+  - **Lead scoring** — a transparent weighted rubric (budget, decision
+    maker, urgency, requirement clarity, timeline, business fit) banded
+    HOT/WARM/COLD. Weights and thresholds are stored per organization and
+    editable from the Leads screen — changing one does not need a redeploy.
+  - **Call Next Lead** — picks the single highest-priority lead for a
+    telecaller: overdue follow-up → callback due soon → hot lead → new
+    lead → oldest untouched.
+  - **Dashboards** — My Day for the telecaller, team KPIs with
+    per-telecaller performance for managers, and an org-wide CRM overview
+    (funnel, sources, revenue trend, follow-up health, assignment
+    distribution) for admins.
+  - **Search, filters and bulk actions** — server-side search and
+    filtering over name/phone/email/company/ID, stage, status, owner,
+    source, score, priority and date ranges; multi-select assign, stage
+    change and tagging for managers. There is deliberately no bulk delete —
+    leads are disqualified with a reason.
+
+  Design notes, what was reused versus newly built, and the explicit
+  out-of-scope backlog are in
+  [`docs/decisions/0001-telecalling-crm.md`](docs/decisions/0001-telecalling-crm.md).
   - **Forecasting** — rep-level (per-owner pipeline value, weighted
     forecast, and forecast-by-category on the sales dashboard),
     manager-level (forecast-category overrides with a full audit trail via
@@ -496,7 +541,7 @@ DATABASE_URL="postgresql://postgres:test@localhost:55432/zulivio_test" \
 docker rm -f zulivio-test-pg
 ```
 
-At last run: **48/48 tests passing** — bootstrap/login/logout, privilege
+At last run: **142/142 tests passing** — bootstrap/login/logout, privilege
 escalation blocked (on both create and edit), cross-employee report access
 blocked, owner edit/reset-password/remove on subordinates, a dedicated
 cross-tenant isolation suite (two independent organizations, ID-guessing
@@ -504,8 +549,20 @@ across the boundary blocked on every employee/assignment/lead/
 opportunity/attendance/audit-log route), the full attendance state machine
 (including rejecting a second concurrent session/break), and the full
 assignment lifecycle (including rejecting invalid transitions and
-mutations on a terminal state). Full findings from the latest security
-pass: [`SECURITY_AUDIT_REPORT.md`](./SECURITY_AUDIT_REPORT.md).
+mutations on a terminal state).
+
+`test/telecalling-crm.e2e-spec.ts` adds the CRM loop — temporary-password
+and forced-change flow, stage/qualification/scoring rules, call
+dispositions, follow-up buckets, Call Next Lead priority, search, bulk
+actions, RBAC scoping, and the manager/admin dashboards. Its
+`backward compatibility of the pre-existing lead API` block is a standing
+regression guard for external integrations: it asserts every original
+field is still on the `POST /api/v1/leads` response, that
+`GET /api/v1/leads` is still a bare array rather than a paginated
+envelope, and that validation was not loosened.
+
+Full findings from the latest security pass:
+[`SECURITY_AUDIT_REPORT.md`](./SECURITY_AUDIT_REPORT.md).
 
 ```bash
 cd apps/web
