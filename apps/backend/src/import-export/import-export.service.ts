@@ -16,6 +16,53 @@ import { SetGoogleSheetsConfigDto } from "./dto/set-google-sheets-config.dto";
 const EMPLOYEE_COLUMNS = ["employeeNumber", "fullName", "email", "role", "department", "employmentStatus"];
 const ASSIGNMENT_COLUMNS = ["assignmentNumber", "title", "status", "priority", "owner", "dueAt"];
 const LEAD_COLUMNS = ["fullName", "email", "phone", "company", "source", "territory", "status", "owner"];
+
+/**
+ * Every CSV header a lead import recognizes as a real Lead column. Anything
+ * else in the file (rating/category/city/outreach_angle/...) still gets
+ * imported — see extractCustomFields — it just lands in `customFields`
+ * instead of a dedicated column, so any CSV shape is importable without a
+ * schema change.
+ */
+const LEAD_FIELD_ALIASES: Record<string, string[]> = {
+  fullName: ["full_name", "fullName", "name", "full name", "contact_name", "contact name"],
+  email: ["email", "email address"],
+  phone: ["phone", "phone number", "mobile", "phone_local_10d", "phone local 10d", "contact_phone"],
+  company: ["company", "company_name", "company name", "business_name", "business name"],
+  source: ["source"],
+  territory: ["territory", "region"],
+  website: ["website", "url", "site"],
+  jobTitle: ["job_title", "jobtitle", "title", "job title"],
+  campaign: ["campaign"],
+};
+
+const CLAIMED_LEAD_HEADER_KEYS = new Set(
+  Object.values(LEAD_FIELD_ALIASES)
+    .flat()
+    .map((alias) => alias.toLowerCase().replace(/[^a-z0-9]/g, "")),
+);
+
+/** "Phone Local 10d" -> "phone_local_10d" — a stable, display-friendly key for an unrecognized CSV column. */
+function toCustomFieldKey(header: string): string {
+  const key = header
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toLowerCase();
+  return key || header.trim();
+}
+
+/** Every column of a CSV row that importLeadsCsv doesn't map to a real Lead field, keyed for display. */
+function extractCustomFields(raw: Record<string, string>): Record<string, string> {
+  const custom: Record<string, string> = {};
+  for (const [header, value] of Object.entries(raw)) {
+    if (CLAIMED_LEAD_HEADER_KEYS.has(normalizeKey(header))) continue;
+    const trimmed = value?.trim();
+    if (!trimmed) continue;
+    custom[toCustomFieldKey(header)] = trimmed;
+  }
+  return custom;
+}
 const OPPORTUNITY_COLUMNS = [
   "title",
   "company",
@@ -185,7 +232,15 @@ export class ImportExportService {
     return { createdCount: created.length, errorCount: errors.length, created, errors, detectedHeaders };
   }
 
-  /** Header-mapped CSV import for leads: full_name/name, email, phone, company, source. */
+  /**
+   * Header-mapped CSV import for leads. Recognizes full_name/email/phone/
+   * company/source/territory/website/job_title/campaign under several
+   * common header spellings (see LEAD_FIELD_ALIASES) and maps them to real
+   * Lead columns; every other column in the file — rating, category, city,
+   * outreach_angle, or anything else a scraped-lead export happens to carry
+   * — is preserved in `customFields` instead of being dropped, so any CSV
+   * shape can be imported without a schema change.
+   */
   async importLeadsCsv(actor: AuthenticatedEmployee, fileContent: string) {
     this.requireManager(actor);
 
@@ -202,7 +257,7 @@ export class ImportExportService {
 
     for (let i = 0; i < records.length; i++) {
       const raw = records[i];
-      const fullName = pickField(raw, ["full_name", "fullName", "name", "full name"]);
+      const fullName = pickField(raw, LEAD_FIELD_ALIASES.fullName);
 
       if (!fullName) {
         errors.push({
@@ -215,11 +270,15 @@ export class ImportExportService {
       try {
         const lead = await this.leadsService.create(actor, {
           fullName,
-          email: pickField(raw, ["email", "email address"]),
-          phone: pickField(raw, ["phone", "phone number", "mobile"]),
-          company: pickField(raw, ["company"]),
-          source: pickField(raw, ["source"]) ?? "CSV import",
-          territory: pickField(raw, ["territory", "region"]),
+          email: pickField(raw, LEAD_FIELD_ALIASES.email),
+          phone: pickField(raw, LEAD_FIELD_ALIASES.phone),
+          company: pickField(raw, LEAD_FIELD_ALIASES.company),
+          source: pickField(raw, LEAD_FIELD_ALIASES.source) ?? "CSV import",
+          territory: pickField(raw, LEAD_FIELD_ALIASES.territory),
+          website: pickField(raw, LEAD_FIELD_ALIASES.website),
+          jobTitle: pickField(raw, LEAD_FIELD_ALIASES.jobTitle),
+          campaign: pickField(raw, LEAD_FIELD_ALIASES.campaign),
+          customFields: extractCustomFields(raw),
         });
         created.push(lead);
       } catch (err) {

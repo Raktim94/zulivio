@@ -18,6 +18,7 @@ export interface AuthenticatedEmployee {
   fullName: string;
   email: string;
   employmentStatus: EmploymentStatus;
+  mustChangePassword: boolean;
 }
 
 const SESSION_COOKIE = "ndcrm_session";
@@ -120,6 +121,7 @@ export class AuthGuard implements CanActivate {
     fullName: string;
     email: string;
     employmentStatus: EmploymentStatus;
+    mustChangePassword: boolean;
   }): AuthenticatedEmployee {
     return {
       id: employee.id,
@@ -128,6 +130,7 @@ export class AuthGuard implements CanActivate {
       fullName: employee.fullName,
       email: employee.email,
       employmentStatus: employee.employmentStatus,
+      mustChangePassword: employee.mustChangePassword,
     };
   }
 }

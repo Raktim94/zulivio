@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsEmail,
   IsEnum,
+  IsObject,
   IsOptional,
   IsString,
   IsUrl,
@@ -86,4 +87,9 @@ export class CreateLeadDto {
   @IsOptional()
   @IsEnum(LeadPriority)
   priority?: LeadPriority;
+
+  /** Import-derived columns with no dedicated field (e.g. a scraped-lead CSV's rating/category). */
+  @IsOptional()
+  @IsObject()
+  customFields?: Record<string, string>;
 }

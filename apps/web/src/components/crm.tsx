@@ -2,6 +2,7 @@
 
 import clsx from "clsx";
 import Link from "next/link";
+import { Phone, MessageCircle, Copy } from "lucide-react";
 import type {
   CallDisposition,
   CallOutcome,
@@ -12,7 +13,7 @@ import type {
   LeadScoreBand,
   PipelineStageSummary,
 } from "@zulivio/types";
-import { Badge } from "./ui";
+import { Badge, useToast } from "./ui";
 
 // ---------------------------------------------------------------------
 // Formatting
@@ -158,14 +159,100 @@ export function PriorityBadge({ priority }: { priority: LeadPriority }) {
   return <Badge tone={tone}>{PRIORITY_LABEL[priority]}</Badge>;
 }
 
+/** "phone_local_10d" -> "Phone local 10d" — humanizes an import-derived custom-field key for display. */
+function humanizeFieldKey(key: string): string {
+  const spaced = key.replace(/_/g, " ").trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+const MAX_VISIBLE_CUSTOM_FIELDS = 4;
+
+/** Compact chips for whatever extra columns a CSV import brought in — a card stays readable for any lead shape. */
+function CustomFieldChips({ customFields }: { customFields: Record<string, string> | null | undefined }) {
+  const entries = Object.entries(customFields ?? {}).filter(([, value]) => value?.trim());
+  if (entries.length === 0) return null;
+
+  const visible = entries.slice(0, MAX_VISIBLE_CUSTOM_FIELDS);
+  const hiddenCount = entries.length - visible.length;
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1">
+      {visible.map(([key, value]) => (
+        <span
+          key={key}
+          title={`${humanizeFieldKey(key)}: ${value}`}
+          className="max-w-[9rem] truncate rounded-full bg-canvas px-2 py-0.5 text-[10px] text-muted"
+        >
+          {humanizeFieldKey(key)}: {value}
+        </span>
+      ))}
+      {hiddenCount > 0 && (
+        <span className="rounded-full bg-canvas px-2 py-0.5 text-[10px] text-muted">+{hiddenCount} more</span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * One-tap reach-out — call, WhatsApp, copy — right on the card, so a
+ * telecaller working the board never has to open a lead just to dial it.
+ * Plain tel:/wa.me links (not the logged-call flow the detail page uses),
+ * matching how the WhatsApp button already behaves there.
+ */
+function QuickActions({ phone }: { phone: string }) {
+  const toast = useToast();
+  const digits = phone.replace(/\D/g, "");
+
+  return (
+    <div className="mt-2 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+      <a
+        href={`tel:${phone}`}
+        aria-label={`Call ${phone}`}
+        title="Call"
+        className="flex h-7 w-7 items-center justify-center rounded-md text-emerald-dark transition hover:bg-emerald/10"
+      >
+        <Phone size={14} aria-hidden />
+      </a>
+      <a
+        href={`https://wa.me/${digits}`}
+        target="_blank"
+        rel="noreferrer noopener"
+        aria-label={`WhatsApp ${phone}`}
+        title="WhatsApp"
+        className="flex h-7 w-7 items-center justify-center rounded-md text-emerald-dark transition hover:bg-emerald/10"
+      >
+        <MessageCircle size={14} aria-hidden />
+      </a>
+      <button
+        type="button"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(phone);
+            toast.push("Phone number copied", "success");
+          } catch {
+            toast.push("Could not copy — your browser blocked clipboard access", "error");
+          }
+        }}
+        aria-label={`Copy ${phone}`}
+        title="Copy number"
+        className="flex h-7 w-7 items-center justify-center rounded-md text-muted transition hover:bg-canvas hover:text-ink"
+      >
+        <Copy size={14} aria-hidden />
+      </button>
+      <span className="truncate text-xs text-muted">{phone}</span>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------
 // Lead card
 // ---------------------------------------------------------------------
 
 /**
- * The board card. Deliberately five lines at most — name, company,
- * value, owner, next follow-up — because a column of dense cards is
- * unreadable at a glance and the workspace is one click away for detail.
+ * The board card. Name/company/value/badges/owner/follow-up stay a tight
+ * five lines; phone (with one-tap call/WhatsApp/copy) and any import-derived
+ * custom fields are shown too since a telecaller needs to act on a lead
+ * without leaving the board — the full workspace is still one click away.
  */
 export function LeadCard({
   lead,
@@ -206,6 +293,7 @@ export function LeadCard({
             {lead.fullName}
           </Link>
           {lead.company && <p className="truncate text-xs text-muted">{lead.company}</p>}
+          {lead.phone && <QuickActions phone={lead.phone} />}
         </div>
         {onToggleSelect && (
           <input
@@ -227,6 +315,8 @@ export function LeadCard({
         <PriorityBadge priority={lead.priority} />
         {lead.source && <Badge tone="info">{lead.source}</Badge>}
       </div>
+
+      <CustomFieldChips customFields={lead.customFields} />
 
       <p className="mt-2 truncate text-xs text-muted">{lead.owner?.fullName ?? "Unassigned"}</p>
 

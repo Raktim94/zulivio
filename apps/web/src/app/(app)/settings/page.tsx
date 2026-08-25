@@ -14,6 +14,7 @@ import type {
 import { api, ApiError } from "@/lib/api";
 import { Badge, Button, Card, ErrorState, Input, Spinner, Tabs, TabPanel, useToast } from "@/components/ui";
 import { useCurrentEmployee, isMasterOwner } from "@/lib/use-current-employee";
+import { ChangePasswordForm } from "@/components/change-password-form";
 
 const STATUS_TONE: Record<BackupRecord["status"], "neutral" | "success" | "warning" | "danger" | "info"> = {
   PENDING: "info",
@@ -139,50 +140,11 @@ function TeamTab() {
 
 function PasswordTab() {
   const { push } = useToast();
-  const [form, setForm] = useState({ currentPassword: "", newPassword: "" });
-  const [error, setError] = useState<string | null>(null);
-
-  const changePassword = useMutation({
-    mutationFn: () => api.post("/api/v1/auth/change-password", form),
-    onSuccess: () => {
-      setError(null);
-      setForm({ currentPassword: "", newPassword: "" });
-      push("Password updated.", "success");
-    },
-    onError: (err) => setError(err instanceof ApiError ? err.message : "Could not change your password"),
-  });
 
   return (
     <Card className="max-w-sm">
       <h2 className="mb-4 text-sm font-medium text-ink">Change password</h2>
-      {error && <ErrorState message={error} />}
-      <form
-        className="mt-3 flex flex-col gap-3"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setError(null);
-          changePassword.mutate();
-        }}
-      >
-        <Input
-          type="password"
-          placeholder="Current password"
-          value={form.currentPassword}
-          onChange={(e) => setForm({ ...form, currentPassword: e.target.value })}
-          required
-        />
-        <Input
-          type="password"
-          placeholder="New password"
-          value={form.newPassword}
-          onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
-          minLength={8}
-          required
-        />
-        <Button type="submit" disabled={changePassword.isPending}>
-          {changePassword.isPending ? "Updating..." : "Update password"}
-        </Button>
-      </form>
+      <ChangePasswordForm onSuccess={() => push("Password updated.", "success")} />
     </Card>
   );
 }

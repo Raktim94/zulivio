@@ -495,6 +495,14 @@ model Lead {
   score             Int             @default(0)
   qualifiedAt       DateTime?
 
+  // Arbitrary source-data columns that don't have a dedicated field of
+  // their own (e.g. a scraped-lead CSV's rating/category/outreach_angle).
+  // Keyed by the original CSV header, normalized to snake_case; values are
+  // always strings as they arrive from CSV/Sheets import. Never a home for
+  // anything that already has a real column above — the importer only
+  // populates this with columns it doesn't recognize.
+  customFields Json @default("{}")
+
   opportunities  Opportunity[] @relation("OpportunityFromLead")
   activities     LeadActivity[]
   followUps      LeadFollowUp[]

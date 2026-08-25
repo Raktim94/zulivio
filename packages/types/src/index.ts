@@ -93,6 +93,7 @@ export interface CurrentEmployee {
   fullName: string;
   email: string;
   employmentStatus: EmploymentStatus;
+  mustChangePassword: boolean;
 }
 
 export interface AssignmentSummary {
@@ -465,6 +466,8 @@ export interface LeadTelecallingFields {
   goodBusinessFit: boolean | null;
   score: number;
   qualifiedAt: string | null;
+  /** Import-derived columns with no dedicated field, keyed by normalized CSV header. */
+  customFields: Record<string, string>;
 }
 
 export interface LeadRecord extends LeadSummary, LeadTelecallingFields {}

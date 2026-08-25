@@ -29,11 +29,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useCurrentEmployee, isManagerOrAbove, isMasterOwner, isSalesHeadOrAbove } from "@/lib/use-current-employee";
-import { Spinner, Dialog } from "@/components/ui";
+import { useQueryClient } from "@tanstack/react-query";
+import { Spinner, Dialog, Card } from "@/components/ui";
 import { Logo } from "@/components/logo";
 import { MadeBy } from "@/components/made-by";
 import { TopBar } from "@/components/top-bar";
 import { UpdateBadge } from "@/components/update-badge";
+import { ChangePasswordForm } from "@/components/change-password-form";
 
 interface NavItem {
   href: string;
@@ -162,6 +164,7 @@ function NavLinks({
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
   const { data: employee, isLoading, isError } = useCurrentEmployee();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -187,6 +190,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   if (!employee) return null;
+
+  if (employee.mustChangePassword) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-8 bg-navy px-4">
+        <Logo size="lg" />
+        <Card className="w-full max-w-sm">
+          <h1 className="text-lg font-semibold text-ink">Set a new password</h1>
+          <p className="mt-1 text-sm text-muted">
+            You&apos;re signing in with a temporary password. Choose a new one to continue to Zulivio.
+          </p>
+          <div className="mt-6">
+            <ChangePasswordForm
+              submitLabel="Set password and continue"
+              onSuccess={() => queryClient.invalidateQueries({ queryKey: ["employees", "me"] })}
+            />
+          </div>
+        </Card>
+        <MadeBy onDark />
+      </div>
+    );
+  }
 
   const isManager = isManagerOrAbove(employee.role);
   const isSalesHead = isSalesHeadOrAbove(employee.role);

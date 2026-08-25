@@ -141,6 +141,7 @@ export class LeadsService {
         campaign: dto.campaign,
         tags: dto.tags ?? [],
         priority: dto.priority ?? LeadPriority.NORMAL,
+        customFields: dto.customFields ?? {},
         pipelineId: leadPipeline.id,
         stageId: firstStage?.id,
         stageChangedAt: firstStage ? new Date() : undefined,
@@ -331,6 +332,21 @@ export class LeadsService {
     const page = Math.max(1, filters.page ?? 1);
     const pageSize = Math.min(Math.max(1, filters.pageSize ?? 25), MAX_PAGE_SIZE);
 
+    // customFields holds whatever a CSV import didn't have a real column
+    // for (category/city/rating/outreach_angle/...) — Prisma can't filter
+    // "any key of this JSON object" generically, so a term match against
+    // it is resolved as a small parameterized raw query first, scoped to
+    // the org, and folded into the main OR below as a plain id-in-list.
+    const customFieldMatchIds = filters.q?.trim()
+      ? (
+          await this.prisma.$queryRaw<{ id: string }[]>`
+            SELECT id FROM leads
+            WHERE "organizationId" = ${actor.organizationId}
+              AND "customFields"::text ILIKE ${"%" + filters.q.trim() + "%"}
+          `
+        ).map((row) => row.id)
+      : [];
+
     const where: Prisma.LeadWhereInput = {
       organizationId: actor.organizationId,
       ...scopeWhere,
@@ -362,7 +378,7 @@ export class LeadsService {
             status: { in: [LeadStatus.NEW, LeadStatus.CONTACTED] },
           }
         : {}),
-      ...(filters.q ? buildSearchWhere(filters.q) : {}),
+      ...(filters.q ? buildSearchWhere(filters.q, customFieldMatchIds) : {}),
     };
 
     const [items, total] = await this.prisma.$transaction([
@@ -971,7 +987,7 @@ function parseDate(value?: string): Date | undefined {
  * mid-call: a name, a number someone read out, a company, or the short id
  * prefix shown on the card.
  */
-function buildSearchWhere(q: string): Prisma.LeadWhereInput {
+function buildSearchWhere(q: string, customFieldMatchIds: string[]): Prisma.LeadWhereInput {
   const term = q.trim();
   if (!term) return {};
   const contains = { contains: term, mode: "insensitive" as const };
@@ -982,6 +998,7 @@ function buildSearchWhere(q: string): Prisma.LeadWhereInput {
       { phone: contains },
       { company: contains },
       { id: { startsWith: term.toLowerCase() } },
+      ...(customFieldMatchIds.length > 0 ? [{ id: { in: customFieldMatchIds } }] : []),
     ],
   };
 }

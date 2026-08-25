@@ -227,6 +227,22 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
         )}
       </Card>
 
+      {Object.keys(lead.customFields ?? {}).length > 0 && (
+        <Card>
+          <h2 className="mb-3 text-sm font-medium text-ink">Imported data</h2>
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+            {Object.entries(lead.customFields).map(([key, value]) => (
+              <div key={key} className="min-w-0">
+                <dt className="truncate text-xs text-muted">{key.replace(/_/g, " ")}</dt>
+                <dd className="truncate text-ink" title={value}>
+                  {value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </Card>
+      )}
+
       <div className="grid gap-5 lg:grid-cols-2">
         <QualificationPanel data={data} onSaved={invalidate} />
 
