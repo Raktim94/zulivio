@@ -16,10 +16,15 @@ export default function HelpdeskPage() {
   const { data: definitions, isLoading } = useQuery<WorkflowDefinitionSummary[]>({
     queryKey: ["workflows", "definitions"],
     queryFn: () => api.get<WorkflowDefinitionSummary[]>("/api/v1/workflows/definitions"),
+    // Guard against a non-array response (e.g. an auth/error payload slipping
+    // through) so a bad fetch degrades to "no workflows" instead of crashing
+    // every .find()/.filter() call site below.
+    select: (data) => (Array.isArray(data) ? data : []),
   });
   const { data: myRuns } = useQuery<WorkflowRunSummary[]>({
     queryKey: ["me", "tasks"],
     queryFn: () => api.get<{ workflowRuns: WorkflowRunSummary[] }>("/api/v1/me/tasks").then((d) => d.workflowRuns),
+    select: (data) => (Array.isArray(data) ? data : []),
   });
 
   const activeRun = myRuns?.find((r) => r.status === "IN_PROGRESS");
