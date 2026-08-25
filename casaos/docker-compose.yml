@@ -23,7 +23,7 @@ services:
       - zulivio
 
   backend:
-    image: ghcr.io/raktim94/zulivio-backend:1.5.0
+    image: ghcr.io/raktim94/zulivio-backend:1.6.0
     container_name: zulivio-backend
     hostname: zulivio-backend
     restart: unless-stopped
@@ -126,7 +126,7 @@ services:
               (you'd just need to re-enter them from Settings).
 
   web:
-    image: ghcr.io/raktim94/zulivio-web:1.5.0
+    image: ghcr.io/raktim94/zulivio-web:1.6.0
     container_name: zulivio-web
     hostname: zulivio-web
     restart: unless-stopped
@@ -204,10 +204,17 @@ x-casaos:
   index: /
   scheme: http
   port_map: "2996"
-  version: "1.5.0"
-  update_at: "2026-08-21"
+  version: "1.6.0"
+  update_at: "2026-08-25"
   release_notes:
     en_US: |-
+      1.6.0: CSV lead imports now preserve any unrecognized columns
+      (rating, category, outreach angle, etc.) into a custom-fields bag
+      instead of dropping them, so any export shape can be imported
+      without a schema change. Adds a forced password-change gate after an
+      admin resets an employee's password, and one-tap call/WhatsApp/copy
+      quick actions right on lead board cards.
+
       1.5.0: security and zero-config hardening, plus a large batch of CRM
       feature work. Fixes an insecure Helmet configuration flagged by
       CodeQL — the Content-Security-Policy is now on by default instead of
