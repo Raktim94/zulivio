@@ -263,12 +263,17 @@ export class ImportExportService {
 
     for (let i = 0; i < records.length; i++) {
       const raw = records[i];
-      const fullName = pickField(raw, LEAD_FIELD_ALIASES.fullName);
+      const company = pickField(raw, LEAD_FIELD_ALIASES.company);
+      // Scraped/B2B lead exports often carry only a business name with no named contact
+      // (e.g. lead-scoring tools with company/rating/source_urls columns but no full_name
+      // value) — fall back to the company name as the lead's identity rather than rejecting
+      // the row, since `Lead.fullName` is a required column with nothing else to put there.
+      const fullName = pickField(raw, LEAD_FIELD_ALIASES.fullName) ?? company;
 
       if (!fullName) {
         errors.push({
           row: i + 2,
-          message: `Missing required field: full_name/name (detected columns: ${detectedHeaders.join(", ") || "none"})`,
+          message: `Missing required field: full_name/name (or company) (detected columns: ${detectedHeaders.join(", ") || "none"})`,
         });
         continue;
       }
@@ -278,7 +283,7 @@ export class ImportExportService {
           fullName,
           email: pickField(raw, LEAD_FIELD_ALIASES.email),
           phone: pickField(raw, LEAD_FIELD_ALIASES.phone),
-          company: pickField(raw, LEAD_FIELD_ALIASES.company),
+          company,
           source: pickField(raw, LEAD_FIELD_ALIASES.source) ?? "CSV import",
           territory: pickField(raw, LEAD_FIELD_ALIASES.territory),
           website: pickField(raw, LEAD_FIELD_ALIASES.website),

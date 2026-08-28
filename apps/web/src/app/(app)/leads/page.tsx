@@ -244,9 +244,11 @@ function ImportLeads() {
     <Card>
       <h2 className="mb-3 text-sm font-medium text-ink">Import from CSV</h2>
       <p className="mb-3 text-xs text-muted">
-        Header row must include <code className="rounded bg-canvas px-1">full_name</code>, and optionally{" "}
+        Header row must include <code className="rounded bg-canvas px-1">full_name</code> or{" "}
+        <code className="rounded bg-canvas px-1">company</code> (used as the lead name if{" "}
+        <code className="rounded bg-canvas px-1">full_name</code> is blank), and optionally{" "}
         <code className="rounded bg-canvas px-1">email</code>, <code className="rounded bg-canvas px-1">phone</code>,{" "}
-        <code className="rounded bg-canvas px-1">company</code>, <code className="rounded bg-canvas px-1">source</code>.
+        <code className="rounded bg-canvas px-1">source</code>.
       </p>
       <div className="flex flex-col items-start gap-3">
         <FileInput value={importFile} onChange={setImportFile} accept=".csv,text/csv" label="Choose CSV file" />

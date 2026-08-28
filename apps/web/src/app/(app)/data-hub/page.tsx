@@ -31,9 +31,9 @@ export default function DataHubPage() {
       <div>
         <h1 className="text-xl font-semibold text-ink">Data Hub</h1>
         <p className="text-sm text-muted">
-          CSV and Google Sheets import/export for employees, assignments, leads, and opportunities. Lead-specific
-          import lives on the <Link href="/leads" className="text-emerald underline">Leads</Link> page, next to lead
-          management.
+          CSV and Google Sheets import/export for employees, assignments, leads, and opportunities. This same lead
+          importer is also available on the <Link href="/leads" className="text-emerald underline">Leads</Link> page,
+          next to lead management.
         </p>
       </div>
 
@@ -63,6 +63,20 @@ export default function DataHubPage() {
             Header row must include <code className="rounded bg-canvas px-1">full_name</code>,{" "}
             <code className="rounded bg-canvas px-1">email</code>, and optionally{" "}
             <code className="rounded bg-canvas px-1">role</code>, <code className="rounded bg-canvas px-1">department</code>.
+          </>
+        }
+      />
+
+      <CsvImportCard
+        title="Import leads from CSV"
+        endpoint="/api/v1/imports/leads/csv"
+        hint={
+          <>
+            Header row must include <code className="rounded bg-canvas px-1">full_name</code> or{" "}
+            <code className="rounded bg-canvas px-1">company</code> (used as the lead name if{" "}
+            <code className="rounded bg-canvas px-1">full_name</code> is blank), and optionally{" "}
+            <code className="rounded bg-canvas px-1">email</code>, <code className="rounded bg-canvas px-1">phone</code>,{" "}
+            <code className="rounded bg-canvas px-1">source</code>. Any other columns are kept as custom fields.
           </>
         }
       />
