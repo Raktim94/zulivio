@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AssignmentStatus, AssignmentSummary } from "@zulivio/types";
 import { api } from "@/lib/api";
@@ -62,6 +63,18 @@ export function AssignmentList() {
                 {a.owner ? `${a.owner.fullName} (${a.owner.employeeNumber})` : "Unassigned"}
                 {a.dueAt && ` · Due ${new Date(a.dueAt).toLocaleDateString()}`}
               </p>
+              {a.lead && (
+                <Link href={`/leads/${a.lead.id}`} className="text-xs text-emerald hover:underline">
+                  Lead: {a.lead.fullName}
+                  {a.lead.company && ` (${a.lead.company})`}
+                </Link>
+              )}
+              {a.opportunity && (
+                <p className="text-xs text-muted">
+                  Opportunity: {a.opportunity.title}
+                  {a.opportunity.company && ` (${a.opportunity.company})`}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <Badge tone={TONE[a.status]}>{a.status.replace("_", " ")}</Badge>

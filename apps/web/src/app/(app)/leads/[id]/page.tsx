@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type {
+  AssignmentSummary,
   LeadDetailData,
   LeadLossReason,
   PipelineStageSummary,
@@ -286,6 +287,8 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
         </Card>
       )}
 
+      <LinkedAssignments leadId={id} />
+
       <div className="grid gap-5 lg:grid-cols-2">
         <QualificationPanel data={data} onSaved={invalidate} />
 
@@ -356,6 +359,32 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
         />
       )}
     </div>
+  );
+}
+
+/** Work items (see Assignments) that were explicitly linked to this lead — hidden entirely when there are none. */
+function LinkedAssignments({ leadId }: { leadId: string }) {
+  const { data } = useQuery<AssignmentSummary[]>({
+    queryKey: ["assignments", "leadId", leadId],
+    queryFn: () => api.get<AssignmentSummary[]>(`/api/v1/assignments?leadId=${leadId}`),
+  });
+
+  if (!data || data.length === 0) return null;
+
+  return (
+    <Card>
+      <h2 className="mb-3 text-sm font-medium text-ink">Linked assignments</h2>
+      <ul className="flex flex-col gap-2">
+        {data.map((a) => (
+          <li key={a.id} className="flex items-center justify-between gap-3 text-sm">
+            <Link href="/assignments" className="text-ink hover:text-emerald-dark hover:underline">
+              #{a.assignmentNumber} {a.title}
+            </Link>
+            <Badge tone={a.status === "COMPLETED" ? "success" : "info"}>{a.status.replace("_", " ")}</Badge>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 

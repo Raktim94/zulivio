@@ -177,11 +177,22 @@ model Assignment {
   updatedAt      DateTime          @updatedAt
   completedAt    DateTime?
 
+  // Optional link to the CRM record this work item is actually about, so a
+  // manager can hand off trackable work ("audit last week's disqualified
+  // leads") without losing the connection to the specific Lead/Opportunity —
+  // shows up on both the Assignments list and the linked record's own page.
+  leadId         String?
+  lead           Lead?             @relation(fields: [leadId], references: [id])
+  opportunityId  String?
+  opportunity    Opportunity?      @relation(fields: [opportunityId], references: [id])
+
   events AssignmentEvent[]
 
   @@unique([organizationId, assignmentNumber])
   @@index([organizationId, status])
   @@index([organizationId, ownerId])
+  @@index([leadId])
+  @@index([opportunityId])
   @@map("assignments")
 }
 
@@ -506,6 +517,7 @@ model Lead {
   opportunities  Opportunity[] @relation("OpportunityFromLead")
   activities     LeadActivity[]
   followUps      LeadFollowUp[]
+  assignments    Assignment[]
 
   @@index([organizationId, status])
   @@index([organizationId, ownerId])
@@ -732,6 +744,7 @@ model Opportunity {
   convertedFromLead Lead? @relation("LeadConvertedOpportunity")
   events         OpportunityEvent[]
   forecastAdjustments ForecastAdjustment[]
+  assignments    Assignment[]
 
   @@index([organizationId, status])
   @@index([organizationId, ownerId])

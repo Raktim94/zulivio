@@ -45,6 +45,20 @@ export class AssignmentsService {
       }
     }
 
+    if (dto.leadId) {
+      const lead = await this.prisma.lead.findFirst({
+        where: { id: dto.leadId, organizationId: actor.organizationId },
+      });
+      if (!lead) throw new BadRequestException("leadId does not belong to this organization");
+    }
+
+    if (dto.opportunityId) {
+      const opportunity = await this.prisma.opportunity.findFirst({
+        where: { id: dto.opportunityId, organizationId: actor.organizationId },
+      });
+      if (!opportunity) throw new BadRequestException("opportunityId does not belong to this organization");
+    }
+
     // assignmentNumber is a per-organization sequential number with a
     // @@unique([organizationId, assignmentNumber]) constraint, not a DB
     // sequence — under concurrent creates, two requests can both read the
@@ -67,6 +81,8 @@ export class AssignmentsService {
               priority: dto.priority ?? "normal",
               dueAt: dto.dueAt ? new Date(dto.dueAt) : undefined,
               createdById: actor.id,
+              leadId: dto.leadId,
+              opportunityId: dto.opportunityId,
             },
           });
 
@@ -191,7 +207,7 @@ export class AssignmentsService {
     });
   }
 
-  async list(actor: AuthenticatedEmployee, filters: { status?: AssignmentStatus; ownerId?: string }) {
+  async list(actor: AuthenticatedEmployee, filters: { status?: AssignmentStatus; ownerId?: string; leadId?: string }) {
     const scoped = !isManagerOrAbove(actor.role);
 
     return this.prisma.assignment.findMany({
@@ -199,10 +215,13 @@ export class AssignmentsService {
         organizationId: actor.organizationId,
         ...(filters.status ? { status: filters.status } : {}),
         ...(filters.ownerId ? { ownerId: filters.ownerId } : {}),
+        ...(filters.leadId ? { leadId: filters.leadId } : {}),
         ...(scoped ? { OR: [{ ownerId: actor.id }, { createdById: actor.id }] } : {}),
       },
       include: {
         owner: { select: { id: true, fullName: true, employeeNumber: true } },
+        lead: { select: { id: true, fullName: true, company: true } },
+        opportunity: { select: { id: true, title: true, company: true } },
       },
       orderBy: { createdAt: "desc" },
     });

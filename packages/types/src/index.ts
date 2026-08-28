@@ -107,6 +107,10 @@ export interface AssignmentSummary {
   owner: { id: string; fullName: string; employeeNumber: string } | null;
   dueAt: string | null;
   createdAt: string;
+  leadId: string | null;
+  lead: { id: string; fullName: string; company: string | null } | null;
+  opportunityId: string | null;
+  opportunity: { id: string; title: string; company: string | null } | null;
 }
 
 export interface WorkSessionStatus {

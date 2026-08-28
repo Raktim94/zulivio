@@ -20,4 +20,12 @@ export class CreateAssignmentDto {
   @IsOptional()
   @IsDateString()
   dueAt?: string;
+
+  @IsOptional()
+  @IsString()
+  leadId?: string;
+
+  @IsOptional()
+  @IsString()
+  opportunityId?: string;
 }

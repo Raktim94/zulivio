@@ -19,8 +19,9 @@ export class AssignmentsController {
     @CurrentEmployee() actor: AuthenticatedEmployee,
     @Query("status") status?: AssignmentStatus,
     @Query("ownerId") ownerId?: string,
+    @Query("leadId") leadId?: string,
   ) {
-    return this.assignmentsService.list(actor, { status, ownerId });
+    return this.assignmentsService.list(actor, { status, ownerId, leadId });
   }
 
   @Post()
