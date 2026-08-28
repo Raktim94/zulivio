@@ -216,12 +216,18 @@ export class ImportExportService {
         continue;
       }
 
+      const expectedCloseDateText = pickField(raw, ["expectedCloseDate", "expected_close_date"]);
+      if (expectedCloseDateText && Number.isNaN(new Date(expectedCloseDateText).getTime())) {
+        errors.push({ row: i + 2, message: `Invalid expectedCloseDate "${expectedCloseDateText}"` });
+        continue;
+      }
+
       try {
         const opportunity = await this.opportunitiesService.create(actor, {
           title,
           company: pickField(raw, ["company"]),
           amountMinor,
-          expectedCloseDate: pickField(raw, ["expectedCloseDate", "expected_close_date"]),
+          expectedCloseDate: expectedCloseDateText,
         });
         created.push(opportunity);
       } catch (err) {
