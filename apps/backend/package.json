@@ -35,7 +35,7 @@
     "cookie-parser": "^1.4.7",
     "csv-parse": "^5.6.0",
     "csv-stringify": "^6.5.2",
-    "googleapis": "^144.0.0",
+    "googleapis": "^176.0.0",
     "helmet": "^8.3.0",
     "multer": "^2.2.0",
     "reflect-metadata": "^0.2.2",
