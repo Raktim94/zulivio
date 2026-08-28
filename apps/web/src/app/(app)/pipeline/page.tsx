@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { EmployeeSummary, OpportunitySummary, PipelineSummary } from "@zulivio/types";
 import { api, ApiError } from "@/lib/api";
@@ -147,12 +148,28 @@ export default function PipelinePage() {
 
                 {cards.map((opp) => (
                   <Card key={opp.id} className="p-3">
-                    <p className="text-sm font-medium text-ink">{opp.title}</p>
+                    {opp.leadId ? (
+                      <Link
+                        href={`/leads/${opp.leadId}`}
+                        className="text-sm font-medium text-ink hover:text-emerald-dark hover:underline"
+                      >
+                        {opp.title}
+                      </Link>
+                    ) : (
+                      <p className="text-sm font-medium text-ink">{opp.title}</p>
+                    )}
                     {opp.company && <p className="text-xs text-muted">{opp.company}</p>}
                     <p className="mt-1 text-sm font-semibold text-emerald-dark">
                       {formatAmount(opp.amountMinor, opp.currency)}
                     </p>
                     <p className="mt-1 text-xs text-muted">{opp.owner?.fullName ?? "Unassigned"}</p>
+                    {opp.leadId && (
+                      <Link href={`/leads/${opp.leadId}`}>
+                        <Button variant="secondary" className="mt-2 w-full py-1 text-xs">
+                          View lead & follow-up
+                        </Button>
+                      </Link>
+                    )}
                     <Select
                       className="mt-2 py-1 text-xs"
                       defaultValue=""

@@ -173,6 +173,7 @@ export interface EmployeeTotalReport {
     canceled: number;
   };
   trainingAcknowledged: number;
+  loginCount: number;
 }
 
 export interface ApiErrorBody {
@@ -232,6 +233,7 @@ export interface OpportunitySummary {
   lossReason: string | null;
   ownerId: string | null;
   owner: { id: string; fullName: string; employeeNumber: string } | null;
+  leadId: string | null;
   expectedCloseDate: string | null;
   createdAt: string;
 }

@@ -3,6 +3,7 @@
 import { use, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import clsx from "clsx";
 import {
   CalendarClock,
@@ -11,6 +12,7 @@ import {
   MessageCircle,
   Phone,
   StickyNote,
+  Trash2,
 } from "lucide-react";
 import type {
   LeadDetailData,
@@ -54,6 +56,7 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
   const { id } = use(params);
   const queryClient = useQueryClient();
   const toast = useToast();
+  const router = useRouter();
 
   const [dispositionOpen, setDispositionOpen] = useState(false);
   const [followUpOpen, setFollowUpOpen] = useState(false);
@@ -98,6 +101,16 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
       invalidate();
     },
     onError: (err) => toast.push(err instanceof ApiError ? err.message : "Could not save the note", "error"),
+  });
+
+  const deleteLead = useMutation({
+    mutationFn: () => api.delete(`/api/v1/leads/${id}`),
+    onSuccess: () => {
+      invalidate();
+      toast.push("Lead deleted", "success");
+      router.push("/leads");
+    },
+    onError: (err) => toast.push(err instanceof ApiError ? err.message : "Could not delete this lead", "error"),
   });
 
   if (isLoading) return <Spinner />;
@@ -194,6 +207,15 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
             </a>
             <Button variant="secondary" onClick={() => setDispositionOpen(true)} disabled={!lead.phone}>
               Log outcome
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (confirm(`Delete ${lead.fullName}? This can't be undone.`)) deleteLead.mutate();
+              }}
+              disabled={deleteLead.isPending}
+            >
+              <Trash2 size={15} aria-hidden /> Delete
             </Button>
           </div>
         </div>
@@ -307,7 +329,7 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
                         {new Date(entry.createdAt).toLocaleString()}
                       </span>
                     </div>
-                    {entry.body && <p className="mt-0.5 text-sm text-muted">{entry.body}</p>}
+                    {entry.body && <p className="mt-0.5 whitespace-pre-wrap text-sm text-ink">{entry.body}</p>}
                     <p className="mt-0.5 text-xs text-muted">{entry.actor.fullName}</p>
                   </li>
                 );

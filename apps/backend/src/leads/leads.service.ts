@@ -238,6 +238,26 @@ export class LeadsService {
     return updated;
   }
 
+  /**
+   * Deletes a lead the actor can already act on (same scoping as `update`).
+   * LeadActivity/LeadFollowUp only ever exist in the context of their lead,
+   * so they're deleted along with it; a converted Opportunity's `leadId` is
+   * nullable and only points back at its source lead, so it's detached
+   * rather than blocking the delete or being deleted itself.
+   */
+  async remove(actor: AuthenticatedEmployee, id: string) {
+    const lead = await this.access.findScopedLead(actor, id);
+
+    await this.prisma.$transaction([
+      this.prisma.opportunity.updateMany({ where: { leadId: id }, data: { leadId: null } }),
+      this.prisma.leadActivity.deleteMany({ where: { leadId: id } }),
+      this.prisma.leadFollowUp.deleteMany({ where: { leadId: id } }),
+      this.prisma.lead.delete({ where: { id: lead.id } }),
+    ]);
+
+    return { success: true };
+  }
+
   /** Transactionally converts a qualified lead into an opportunity, without losing lead history. */
   async convert(actor: AuthenticatedEmployee, id: string, dto: ConvertLeadDto) {
     const lead = await this.access.findScopedLead(actor, id);

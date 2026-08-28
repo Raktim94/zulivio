@@ -20,10 +20,11 @@ export default function EmployeeReportPage() {
     <div className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold text-ink">Employee report</h1>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
         <Stat label="Net worked" value={formatMinutes(data.attendance.totalNetWorkedMinutes)} />
         <Stat label="Break time" value={formatMinutes(data.attendance.totalBreakMinutes)} />
         <Stat label="Shifts" value={data.attendance.sessionCount} />
+        <Stat label="Logins" value={data.loginCount} />
         <Stat label="Training acknowledged" value={data.trainingAcknowledged} />
       </div>
 

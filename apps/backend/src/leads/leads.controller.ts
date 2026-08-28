@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { LeadPriority, LeadStatus } from "@prisma/client";
 import { LeadsService } from "./leads.service";
 import { LeadScoringService } from "./lead-scoring.service";
@@ -166,6 +166,11 @@ export class LeadsController {
     @Body() dto: UpdateLeadDto,
   ) {
     return this.leadsService.update(actor, id, dto);
+  }
+
+  @Delete(":id")
+  async remove(@CurrentEmployee() actor: AuthenticatedEmployee, @Param("id") id: string) {
+    return this.leadsService.remove(actor, id);
   }
 
   @Patch(":id/stage")

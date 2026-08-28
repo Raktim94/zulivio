@@ -82,7 +82,7 @@ export class ReportsService {
       throw new ForbiddenException("Cannot view another employee's report");
     }
 
-    const [attendance, assignmentCounts, trainingAck] = await Promise.all([
+    const [attendance, assignmentCounts, trainingAck, loginCount] = await Promise.all([
       this.attendanceService.report(actor, employeeId, from, to),
       this.prisma.assignment.groupBy({
         by: ["status"],
@@ -96,6 +96,11 @@ export class ReportsService {
       this.prisma.trainingResult.count({
         where: { employeeId, acknowledgedAt: { not: null } },
       }),
+      // Every successful sign-in creates a Session row (auth.service.ts), so this
+      // counts logins in the window rather than concurrent/active sessions.
+      this.prisma.session.count({
+        where: { employeeId, createdAt: { gte: from, lte: to } },
+      }),
     ]);
 
     const byStatus = Object.fromEntries(assignmentCounts.map((row) => [row.status, row._count._all]));
@@ -103,6 +108,7 @@ export class ReportsService {
 
     return {
       attendance,
+      loginCount,
       assignments: {
         total: totalAssigned,
         completed: byStatus[AssignmentStatus.COMPLETED] ?? 0,

@@ -58,44 +58,54 @@ export default function TasksPage() {
         <ErrorState message="Could not load your tasks." />
       ) : (
         <>
-          <Tabs
-            tabs={[
-              { id: "pending", label: `Pending (${data.pending.length})` },
-              { id: "completed", label: `Completed (${data.completed.length})` },
-              { id: "all", label: `All (${data.all.length})` },
-              { id: "workflows", label: `Workflow Runs (${data.workflowRuns.length})` },
-            ]}
-            active={tab}
-            onChange={setTab}
-          />
-          <TabPanel id="pending" active={tab}>
-            <AssignmentRows items={data.pending} />
-          </TabPanel>
-          <TabPanel id="completed" active={tab}>
-            <AssignmentRows items={data.completed} />
-          </TabPanel>
-          <TabPanel id="all" active={tab}>
-            <AssignmentRows items={data.all} />
-          </TabPanel>
-          <TabPanel id="workflows" active={tab}>
-            {data.workflowRuns.length === 0 ? (
-              <EmptyState title="No workflow runs" description="Start one from the Helpdesk page." />
-            ) : (
-              <div className="flex flex-col gap-3">
-                {data.workflowRuns.map((run) => (
-                  <Card key={run.id} className="flex items-center justify-between gap-4">
-                    <div>
-                      <p className="text-sm font-medium text-ink">{run.workflowDefinition?.name ?? "Workflow"}</p>
-                      <p className="text-xs text-muted">Started {new Date(run.startedAt).toLocaleDateString()}</p>
+          {(() => {
+            const pending = data.pending ?? [];
+            const completed = data.completed ?? [];
+            const all = data.all ?? [];
+            const workflowRuns = data.workflowRuns ?? [];
+            return (
+              <>
+                <Tabs
+                  tabs={[
+                    { id: "pending", label: `Pending (${pending.length})` },
+                    { id: "completed", label: `Completed (${completed.length})` },
+                    { id: "all", label: `All (${all.length})` },
+                    { id: "workflows", label: `Workflow Runs (${workflowRuns.length})` },
+                  ]}
+                  active={tab}
+                  onChange={setTab}
+                />
+                <TabPanel id="pending" active={tab}>
+                  <AssignmentRows items={pending} />
+                </TabPanel>
+                <TabPanel id="completed" active={tab}>
+                  <AssignmentRows items={completed} />
+                </TabPanel>
+                <TabPanel id="all" active={tab}>
+                  <AssignmentRows items={all} />
+                </TabPanel>
+                <TabPanel id="workflows" active={tab}>
+                  {workflowRuns.length === 0 ? (
+                    <EmptyState title="No workflow runs" description="Start one from the Helpdesk page." />
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {workflowRuns.map((run) => (
+                        <Card key={run.id} className="flex items-center justify-between gap-4">
+                          <div>
+                            <p className="text-sm font-medium text-ink">{run.workflowDefinition?.name ?? "Workflow"}</p>
+                            <p className="text-xs text-muted">Started {new Date(run.startedAt).toLocaleDateString()}</p>
+                          </div>
+                          <Badge tone={run.status === "COMPLETED" ? "success" : "info"}>
+                            {run.status.replace("_", " ")}
+                          </Badge>
+                        </Card>
+                      ))}
                     </div>
-                    <Badge tone={run.status === "COMPLETED" ? "success" : "info"}>
-                      {run.status.replace("_", " ")}
-                    </Badge>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabPanel>
+                  )}
+                </TabPanel>
+              </>
+            );
+          })()}
         </>
       )}
     </div>

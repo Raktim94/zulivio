@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import Link from "next/link";
-import { Phone, MessageCircle, Copy, StickyNote } from "lucide-react";
+import { Phone, MessageCircle, Copy, StickyNote, Trash2 } from "lucide-react";
 import type {
   CallDisposition,
   CallOutcome,
@@ -312,6 +312,36 @@ function NoteButton({ leadId }: { leadId: string }) {
   );
 }
 
+function DeleteButton({ leadId, leadName }: { leadId: string; leadName: string }) {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+
+  const deleteLead = useMutation({
+    mutationFn: () => api.delete(`/api/v1/leads/${leadId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      toast.push("Lead deleted", "success");
+    },
+    onError: (err) => toast.push(err instanceof ApiError ? err.message : "Could not delete this lead", "error"),
+  });
+
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        if (confirm(`Delete ${leadName}? This can't be undone.`)) deleteLead.mutate();
+      }}
+      disabled={deleteLead.isPending}
+      aria-label={`Delete ${leadName}`}
+      title="Delete lead"
+      className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted transition hover:bg-coral/10 hover:text-coral"
+    >
+      <Trash2 size={13} aria-hidden />
+    </button>
+  );
+}
+
 // ---------------------------------------------------------------------
 // Lead card
 // ---------------------------------------------------------------------
@@ -388,7 +418,10 @@ export function LeadCard({
 
       <div className="mt-2 flex items-center justify-between gap-2">
         <p className="truncate text-xs text-muted">{lead.owner?.fullName ?? "Unassigned"}</p>
-        <NoteButton leadId={lead.id} />
+        <div className="flex items-center">
+          <NoteButton leadId={lead.id} />
+          <DeleteButton leadId={lead.id} leadName={lead.fullName} />
+        </div>
       </div>
 
       {lead.nextFollowUpAt && (
