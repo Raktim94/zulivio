@@ -75,7 +75,15 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.version }}"
           if [ -z "$VERSION" ]; then
-            GIT_TAG="$(git describe --tags --abbrev=0 2>/dev/null || true)"
+            # --exact-match only succeeds when HEAD *is* a tagged commit.
+            # A plain push to main (this workflow's other trigger) is
+            # usually NOT at a tag — using --abbrev=0 there would resolve to
+            # the nearest ANCESTOR tag instead and silently republish that
+            # older version's image tag with today's code, corrupting it.
+            # (This bug was live from 2026-08-13 to 2026-08-28: every plain
+            # push after v1.4.0 was tagged kept overwriting the `1.4.0`
+            # GHCR tag, since no newer git tag ever existed to be found.)
+            GIT_TAG="$(git describe --tags --exact-match 2>/dev/null || true)"
             if [ -n "$GIT_TAG" ]; then
               VERSION="${GIT_TAG#v}"
             else
