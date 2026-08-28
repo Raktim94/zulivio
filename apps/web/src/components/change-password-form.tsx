@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
-import { Button, ErrorState, Input } from "@/components/ui";
+import { Button, ErrorState, PasswordInput } from "@/components/ui";
 
 export function ChangePasswordForm({
   submitLabel = "Update password",
@@ -13,6 +13,7 @@ export function ChangePasswordForm({
   onSuccess?: () => void;
 }) {
   const [form, setForm] = useState({ currentPassword: "", newPassword: "" });
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const changePassword = useMutation({
@@ -20,6 +21,7 @@ export function ChangePasswordForm({
     onSuccess: () => {
       setError(null);
       setForm({ currentPassword: "", newPassword: "" });
+      setConfirmPassword("");
       onSuccess?.();
     },
     onError: (err) => setError(err instanceof ApiError ? err.message : "Could not change your password"),
@@ -31,22 +33,31 @@ export function ChangePasswordForm({
       onSubmit={(e) => {
         e.preventDefault();
         setError(null);
+        if (form.newPassword !== confirmPassword) {
+          setError("New passwords do not match");
+          return;
+        }
         changePassword.mutate();
       }}
     >
       {error && <ErrorState message={error} />}
-      <Input
-        type="password"
+      <PasswordInput
         placeholder="Current password"
         value={form.currentPassword}
         onChange={(e) => setForm({ ...form, currentPassword: e.target.value })}
         required
       />
-      <Input
-        type="password"
+      <PasswordInput
         placeholder="New password"
         value={form.newPassword}
         onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
+        minLength={10}
+        required
+      />
+      <PasswordInput
+        placeholder="Confirm new password"
+        value={confirmPassword}
+        onChange={(e) => setConfirmPassword(e.target.value)}
         minLength={10}
         required
       />

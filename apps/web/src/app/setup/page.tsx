@@ -3,20 +3,25 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
-import { Button, Card, ErrorState, Input } from "@/components/ui";
+import { Button, Card, ErrorState, Input, PasswordInput } from "@/components/ui";
 import { Logo } from "@/components/logo";
 import { MadeBy } from "@/components/made-by";
 
 export default function SetupPage() {
   const router = useRouter();
   const [form, setForm] = useState({ organizationName: "", fullName: "", email: "", password: "" });
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitting(true);
     setError(null);
+    if (form.password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+    setSubmitting(true);
     try {
       await api.post("/api/v1/bootstrap", form);
       await api.post("/api/v1/auth/sessions", { email: form.email, password: form.password });
@@ -68,11 +73,19 @@ export default function SetupPage() {
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-muted">Password (min 10 characters)</label>
-            <Input
-              type="password"
+            <PasswordInput
               minLength={10}
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
+              required
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-muted">Confirm password</label>
+            <PasswordInput
+              minLength={10}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
               required
             />
           </div>
