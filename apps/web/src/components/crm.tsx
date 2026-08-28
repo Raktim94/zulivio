@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import clsx from "clsx";
 import Link from "next/link";
-import { Phone, MessageCircle, Copy } from "lucide-react";
+import { Phone, MessageCircle, Copy, StickyNote } from "lucide-react";
 import type {
   CallDisposition,
   CallOutcome,
@@ -13,7 +15,8 @@ import type {
   LeadScoreBand,
   PipelineStageSummary,
 } from "@zulivio/types";
-import { Badge, useToast } from "./ui";
+import { api, ApiError } from "@/lib/api";
+import { Badge, Button, Dialog, Input, useToast } from "./ui";
 
 // ---------------------------------------------------------------------
 // Formatting
@@ -244,6 +247,71 @@ function QuickActions({ phone }: { phone: string }) {
   );
 }
 
+/**
+ * A quick note a caller can leave on a lead right from the board, without
+ * opening the full workspace — the same `/notes` endpoint the lead
+ * workspace's Activity panel posts to, so it lands on the same timeline.
+ */
+function NoteButton({ leadId }: { leadId: string }) {
+  const [open, setOpen] = useState(false);
+  const [note, setNote] = useState("");
+  const queryClient = useQueryClient();
+  const toast = useToast();
+
+  const addNote = useMutation({
+    mutationFn: () => api.post(`/api/v1/leads/${leadId}/notes`, { body: note }),
+    onSuccess: () => {
+      setNote("");
+      setOpen(false);
+      queryClient.invalidateQueries({ queryKey: ["leads"] });
+      toast.push("Note added", "success");
+    },
+    onError: (err) => toast.push(err instanceof ApiError ? err.message : "Could not save the note", "error"),
+  });
+
+  return (
+    <div onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label="Add a note to this lead"
+        title="Add a note"
+        className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted transition hover:bg-canvas hover:text-ink"
+      >
+        <StickyNote size={13} aria-hidden />
+        Note
+      </button>
+      {open && (
+        <Dialog open onClose={() => setOpen(false)} title="Add a note">
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (note.trim()) addNote.mutate();
+            }}
+            className="flex flex-col gap-3"
+          >
+            <Input
+              placeholder="What happened on this call?"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              aria-label="Note"
+              autoFocus
+            />
+            <div className="flex gap-2">
+              <Button type="submit" disabled={!note.trim() || addNote.isPending}>
+                {addNote.isPending ? "Saving…" : "Save note"}
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Dialog>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------
 // Lead card
 // ---------------------------------------------------------------------
@@ -318,7 +386,10 @@ export function LeadCard({
 
       <CustomFieldChips customFields={lead.customFields} />
 
-      <p className="mt-2 truncate text-xs text-muted">{lead.owner?.fullName ?? "Unassigned"}</p>
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <p className="truncate text-xs text-muted">{lead.owner?.fullName ?? "Unassigned"}</p>
+        <NoteButton leadId={lead.id} />
+      </div>
 
       {lead.nextFollowUpAt && (
         <p className={clsx("mt-1 text-xs font-medium", followUp.overdue ? "text-coral" : "text-muted")}>

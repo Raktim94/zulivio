@@ -6,6 +6,7 @@ import Link from "next/link";
 import clsx from "clsx";
 import {
   CalendarClock,
+  Copy,
   Mail,
   MessageCircle,
   Phone,
@@ -126,8 +127,28 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
             <p className="mt-1 text-sm text-muted">
               {[lead.jobTitle, lead.company].filter(Boolean).join(" · ") || "No company on file"}
             </p>
-            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted">
-              {lead.phone && <span>{lead.phone}</span>}
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted">
+              {lead.phone && (
+                <span className="flex items-center gap-1">
+                  {lead.phone}
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(lead.phone!);
+                        toast.push("Phone number copied", "success");
+                      } catch {
+                        toast.push("Could not copy — your browser blocked clipboard access", "error");
+                      }
+                    }}
+                    aria-label={`Copy ${lead.phone}`}
+                    title="Copy number"
+                    className="flex h-6 w-6 items-center justify-center rounded-md text-muted transition hover:bg-canvas hover:text-ink"
+                  >
+                    <Copy size={13} aria-hidden />
+                  </button>
+                </span>
+              )}
               {lead.email && <span>{lead.email}</span>}
               {lead.website && (
                 <a

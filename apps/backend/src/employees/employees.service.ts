@@ -332,4 +332,110 @@ export class EmployeesService {
 
     return { ok: true };
   }
+
+  /**
+   * Permanent, irreversible delete — separate from `remove` (which only
+   * separates the employee and keeps their row for history). Only allowed
+   * once an employee is already SEPARATED, and only if they have no
+   * historical footprint that would need a "Former employee" placeholder:
+   * every relation this touches (see the Employee model's relation list in
+   * schema.prisma) is either a required FK — in which case we refuse and
+   * name what's blocking it, rather than leaving orphaned rows a required
+   * column can't legally hold null — or an already-nullable ownership field
+   * (Assignment/Lead/Opportunity `ownerId`, self-relation `managerId`),
+   * which we clear as part of the purge.
+   */
+  async purge(actor: AuthenticatedEmployee, employeeId: string) {
+    const target = await this.prisma.employee.findFirst({
+      where: { id: employeeId, organizationId: actor.organizationId },
+    });
+
+    if (!target) {
+      throw new NotFoundException("Employee not found in this organization");
+    }
+
+    if (rank(target.role) >= rank(actor.role)) {
+      throw new ForbiddenException("Cannot permanently delete a peer or higher-ranked employee");
+    }
+
+    if (target.employmentStatus !== "SEPARATED") {
+      throw new BadRequestException("Only a separated employee can be permanently deleted — remove them first");
+    }
+
+    const [
+      workSessions,
+      trainingResults,
+      tipAcknowledgements,
+      assignmentsCreated,
+      leadsCreated,
+      opportunitiesCreated,
+      qualityAuditsAsSubject,
+      qualityAuditsAsReviewer,
+      workflowRuns,
+      leadActivities,
+      followUpsAssigned,
+      followUpsCreated,
+    ] = await Promise.all([
+      this.prisma.workSession.count({ where: { employeeId } }),
+      this.prisma.trainingResult.count({ where: { employeeId } }),
+      this.prisma.tipAcknowledgement.count({ where: { employeeId } }),
+      this.prisma.assignment.count({ where: { createdById: employeeId } }),
+      this.prisma.lead.count({ where: { createdById: employeeId } }),
+      this.prisma.opportunity.count({ where: { createdById: employeeId } }),
+      this.prisma.qualityAuditResult.count({ where: { employeeId } }),
+      this.prisma.qualityAuditResult.count({ where: { reviewerId: employeeId } }),
+      this.prisma.workflowRun.count({ where: { employeeId } }),
+      this.prisma.leadActivity.count({ where: { actorId: employeeId } }),
+      this.prisma.leadFollowUp.count({ where: { assigneeId: employeeId } }),
+      this.prisma.leadFollowUp.count({ where: { createdById: employeeId } }),
+    ]);
+
+    const blockers: string[] = [];
+    const noteIfAny = (count: number, label: string) => {
+      if (count > 0) blockers.push(`${count} ${label}`);
+    };
+    noteIfAny(workSessions, "attendance session(s)");
+    noteIfAny(trainingResults, "training record(s)");
+    noteIfAny(tipAcknowledgements, "tip acknowledgement(s)");
+    noteIfAny(assignmentsCreated, "assignment(s) created");
+    noteIfAny(leadsCreated, "lead(s) created");
+    noteIfAny(opportunitiesCreated, "opportunit(y/ies) created");
+    noteIfAny(qualityAuditsAsSubject, "quality audit result(s) as subject");
+    noteIfAny(qualityAuditsAsReviewer, "quality audit result(s) as reviewer");
+    noteIfAny(workflowRuns, "workflow run(s)");
+    noteIfAny(leadActivities, "lead activity/activities logged");
+    noteIfAny(followUpsAssigned, "follow-up(s) assigned");
+    noteIfAny(followUpsCreated, "follow-up(s) created");
+
+    if (blockers.length > 0) {
+      throw new BadRequestException(
+        `Cannot permanently delete ${target.fullName} — they have ${blockers.join(", ")}. ` +
+          "Their record must stay to preserve that history; they remain separated and hidden from active work.",
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.assignment.updateMany({ where: { ownerId: employeeId }, data: { ownerId: null } });
+      await tx.lead.updateMany({ where: { ownerId: employeeId }, data: { ownerId: null } });
+      await tx.opportunity.updateMany({ where: { ownerId: employeeId }, data: { ownerId: null } });
+      await tx.employee.updateMany({ where: { managerId: employeeId }, data: { managerId: null } });
+      await tx.session.deleteMany({ where: { employeeId } });
+      await tx.apiKey.deleteMany({ where: { employeeId } });
+
+      await tx.auditEvent.create({
+        data: {
+          organizationId: actor.organizationId,
+          actorId: actor.id,
+          action: "employee.purged",
+          targetType: "employee",
+          targetId: employeeId,
+          metadata: { fullName: target.fullName, employeeNumber: target.employeeNumber },
+        },
+      });
+
+      await tx.employee.delete({ where: { id: employeeId } });
+    });
+
+    return { ok: true };
+  }
 }

@@ -63,6 +63,12 @@ export default function EmployeesPage() {
     onError: (err) => setRowError(err instanceof ApiError ? err.message : "Could not remove employee"),
   });
 
+  const purgeEmployee = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/employees/${id}/permanent`),
+    onSuccess: invalidate,
+    onError: (err) => setRowError(err instanceof ApiError ? err.message : "Could not permanently delete employee"),
+  });
+
   const resetPassword = useMutation({
     mutationFn: (id: string) => api.post<{ temporaryPassword: string }>(`/api/v1/employees/${id}/reset-password`),
     onSuccess: (result, id) => {
@@ -234,7 +240,7 @@ export default function EmployeesPage() {
                             >
                               Reset password
                             </button>
-                            {emp.employmentStatus === "ACTIVE" && (
+                            {emp.employmentStatus !== "SEPARATED" && (
                               <button
                                 onClick={() => {
                                   if (confirm(`Remove ${emp.fullName}? This revokes their access.`)) {
@@ -245,6 +251,24 @@ export default function EmployeesPage() {
                                 className="text-xs text-coral underline"
                               >
                                 Remove
+                              </button>
+                            )}
+                            {emp.employmentStatus === "SEPARATED" && (
+                              <button
+                                onClick={() => {
+                                  if (
+                                    confirm(
+                                      `Permanently delete ${emp.fullName}? This cannot be undone. Their record only ` +
+                                        "deletes if they have no lead/assignment/attendance history — otherwise you'll see why not.",
+                                    )
+                                  ) {
+                                    setRowError(null);
+                                    purgeEmployee.mutate(emp.id);
+                                  }
+                                }}
+                                className="text-xs text-coral underline"
+                              >
+                                Delete
                               </button>
                             )}
                           </div>

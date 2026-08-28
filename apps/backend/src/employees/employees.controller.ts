@@ -68,4 +68,10 @@ export class EmployeesController {
   ) {
     return this.employeesService.remove(actor, id, dto.reason);
   }
+
+  @Roles(Role.MANAGER)
+  @Delete(":id/permanent")
+  async purge(@CurrentEmployee() actor: AuthenticatedEmployee, @Param("id") id: string) {
+    return this.employeesService.purge(actor, id);
+  }
 }

@@ -271,6 +271,65 @@ describe("Zulivio (e2e)", () => {
       const freshEmployeeList = await freshEmployeeAgent.get("/api/v1/employees").expect(200);
       expect(freshEmployeeList.body.map((e: { id: string }) => e.id)).toEqual([freshEmployeeRes.body.id]);
     });
+
+    it("removes (soft-deletes) a subordinate, then permanently deletes them once they have no history", async () => {
+      const ownerAgent = request.agent(server());
+      await ownerAgent.post("/api/v1/auth/sessions").send({ email: orgEmail, password: orgPassword }).expect(201);
+
+      const email = `purge-clean-${Date.now()}@e2e.local`;
+      const created = await ownerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Clean Leaver", email, role: "EMPLOYEE" })
+        .expect(201);
+      const id = created.body.id;
+
+      // Still ACTIVE — must be separated first.
+      await ownerAgent.delete(`/api/v1/employees/${id}/permanent`).expect(400);
+
+      await ownerAgent.delete(`/api/v1/employees/${id}`).send({}).expect(200);
+      const afterRemove = await ownerAgent.get("/api/v1/employees").expect(200);
+      expect(afterRemove.body.find((e: { id: string }) => e.id === id).employmentStatus).toBe("SEPARATED");
+
+      // No history anywhere — purge succeeds and the row is actually gone.
+      await ownerAgent.delete(`/api/v1/employees/${id}/permanent`).expect(200);
+      const afterPurge = await ownerAgent.get("/api/v1/employees").expect(200);
+      expect(afterPurge.body.map((e: { id: string }) => e.id)).not.toContain(id);
+    });
+
+    it("refuses to permanently delete a separated employee who has lead history, and explains why", async () => {
+      const ownerAgent = request.agent(server());
+      await ownerAgent.post("/api/v1/auth/sessions").send({ email: orgEmail, password: orgPassword }).expect(201);
+
+      const email = `purge-history-${Date.now()}@e2e.local`;
+      const created = await ownerAgent
+        .post("/api/v1/employees")
+        .send({ fullName: "Left Behind History", email, role: "EMPLOYEE" })
+        .expect(201);
+      const id = created.body.id;
+
+      const subjectAgent = request.agent(server());
+      await subjectAgent
+        .post("/api/v1/auth/sessions")
+        .send({ email, password: created.body.temporaryPassword })
+        .expect(201);
+      await subjectAgent.post("/api/v1/leads").send({ fullName: "A lead they created" }).expect(201);
+
+      await ownerAgent.delete(`/api/v1/employees/${id}`).send({}).expect(200);
+
+      const res = await ownerAgent.delete(`/api/v1/employees/${id}/permanent`).expect(400);
+      expect(res.body.message).toContain("lead(s) created");
+
+      // Blocked, not silently dropped — the record must still be there.
+      const afterBlockedPurge = await ownerAgent.get("/api/v1/employees").expect(200);
+      expect(afterBlockedPurge.body.map((e: { id: string }) => e.id)).toContain(id);
+    });
+
+    it("blocks a manager from permanently deleting a peer-or-higher-ranked employee", async () => {
+      const agent = request.agent(server());
+      await agent.post("/api/v1/auth/sessions").send(managerCreds).expect(201);
+
+      await agent.delete(`/api/v1/employees/${ownerId}/permanent`).expect(403);
+    });
   });
 
   describe("audit log", () => {

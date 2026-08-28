@@ -1,10 +1,38 @@
 "use client";
 
+import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
 import type { DashboardData } from "@zulivio/types";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { Users, Workflow, PieChart as PieChartIcon, UserCog, ClipboardList, type LucideIcon } from "lucide-react";
 import { api } from "@/lib/api";
 import { Badge, Card, ErrorState, Spinner, StatCard } from "@/components/ui";
+
+const QUICK_ACCESS: { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/leads", label: "Leads", icon: Users },
+  { href: "/pipeline", label: "Pipeline", icon: Workflow },
+  { href: "/reports", label: "CRM Reports", icon: PieChartIcon },
+  { href: "/assignments", label: "Assignments", icon: ClipboardList },
+  { href: "/employees", label: "Employees", icon: UserCog },
+];
+
+/** One-tap jump to the sections a manager opens most, so the dashboard doubles as a launcher. */
+function QuickAccess() {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {QUICK_ACCESS.map(({ href, label, icon: Icon }) => (
+        <Link
+          key={href}
+          href={href}
+          className="flex items-center gap-1.5 rounded-full border border-border bg-surface px-3 py-1.5 text-xs font-medium text-ink transition hover:border-emerald/40 hover:text-emerald-dark"
+        >
+          <Icon size={14} aria-hidden />
+          {label}
+        </Link>
+      ))}
+    </div>
+  );
+}
 
 export function Dashboard() {
   const { data, isLoading, error } = useQuery<DashboardData>({
@@ -29,6 +57,8 @@ export function Dashboard() {
           Generated {new Date(data.generatedAt).toLocaleString()}
         </p>
       </div>
+
+      <QuickAccess />
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard label="Active employees" value={`${data.headcount.active} / ${data.headcount.total}`} />
