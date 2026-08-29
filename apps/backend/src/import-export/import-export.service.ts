@@ -151,7 +151,7 @@ export class ImportExportService {
       status: l.status,
       owner: l.owner?.fullName ?? "",
     }));
-    return toCsv(rows, LEAD_COLUMNS);
+    return toCsv(rows, LEAD_COLUMNS, ["phone"]);
   }
 
   async exportOpportunitiesCsv(actor: AuthenticatedEmployee): Promise<string> {
@@ -369,8 +369,8 @@ export class ImportExportService {
       const rows = [
         ASSIGNMENT_COLUMNS,
         ...assignments.map((a) =>
-          [a.assignmentNumber, a.title, a.status, a.priority, a.owner?.fullName ?? "", a.dueAt ?? ""].map(
-            sanitizeCsvCell,
+          [a.assignmentNumber, a.title, a.status, a.priority, a.owner?.fullName ?? "", a.dueAt ?? ""].map((value) =>
+            sanitizeCsvCell(value),
           ),
         ),
       ];

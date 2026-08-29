@@ -1063,6 +1063,45 @@ describe("Zulivio (e2e)", () => {
       expect(res.text).toContain("Aditi Sharma");
     });
 
+    it("cleans a phone number's formatting on create, keeping the country code dialable", async () => {
+      const res = await ownerAgent
+        .post("/api/v1/leads")
+        .send({ fullName: "Phone Format Test", phone: "+91 86051-23456" })
+        .expect(201);
+      expect(res.body.phone).toBe("+918605123456");
+    });
+
+    it("imports leads from CSV, recovering a phone number Excel mangled into scientific notation", async () => {
+      const csv = ["full_name,phone", "Excel Mangled Lead,9.18605E+11", "Country Code Lead,+91-8605123457"].join(
+        "\n",
+      );
+
+      const res = await ownerAgent
+        .post("/api/v1/imports/leads/csv")
+        .attach("file", Buffer.from(csv), "leads.csv")
+        .expect(201);
+
+      expect(res.body.createdCount).toBe(2);
+      const created = res.body.created as { fullName: string; phone: string }[];
+      expect(created.find((l) => l.fullName === "Country Code Lead")?.phone).toBe("+918605123457");
+      // "9.18605E+11" only carries 6 significant digits (918605000000) — the
+      // trailing digits were already lost by the time the source file was
+      // written that way, so this only verifies the reconstructed value,
+      // not full recovery of the original number.
+      expect(created.find((l) => l.fullName === "Excel Mangled Lead")?.phone).toBe("918605000000");
+    });
+
+    it("finds a lead by phone number regardless of country code, via Agent Assist", async () => {
+      const res = await ownerAgent.get("/api/v1/me/agent-assist?phone=8605123457").expect(200);
+      expect(res.body.lead?.fullName).toBe("Country Code Lead");
+    });
+
+    it("protects an exported phone number from Excel's scientific-notation auto-conversion", async () => {
+      const res = await ownerAgent.get("/api/v1/exports/leads.csv").expect(200);
+      expect(res.text).toContain("'+918605123457");
+      expect(res.text).toContain("'918605000000");
+    });
+
     it("returns sales dashboard data with stage breakdown, drill-down IDs, and a 14-day trend", async () => {
       const res = await ownerAgent.get("/api/v1/reports/sales-dashboard").expect(200);
       expect(res.body.winLoss.lost).toBeGreaterThanOrEqual(1);

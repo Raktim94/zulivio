@@ -19,6 +19,7 @@ import {
 } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
+import { normalizePhone, phoneLast10 } from "../common/phone.util";
 import { AssignmentRulesService } from "../assignment-rules/assignment-rules.service";
 import { PipelinesService } from "../pipelines/pipelines.service";
 import { CALL_PROVIDER, type CallProvider } from "../calling/calling.types";
@@ -128,7 +129,7 @@ export class LeadsService {
         organizationId: actor.organizationId,
         fullName: dto.fullName,
         email: dto.email,
-        phone: dto.phone,
+        phone: normalizePhone(dto.phone),
         company: dto.company,
         source: dto.source,
         notes: dto.notes,
@@ -172,11 +173,19 @@ export class LeadsService {
     });
   }
 
-  /** Most recent scoped lead matching a phone number, or null — used by Agent Assist. Never throws on no match. */
+  /**
+   * Most recent scoped lead matching a phone number, or null — used by Agent
+   * Assist. Matches on the last 10 digits so a caller-ID lookup finds the
+   * lead regardless of whether it or the search value carries a country
+   * code. Never throws on no match.
+   */
   async findByPhone(actor: AuthenticatedEmployee, phone: string) {
+    const last10 = phoneLast10(phone);
+    if (!last10) return null;
+
     const scopeWhere = await this.access.leadScopeWhere(actor);
     return this.prisma.lead.findFirst({
-      where: { organizationId: actor.organizationId, phone, ...scopeWhere },
+      where: { organizationId: actor.organizationId, phone: { endsWith: last10 }, ...scopeWhere },
       orderBy: { createdAt: "desc" },
     });
   }
@@ -207,7 +216,10 @@ export class LeadsService {
       data: {
         fullName: dto.fullName,
         email: dto.email,
-        phone: dto.phone,
+        // dto.phone === undefined means "field not sent, leave unchanged" (Prisma
+        // skips undefined update values); an explicit "" clears it, so that case
+        // must not fall through normalizePhone's undefined-for-empty-input return.
+        phone: dto.phone === undefined ? undefined : (normalizePhone(dto.phone) ?? ""),
         company: dto.company,
         notes: dto.notes,
         territory: dto.territory,
