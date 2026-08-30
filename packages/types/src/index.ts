@@ -120,6 +120,23 @@ export interface WorkSessionStatus {
   currentBreakId?: string;
 }
 
+/** Same shape as EmployeeTotalReport["attendance"] below — kept as its own
+ * name since it's also returned standalone by GET /work-sessions/report/:id. */
+export type AttendanceReport = EmployeeTotalReport["attendance"];
+
+export interface TeamAttendanceRow {
+  employeeId: string;
+  employeeNumber: string;
+  fullName: string;
+  role: Role;
+  employmentStatus: string;
+  daysPresent: number;
+  sessionCount: number;
+  totalNetWorkedMinutes: number;
+  totalBreakMinutes: number;
+  calls: number;
+}
+
 export interface DashboardData {
   generatedAt: string;
   headcount: { total: number; active: number };
@@ -311,8 +328,9 @@ export interface WorkflowRunSummary {
 
 export interface MeHomeData {
   attendance: WorkSessionStatus;
-  summary: { assigned: number; inProgress: number; followUp: number; completedToday: number };
+  summary: { assigned: number; inProgress: number; followUp: number; completedToday: number; openLeads: number };
   activeWork: AssignmentSummary[];
+  assignedLeads: LeadRecord[];
 }
 
 export interface MeTasksData {

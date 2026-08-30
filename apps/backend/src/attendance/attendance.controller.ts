@@ -30,6 +30,16 @@ export class AttendanceController {
     );
   }
 
+  /** Manager+ team attendance and call-volume summary for a date range. */
+  @Get("team-report")
+  async teamReport(
+    @CurrentEmployee() actor: AuthenticatedEmployee,
+    @Query("from") from: string,
+    @Query("to") to: string,
+  ) {
+    return this.attendanceService.teamReport(actor, new Date(from), new Date(to));
+  }
+
   @Post("start")
   async start(@CurrentEmployee() actor: AuthenticatedEmployee) {
     return this.attendanceService.start(actor);

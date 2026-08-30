@@ -854,6 +854,34 @@ export class LeadsService {
     };
   }
 
+  /**
+   * Leads currently owned by the actor and still open. Lead ownership is set
+   * directly on `Lead.ownerId` (via `assign()`/auto-assignment) and is a
+   * separate mechanism from the `Assignment` model — the Overview/Start Work
+   * "assigned work" summary only queried Assignments, so a lead handed to
+   * someone through the leads system never showed up there. This backs that
+   * summary the same way `myDay`'s own open-leads count already works.
+   */
+  async myOpenLeadsSummary(actor: AuthenticatedEmployee) {
+    const where: Prisma.LeadWhereInput = {
+      organizationId: actor.organizationId,
+      ownerId: actor.id,
+      status: { notIn: CLOSED_STATUSES },
+    };
+
+    const [count, leads] = await Promise.all([
+      this.prisma.lead.count({ where }),
+      this.prisma.lead.findMany({
+        where,
+        orderBy: [{ nextFollowUpAt: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }],
+        take: 10,
+        include: { owner: OWNER_SELECT, stage: true },
+      }),
+    ]);
+
+    return { count, leads };
+  }
+
   // --- Assignment (built on the existing assignment-rules engine) ---
 
   async assign(actor: AuthenticatedEmployee, id: string, ownerId: string | null) {

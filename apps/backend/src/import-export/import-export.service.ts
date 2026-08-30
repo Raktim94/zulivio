@@ -101,6 +101,33 @@ function pickField(raw: Record<string, string>, aliases: string[]): string | und
   return undefined;
 }
 
+const SCIENTIFIC_NOTATION = /^[+-]?\d+(?:\.\d+)?[eE][+-]?\d+$/;
+
+/**
+ * Scraped-lead exports commonly carry both a `phone` column already
+ * destroyed by Excel/Sheets ("9.18E+11") *and* a same-row fallback like
+ * `phone_local_10d` with the real digits, specifically because the source
+ * tool already worked around the same mangling once. Plain `pickField`
+ * would always take `phone` since it's first in the alias list and
+ * non-empty, silently preferring the broken value over the good one sitting
+ * right next to it. Skip any candidate still in scientific notation and
+ * keep looking for a clean one before falling back to it.
+ */
+function pickPhoneField(raw: Record<string, string>, aliases: string[]): string | undefined {
+  const normalized = new Map(Object.entries(raw).map(([k, v]) => [normalizeKey(k), v]));
+  let mangledFallback: string | undefined;
+  for (const alias of aliases) {
+    const value = normalized.get(normalizeKey(alias))?.trim();
+    if (!value) continue;
+    if (SCIENTIFIC_NOTATION.test(value)) {
+      mangledFallback ??= value;
+      continue;
+    }
+    return value;
+  }
+  return mangledFallback;
+}
+
 @Injectable()
 export class ImportExportService {
   constructor(
@@ -282,7 +309,7 @@ export class ImportExportService {
         const lead = await this.leadsService.create(actor, {
           fullName,
           email: pickField(raw, LEAD_FIELD_ALIASES.email),
-          phone: pickField(raw, LEAD_FIELD_ALIASES.phone),
+          phone: pickPhoneField(raw, LEAD_FIELD_ALIASES.phone),
           company,
           source: pickField(raw, LEAD_FIELD_ALIASES.source) ?? "CSV import",
           territory: pickField(raw, LEAD_FIELD_ALIASES.territory),

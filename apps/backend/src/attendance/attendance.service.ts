@@ -1,12 +1,16 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { LeadActivityType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
 import { isManagerOrAbove } from "../common/roles";
-
+import { EmployeeScopeService } from "../common/scope.service";
 
 @Injectable()
 export class AttendanceService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly scope: EmployeeScopeService,
+  ) {}
 
   private async findOpenSession(employeeId: string) {
     return this.prisma.workSession.findFirst({
@@ -152,5 +156,80 @@ export class AttendanceService {
       sessionCount: sessions.length,
       sessions: sessionSummaries,
     };
+  }
+
+  /**
+   * Manager+ view of everyone's attendance and call volume for a date range —
+   * scoped the same way CrmReportsService.teamPerformance is (org-wide for
+   * Company Admin/Master Owner, reporting subtree otherwise), so a Manager
+   * or Sales Head only ever sees their own team's attendance.
+   */
+  async teamReport(actor: AuthenticatedEmployee, from: Date, to: Date) {
+    if (!isManagerOrAbove(actor.role)) {
+      throw new ForbiddenException("Team attendance is restricted to managers and above");
+    }
+
+    const employeeIds = await this.scope.authorizedEmployeeIds(actor);
+    const employees = await this.prisma.employee.findMany({
+      where: { id: { in: employeeIds } },
+      select: { id: true, employeeNumber: true, fullName: true, role: true, employmentStatus: true },
+      orderBy: { fullName: "asc" },
+    });
+
+    const [sessions, callCounts] = await Promise.all([
+      this.prisma.workSession.findMany({
+        where: { employeeId: { in: employeeIds }, startedAt: { gte: from, lte: to } },
+        include: { breaks: true },
+      }),
+      this.prisma.leadActivity.groupBy({
+        by: ["actorId"],
+        where: {
+          actorId: { in: employeeIds },
+          type: LeadActivityType.CALL,
+          createdAt: { gte: from, lte: to },
+        },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const callsByEmployee = new Map(callCounts.map((c) => [c.actorId, c._count._all]));
+    const sessionsByEmployee = new Map<string, typeof sessions>();
+    for (const session of sessions) {
+      const bucket = sessionsByEmployee.get(session.employeeId);
+      if (bucket) bucket.push(session);
+      else sessionsByEmployee.set(session.employeeId, [session]);
+    }
+
+    return employees.map((employee) => {
+      const empSessions = sessionsByEmployee.get(employee.id) ?? [];
+      let workedMs = 0;
+      let breakMs = 0;
+      const presentDays = new Set<string>();
+
+      for (const s of empSessions) {
+        const endedAt = s.endedAt ?? new Date();
+        const grossMs = endedAt.getTime() - s.startedAt.getTime();
+        const sessionBreakMs = s.breaks.reduce((sum, b) => {
+          const bEnd = b.endedAt ?? new Date();
+          return sum + (bEnd.getTime() - b.startedAt.getTime());
+        }, 0);
+        workedMs += Math.max(0, grossMs - sessionBreakMs);
+        breakMs += sessionBreakMs;
+        presentDays.add(s.startedAt.toISOString().slice(0, 10));
+      }
+
+      return {
+        employeeId: employee.id,
+        employeeNumber: employee.employeeNumber,
+        fullName: employee.fullName,
+        role: employee.role,
+        employmentStatus: employee.employmentStatus,
+        daysPresent: presentDays.size,
+        sessionCount: empSessions.length,
+        totalNetWorkedMinutes: Math.round(workedMs / 60000),
+        totalBreakMinutes: Math.round(breakMs / 60000),
+        calls: callsByEmployee.get(employee.id) ?? 0,
+      };
+    });
   }
 }

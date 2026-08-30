@@ -775,6 +775,21 @@ describe("Zulivio (e2e)", () => {
       expect(res.body.summary.assigned).toBeGreaterThanOrEqual(1);
     });
 
+    it("surfaces a lead assigned via Lead.ownerId (not just the Assignment model) in the home summary", async () => {
+      // Lead ownership is a separate assignment mechanism from Assignment
+      // (see leads.service.ts's `assign()`/auto-assignment, which sets
+      // Lead.ownerId directly) — the home summary previously only queried
+      // Assignments, so a lead handed to someone never showed up here.
+      const leadRes = await ownerAgent
+        .post("/api/v1/leads")
+        .send({ fullName: "Overview Bug Lead", ownerId: employeeId });
+      expect(leadRes.status).toBe(201);
+
+      const res = await employeeAgent.get("/api/v1/me/home").expect(200);
+      expect(res.body.summary.openLeads).toBeGreaterThanOrEqual(1);
+      expect(res.body.assignedLeads.some((l: { id: string }) => l.id === leadRes.body.id)).toBe(true);
+    });
+
     it("returns tasks split into pending/completed", async () => {
       const res = await employeeAgent.get("/api/v1/me/tasks").expect(200);
       expect(res.body.pending.length).toBeGreaterThanOrEqual(1);
@@ -808,17 +823,20 @@ describe("Zulivio (e2e)", () => {
 
   describe("attendance state machine", () => {
     let agent: ReturnType<typeof request.agent>;
+    let ownerAgent: ReturnType<typeof request.agent>;
+    let employeeId: string;
     let sessionId: string;
     let breakId: string;
 
     beforeAll(async () => {
       agent = request.agent(server());
       const email = `att-${Date.now()}@e2e.local`;
-      const ownerAgent = request.agent(server());
+      ownerAgent = request.agent(server());
       await ownerAgent.post("/api/v1/auth/sessions").send({ email: orgEmail, password: orgPassword });
       const created = await ownerAgent
         .post("/api/v1/employees")
         .send({ fullName: "Attendance Tester", email, role: "EMPLOYEE" });
+      employeeId = created.body.id;
 
       await agent.post("/api/v1/auth/sessions").send({ email, password: created.body.temporaryPassword });
     });
@@ -864,6 +882,24 @@ describe("Zulivio (e2e)", () => {
 
       const status = await agent.get("/api/v1/work-sessions/me").expect(200);
       expect(status.body.state).toBe("logged_out");
+    });
+
+    it("rejects a plain employee querying the team attendance report", async () => {
+      const from = new Date(Date.now() - 86_400_000).toISOString();
+      const to = new Date().toISOString();
+      await agent.get(`/api/v1/work-sessions/team-report?from=${from}&to=${to}`).expect(403);
+    });
+
+    it("gives a manager the completed shift's worked/break time and days present in the team report", async () => {
+      const from = new Date(Date.now() - 86_400_000).toISOString();
+      const to = new Date().toISOString();
+      const res = await ownerAgent.get(`/api/v1/work-sessions/team-report?from=${from}&to=${to}`).expect(200);
+
+      const row = res.body.find((r: { employeeId: string }) => r.employeeId === employeeId);
+      expect(row).toBeDefined();
+      expect(row.daysPresent).toBe(1);
+      expect(row.sessionCount).toBe(1);
+      expect(row.totalNetWorkedMinutes).toBeGreaterThanOrEqual(0);
     });
   });
 
@@ -1089,6 +1125,27 @@ describe("Zulivio (e2e)", () => {
       // written that way, so this only verifies the reconstructed value,
       // not full recovery of the original number.
       expect(created.find((l) => l.fullName === "Excel Mangled Lead")?.phone).toBe("918605000000");
+    });
+
+    it("prefers a clean phone_local_10d column over an Excel-mangled phone column in the same row", async () => {
+      // Real-world case: scraped-lead exports often carry both `phone`
+      // (already destroyed by Excel into scientific notation) and a
+      // `phone_local_10d` fallback with the real digits, because the
+      // source tool hit the same mangling once already. The importer must
+      // not blindly take the first alias match — it should skip the
+      // mangled `phone` value and use the clean one sitting in the same row.
+      const csv = [
+        "full_name,phone,phone_local_10d",
+        "Clean Fallback Lead,9.18E+11,7669976699",
+      ].join("\n");
+
+      const res = await ownerAgent
+        .post("/api/v1/imports/leads/csv")
+        .attach("file", Buffer.from(csv), "leads.csv")
+        .expect(201);
+
+      expect(res.body.createdCount).toBe(1);
+      expect(res.body.created[0].phone).toBe("7669976699");
     });
 
     it("finds a lead by phone number regardless of country code, via Agent Assist", async () => {

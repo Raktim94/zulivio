@@ -1,33 +1,20 @@
 "use client";
 
-import { useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CalendarClock, Flame, PhoneCall, Plus, Users } from "lucide-react";
-import type { LeadScoreConfigSummary, MyDayData, NextLeadData } from "@zulivio/types";
-import { api, ApiError } from "@/lib/api";
-import { Button, Card, EmptyState, ErrorState, Spinner, StatCard, useToast } from "@/components/ui";
+import { useQuery } from "@tanstack/react-query";
+import type { LeadScoreConfigSummary, MyDayData } from "@zulivio/types";
+import { api } from "@/lib/api";
+import { Button, Card, EmptyState, ErrorState, Spinner, StatCard } from "@/components/ui";
 import { LeadCard, formatWhen } from "@/components/crm";
 
-const REASON_LABEL: Record<NextLeadData["reason"], string> = {
-  overdue_follow_up: "an overdue follow-up",
-  scheduled_callback: "a callback due soon",
-  hot_lead: "a hot lead",
-  new_lead: "a new, untouched lead",
-  oldest_untouched: "the lead waiting longest",
-  queue_empty: "nothing left in the queue",
-};
-
 /**
- * The telecaller's home screen. Its job is to remove every decision except
- * "who do I call next" — which is exactly what the Call Next Lead button
- * answers, using the server's priority order rather than the rep's memory.
+ * The telecaller's home screen: everything waiting on them today, in the
+ * order to work it — assigned leads, hot leads, and follow-ups due.
  */
 export default function MyDayPage() {
   const router = useRouter();
-  const toast = useToast();
-  const [reason, setReason] = useState<NextLeadData["reason"] | null>(null);
 
   const { data, isLoading, error } = useQuery<MyDayData>({
     queryKey: ["leads", "my-day"],
@@ -38,16 +25,6 @@ export default function MyDayPage() {
   const { data: scoreConfig } = useQuery<LeadScoreConfigSummary>({
     queryKey: ["leads", "score-config"],
     queryFn: () => api.get<LeadScoreConfigSummary>("/api/v1/leads/score-config"),
-  });
-
-  const callNext = useMutation({
-    mutationFn: () => api.get<NextLeadData>("/api/v1/leads/next"),
-    onSuccess: (result) => {
-      setReason(result.reason);
-      if (result.lead) router.push(`/leads/${result.lead.id}`);
-      else toast.push("Your queue is empty — nice work.", "success");
-    },
-    onError: (err) => toast.push(err instanceof ApiError ? err.message : "Could not pick a lead", "error"),
   });
 
   if (isLoading) return <Spinner />;
@@ -63,10 +40,6 @@ export default function MyDayPage() {
           <p className="text-sm text-muted">Everything waiting on you right now, in the order to work it.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={() => callNext.mutate()} disabled={callNext.isPending}>
-            <PhoneCall size={15} aria-hidden />
-            {callNext.isPending ? "Finding…" : "Call next lead"}
-          </Button>
           <Link href="/leads">
             <Button variant="secondary">
               <Plus size={15} aria-hidden /> Add a lead
@@ -80,16 +53,12 @@ export default function MyDayPage() {
         </div>
       </div>
 
-      {reason && (
-        <p className="text-xs text-muted" role="status">
-          Last pick was {REASON_LABEL[reason]}.
-        </p>
-      )}
-
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard label="Calls today" value={data.stats.callsToday} />
         <StatCard label="Connected today" value={data.stats.connectedToday} tone="success" />
-        <StatCard label="Overdue follow-ups" value={counts.overdue} tone={counts.overdue > 0 ? "danger" : "neutral"} />
+        <button type="button" onClick={() => router.push("/follow-ups")} className="w-full text-left">
+          <StatCard label="Overdue follow-ups" value={counts.overdue} tone={counts.overdue > 0 ? "danger" : "neutral"} />
+        </button>
         <StatCard label="Open leads" value={data.stats.openLeads} />
       </div>
 

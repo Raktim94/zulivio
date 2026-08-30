@@ -35,9 +35,10 @@ export class MeService {
 
   /** Today's work summary: assignment counts, attendance state, activity today. */
   async home(actor: AuthenticatedEmployee) {
-    const [myAssignments, attendanceState] = await Promise.all([
+    const [myAssignments, attendanceState, openLeads] = await Promise.all([
       this.assignments.list(actor, {}),
       this.attendance.currentStatus(actor),
+      this.leads.myOpenLeadsSummary(actor),
     ]);
 
     const startOfToday = new Date();
@@ -57,11 +58,13 @@ export class MeService {
         inProgress: inProgress.length,
         followUp: followUp.length,
         completedToday: completedToday.length,
+        openLeads: openLeads.count,
       },
       activeWork: pending
         .slice()
         .sort((a, b) => (a.dueAt?.getTime() ?? Infinity) - (b.dueAt?.getTime() ?? Infinity))
         .slice(0, 10),
+      assignedLeads: openLeads.leads,
     };
   }
 
