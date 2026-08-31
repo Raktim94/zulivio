@@ -1,0 +1,47 @@
+// Zulivio — MSIX frontend entry point wrapper. Spawned by zulivio.exe
+// (packaging/windows/msix/launcher/Program.cs) instead of Next.js's
+// generated server.js directly, so it can add one thing server.js has no
+// hook for: watching for the launcher process itself dying WITHOUT a
+// clean shutdown, and exiting itself in response.
+//
+// Why this exists — real CI failure: the launcher's Win32 Job Object (its
+// primary crash-path cleanup backstop) fails to accept this app's own
+// freshly-spawned child processes on this Windows/MSIX environment
+// (AssignProcessToJobObject error 5, ERROR_ACCESS_DENIED — see
+// Program.cs's TryAddToJobObject comment; likely because Desktop Bridge
+// apps' process trees are already members of an OS-managed job object,
+// and nesting isn't permitted). FormClosing-driven cleanup
+// (Program.cs's ShutDownChildProcesses) only runs on a CLEAN window
+// close — it does not run at all when the parent process is terminated
+// directly (Task Manager "End task", a crash, `Stop-Process -Force`, the
+// exact scenario a real CI run caught: closing the app that way left both
+// node.exe children running with nothing left to stop them). This
+// wrapper is the fallback for exactly that gap, implemented independently
+// of any OS job-object mechanism.
+const parentPid = Number(process.env.ZULIVIO_PARENT_PID);
+
+function isParentAlive() {
+  if (!parentPid) return true;
+  try {
+    // Signal 0 checks existence without actually sending a signal — works
+    // cross-platform in Node, including Windows (backed by an OpenProcess
+    // existence check under the hood, not a real POSIX signal).
+    process.kill(parentPid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+if (parentPid) {
+  // unref() so this timer alone never keeps the process alive — the
+  // actual HTTP listener in server.js is what does that normally.
+  setInterval(() => {
+    if (!isParentAlive()) {
+      console.error("Zulivio launcher (pid " + parentPid + ") is no longer running — exiting");
+      process.exit(0);
+    }
+  }, 2000).unref();
+}
+
+require("./server.js");

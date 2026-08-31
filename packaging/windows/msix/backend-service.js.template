@@ -35,6 +35,28 @@
 const path = require("path");
 const { execFileSync } = require("child_process");
 
+// Watchdog for a launcher that dies WITHOUT a clean shutdown (Task Manager
+// "End task", a crash, `Stop-Process -Force`) — the launcher's Win32 Job
+// Object (its primary crash-path cleanup backstop) fails to accept this
+// app's own child processes on this Windows/MSIX environment
+// (AssignProcessToJobObject error 5 — see Program.cs's TryAddToJobObject
+// comment), and FormClosing-driven cleanup only runs on a clean window
+// close. See frontend-service.js.template for the identical mechanism and
+// the real CI failure (an orphaned node.exe after a forced close) this
+// fixes on the frontend side — applied here too since the backend has the
+// exact same gap.
+const parentPid = Number(process.env.ZULIVIO_PARENT_PID);
+if (parentPid) {
+  setInterval(() => {
+    try {
+      process.kill(parentPid, 0);
+    } catch {
+      console.error("Zulivio launcher (pid " + parentPid + ") is no longer running — exiting");
+      process.exit(0);
+    }
+  }, 2000).unref();
+}
+
 const backendDir = path.join(__dirname, "..", "backend", "apps", "backend");
 
 try {

@@ -449,6 +449,19 @@ Step "Writing the backend entry-point wrapper"
 Copy-Item (Join-Path $MsixDir "backend-service.js.template") (Join-Path $WrappersDir "backend-service.js")
 Ok "wrapper written to msix-wrappers\backend-service.js"
 
+# --- Frontend entry-point wrapper — staged right next to the real server.js
+#     (not in msix-wrappers\) so its `require("./server.js")` resolves with
+#     a plain relative path regardless of how deep server.js ended up
+#     nested (see the "Staging the frontend" step's ServerDirRelative
+#     discovery). See frontend-service.js.template's header comment for why
+#     this wrapper exists (a parent-liveness watchdog, not a migration
+#     step) — real CI failure: forcefully closing zulivio.exe left the
+#     frontend's node.exe orphaned because both the Job Object backstop and
+#     FormClosing-driven cleanup fail to cover that case on this environment. ---
+Step "Writing the frontend entry-point wrapper"
+Copy-Item (Join-Path $MsixDir "frontend-service.js.template") (Join-Path $FrontendServerDir "frontend-service.js")
+Ok "wrapper written to frontend\$ServerDirRelative\frontend-service.js"
+
 # ---------------------------------------------------------------------------
 # 5. Visual assets, generated fresh each build from the app's own logo.
 # ---------------------------------------------------------------------------

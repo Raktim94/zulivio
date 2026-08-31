@@ -173,6 +173,15 @@ namespace Zulivio.Launcher
                 var databaseUrl = await StartPostgresAsync();
                 Log("PostgreSQL ready, database URL resolved");
 
+                // Passed to both children so their own wrapper scripts can watch
+                // for this process dying WITHOUT a clean shutdown (crash, Task
+                // Manager "End task", Stop-Process -Force) and self-terminate —
+                // the fallback for exactly the gap left by AssignProcessToJobObject
+                // failing on this environment (see TryAddToJobObject). Real CI
+                // failure this fixes: forcefully killing zulivio.exe left both
+                // node.exe children running with nothing left to stop them.
+                var parentPid = Process.GetCurrentProcess().Id.ToString();
+
                 _statusLabel.Text = "Starting Zulivio…";
                 _backendProcess = StartChild(
                     exe: Path.Combine(baseDir, "runtime", "node.exe"),
@@ -195,15 +204,22 @@ namespace Zulivio.Launcher
                         ["FIELD_ENCRYPTION_KEY_PATH"] = Path.Combine(DataDir, "secrets", "field-encryption.key"),
                         ["CHECKPOINT_DISABLE"] = "1",
                         ["PRISMA_HIDE_UPDATE_MESSAGE"] = "1",
+                        ["ZULIVIO_PARENT_PID"] = parentPid,
                     });
                 TryAddToJobObject(_backendProcess, "backend");
                 Log("Backend child process started (pid=" + _backendProcess.Id + ")");
 
+                // Spawns frontend-service.js (a thin parent-liveness-watchdog
+                // wrapper staged right next to the real server.js — see
+                // build-msix.ps1's "Staging the frontend" step and
+                // frontend-service.js.template), not server.js directly.
                 var frontendEntry = Path.Combine(baseDir, "frontend", FrontendEntryRelative.Replace('/', Path.DirectorySeparatorChar));
+                var frontendDir = Path.GetDirectoryName(frontendEntry);
+                var frontendServiceEntry = Path.Combine(frontendDir, "frontend-service.js");
                 _frontendProcess = StartChild(
                     exe: Path.Combine(baseDir, "runtime", "node.exe"),
-                    args: "\"" + frontendEntry + "\"",
-                    workingDir: Path.GetDirectoryName(frontendEntry),
+                    args: "\"" + frontendServiceEntry + "\"",
+                    workingDir: frontendDir,
                     logName: "frontend",
                     env: new System.Collections.Generic.Dictionary<string, string>
                     {
@@ -211,6 +227,7 @@ namespace Zulivio.Launcher
                         ["NODE_ENV"] = "production",
                         ["HOSTNAME"] = "127.0.0.1",
                         ["NEXT_TELEMETRY_DISABLED"] = "1",
+                        ["ZULIVIO_PARENT_PID"] = parentPid,
                     });
                 TryAddToJobObject(_frontendProcess, "frontend");
                 Log("Frontend child process started (pid=" + _frontendProcess.Id + ")");
