@@ -184,18 +184,31 @@ jobs:
       - name: Functional test — bootstrap an organization and log in
         shell: pwsh
         run: |
+          # The backend's csrf-origin-check middleware (apps/backend/src/
+          # common/csrf-origin-check.ts) requires a matching Origin (or
+          # Referer) header on every state-changing request — this is
+          # correct, deliberate defense-in-depth (see that file's own
+          # comment) that every real browser satisfies automatically on
+          # POST requests, same-origin or not. Invoke-WebRequest does NOT
+          # set one on its own, so it must be added explicitly here to
+          # behave like the real browser this test is meant to simulate —
+          # this is a test-script gap, not an application bug (confirmed by
+          # reading csrf-origin-check.ts: no origin/referer at all is
+          # correctly rejected with 403 "Cross-origin request blocked").
+          $originHeader = @{ Origin = "http://localhost:3100" }
+
           $body = @{
             organizationName = "CI Test Org"
             fullName         = "CI Test Owner"
             email            = "ci-test@example.com"
             password         = "CorrectHorseBatteryStaple123"
           } | ConvertTo-Json
-          $bootstrap = Invoke-WebRequest -Uri "http://127.0.0.1:4100/api/v1/bootstrap" -Method Post -Body $body -ContentType "application/json" -UseBasicParsing
+          $bootstrap = Invoke-WebRequest -Uri "http://127.0.0.1:4100/api/v1/bootstrap" -Method Post -Headers $originHeader -Body $body -ContentType "application/json" -UseBasicParsing
           if ($bootstrap.StatusCode -ne 201 -and $bootstrap.StatusCode -ne 200) { throw "bootstrap returned status $($bootstrap.StatusCode)" }
           Write-Host "  [PASS] bootstrap created an organization + master owner"
 
           $loginBody = @{ email = "ci-test@example.com"; password = "CorrectHorseBatteryStaple123" } | ConvertTo-Json
-          $session = Invoke-WebRequest -Uri "http://127.0.0.1:4100/api/v1/auth/sessions" -Method Post -Body $loginBody -ContentType "application/json" -UseBasicParsing -SessionVariable webSession
+          $session = Invoke-WebRequest -Uri "http://127.0.0.1:4100/api/v1/auth/sessions" -Method Post -Headers $originHeader -Body $loginBody -ContentType "application/json" -UseBasicParsing -SessionVariable webSession
           if ($session.StatusCode -ne 201 -and $session.StatusCode -ne 200) { throw "login returned status $($session.StatusCode)" }
           if (-not $webSession.Cookies.GetCookies("http://127.0.0.1:4100").Count) { throw "login did not set a session cookie" }
           Write-Host "  [PASS] login succeeded and set a session cookie"
