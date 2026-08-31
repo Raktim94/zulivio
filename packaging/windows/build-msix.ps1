@@ -29,6 +29,15 @@
   GitHub Actions workspace) — it does not touch pnpm-workspace.yaml or
   affect the normal dev/Docker workflow.
 
+  Belt-and-suspenders: even with hoisted mode, every bulk directory copy
+  below uses the `Copy-Tree` helper (robocopy /XJ), not PowerShell's
+  Copy-Item -Recurse — a real CI run hit Copy-Item recursing into a
+  reparse point and producing a garbled, ever-growing path with an "Access
+  denied" failure after several minutes. robocopy /XJ explicitly skips
+  junction points instead of following them, so any reparse point left
+  anywhere in the tree (whatever its exact origin) is excluded from the
+  payload rather than causing a hang or a cycle.
+
   This is architecturally distinct from Docker/CasaOS on purpose (see
   packaging/windows/README.md's "MSIX" section): no PostgreSQL server
   container, no NestJS "migrate" one-shot service — this build EMBEDS a
@@ -82,6 +91,25 @@ function Step($m) { Write-Host "`n==> $m" -ForegroundColor Cyan }
 function Info($m) { Write-Host "    $m" }
 function Ok($m)   { Write-Host "    [ok] $m" -ForegroundColor Green }
 function Die($m)  { Write-Host "`nERROR: $m" -ForegroundColor Red; exit 1 }
+
+# Copies a directory's CONTENTS into $Dest via robocopy, not PowerShell's
+# Copy-Item -Recurse. Hit a real failure using Copy-Item here: even with
+# `--node-linker=hoisted` (below), copying the workspace's node_modules
+# produced a garbled, ever-growing path and an "Access to the path ... is
+# denied" error after several minutes — the signature of Copy-Item's
+# recursive enumeration following a reparse point into a cycle rather than
+# treating it as a leaf. robocopy with /XJ explicitly does NOT traverse
+# junction points (added specifically to prevent this class of infinite
+# loop) — so leftover reparse points anywhere in the tree are skipped
+# instead of recursed into, whatever their exact origin. /E copies
+# subdirectories including empty ones; the /NFL /NDL /NJH /NJS /NC /NS /NP
+# flags just quiet robocopy's normally very verbose per-file logging.
+# robocopy's exit codes are bit-flags where 0-7 are all real success (8+ is
+# a genuine failure) — not the usual "0 means success" convention.
+function Copy-Tree($Src, $Dest) {
+  robocopy $Src $Dest /E /XJ /NFL /NDL /NJH /NJS /NC /NS /NP | Out-Null
+  if ($LASTEXITCODE -ge 8) { Die "robocopy failed copying `"$Src`" to `"$Dest`" (exit $LASTEXITCODE)" }
+}
 
 $RepoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $PkgDir   = $PSScriptRoot
@@ -236,7 +264,7 @@ Copy-Item $NodeExe (Join-Path $AppRuntime "node.exe")
 Copy-Item (Join-Path $NodeHome "LICENSE") (Join-Path $AppRuntime "LICENSE") -ErrorAction SilentlyContinue
 
 # --- PostgreSQL: the whole extracted tree (bin, lib, share) ---
-Copy-Item (Join-Path $PgSourceRoot.FullName "*") $AppPgsql -Recurse -Force
+Copy-Tree $PgSourceRoot.FullName $AppPgsql
 Ok "PostgreSQL binaries staged at pgsql\"
 
 # --- Backend: preserve the exact workspace-relative depth (backend\ +
@@ -245,15 +273,38 @@ Ok "PostgreSQL binaries staged at pgsql\"
 #     node_modules directories, so this hoisted-then-copied layout resolves
 #     identically to the real install it was copied from. ---
 Step "Staging the backend (preserving workspace-relative node_modules depth)"
-Copy-Item (Join-Path $RepoRoot "node_modules") (Join-Path $AppBackend "node_modules") -Recurse
+Copy-Tree (Join-Path $RepoRoot "node_modules") (Join-Path $AppBackend "node_modules")
 $BackendAppDir = Join-Path $AppBackend "apps\backend"
 New-Item -ItemType Directory -Force -Path $BackendAppDir | Out-Null
-foreach ($item in @("node_modules", "dist", "prisma", "package.json")) {
+foreach ($item in @("node_modules", "dist", "prisma")) {
   $src = Join-Path $RepoRoot "apps\backend\$item"
   if (-not (Test-Path $src)) { Die "expected apps\backend\$item not found — did the backend build succeed?" }
-  Copy-Item $src (Join-Path $BackendAppDir $item) -Recurse -Force
+  Copy-Tree $src (Join-Path $BackendAppDir $item)
 }
+Copy-Item (Join-Path $RepoRoot "apps\backend\package.json") (Join-Path $BackendAppDir "package.json")
 Ok "backend staged"
+
+# Verify from the PAYLOAD's own copy, not the source tree: robocopy's /XJ
+# (above) deliberately SKIPS any junction/reparse point rather than
+# following it, which is what fixed the Copy-Item hang/failure copying
+# node_modules — but a skip is silent, so if hoisting had left something
+# needed behind a reparse point, this staged copy would be missing it. This
+# would otherwise surface much later as a runtime "Cannot find module"
+# inside the packaged app instead of a build failure right here.
+Info "verifying native modules load from the staged (robocopied) backend payload"
+Push-Location $BackendAppDir
+try {
+  & $NodeExe -e @"
+const mods = ['argon2', '@prisma/client'];
+for (const m of mods) {
+  try { require(require.resolve(m, { paths: [process.cwd()] })); }
+  catch (e) { console.error('FAILED ' + m + ': ' + e.message); process.exit(1); }
+}
+console.log('  all required native modules loaded from the staged payload');
+"@
+  if ($LASTEXITCODE -ne 0) { Die "a required native module failed to load from the staged (robocopied) backend payload — /XJ may have skipped something needed" }
+} finally { Pop-Location }
+Ok "staged backend native modules verified"
 
 # --- Frontend: Next standalone output. In a monorepo, `server.js` is NOT
 #     necessarily at the standalone root — Next preserves the path from the
@@ -269,16 +320,16 @@ $ServerRelative = $ServerJs.FullName.Substring($StandaloneRoot.Length + 1).Repla
 $ServerDirRelative = Split-Path $ServerRelative -Parent
 Info "standalone server.js found at: $ServerRelative"
 
-Copy-Item (Join-Path $StandaloneRoot "*") $AppFrontend -Recurse -Force
+Copy-Tree $StandaloneRoot $AppFrontend
 
 $StaticDest = if ($ServerDirRelative) { Join-Path $AppFrontend "$ServerDirRelative\.next\static" } else { Join-Path $AppFrontend ".next\static" }
 New-Item -ItemType Directory -Force -Path (Split-Path $StaticDest -Parent) | Out-Null
-Copy-Item (Join-Path $RepoRoot "apps\web\.next\static") $StaticDest -Recurse -Force
+Copy-Tree (Join-Path $RepoRoot "apps\web\.next\static") $StaticDest
 
 $PublicSrc = Join-Path $RepoRoot "apps\web\public"
 $PublicDest = if ($ServerDirRelative) { Join-Path $AppFrontend "$ServerDirRelative\public" } else { Join-Path $AppFrontend "public" }
 if (Test-Path $PublicSrc) {
-  Copy-Item $PublicSrc $PublicDest -Recurse -Force
+  Copy-Tree $PublicSrc $PublicDest
 } else {
   New-Item -ItemType Directory -Force -Path $PublicDest | Out-Null
 }
