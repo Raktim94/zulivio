@@ -73,7 +73,11 @@ param(
   [string]$PostgresBaseUrl      = "https://get.enterprisedb.com/postgresql",
   [int]$BackendPort            = 4100,
   [int]$FrontendPort           = 3100,
-  [int]$PostgresPort           = 54329,
+  # PostgreSQL's port is NOT configured here — it's chosen dynamically at
+  # app startup by Program.cs's GetFreeTcpPort(), specifically to avoid
+  # Windows' dynamically-reserved ephemeral port ranges (a real CI failure:
+  # a hardcoded port here bind-failed with "Permission denied" on a real
+  # Windows runner). See that method's comment for the full reasoning.
   [string]$OutDir              = "dist",
   [string]$PackageIdentityName = $env:ZULIVIO_MSIX_IDENTITY_NAME,
   [string]$PublisherCn         = $env:ZULIVIO_MSIX_PUBLISHER_CN,
@@ -129,7 +133,7 @@ if ([string]::IsNullOrWhiteSpace($PublisherCn) -or $PublisherCn -eq "@PARTNER_CE
 Info "identity  $PackageIdentityName"
 Info "publisher $PublisherCn"
 Info "version   $Version.0"
-Info "ports     web $FrontendPort, api (loopback) $BackendPort, postgres (loopback) $PostgresPort"
+Info "ports     web $FrontendPort, api (loopback) $BackendPort, postgres (loopback, dynamic port chosen at app startup)"
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) { Die "node is required on PATH to bootstrap the build" }
 
 # ---------------------------------------------------------------------------
@@ -481,7 +485,6 @@ $programCsPath = Join-Path $LauncherWork "Program.cs"
 $programCs = (Get-Content $programCsPath -Raw).
   Replace("@BACKEND_PORT@", "$BackendPort").
   Replace("@FRONTEND_PORT@", "$FrontendPort").
-  Replace("@POSTGRES_PORT@", "$PostgresPort").
   Replace("@FRONTEND_ENTRY@", $ServerRelative)
 Set-Content -Path $programCsPath -Value $programCs -Encoding UTF8
 

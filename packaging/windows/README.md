@@ -122,9 +122,21 @@ is scoped to the fresh checkout this script runs in; it does not touch
 | --- | --- | --- |
 | Frontend (WebView2 navigates here) | 3100 | `127.0.0.1` |
 | Backend API | 4100 | `127.0.0.1` |
-| Embedded PostgreSQL | 54329 | `127.0.0.1` |
+| Embedded PostgreSQL | chosen dynamically at each app startup | `127.0.0.1` |
 
 All three are loopback-only. No firewall rules are created or needed.
+
+PostgreSQL's port is deliberately NOT fixed — `Program.cs`'s `GetFreeTcpPort()`
+asks the OS for a free port at startup (bind to port 0, read back what was
+assigned) rather than using a hardcoded number. Real CI failure this works
+around: a fixed port bind-failed with "could not bind IPv4 address
+127.0.0.1: Permission denied" — the signature of Windows' dynamically-
+reserved ephemeral port ranges, which the OS's own port-0 allocator already
+knows to avoid. Backend/frontend stay fixed because the frontend's port is
+baked into the Next.js build's routes-manifest at compile time (see
+`build-msix.ps1`'s verification step); only Postgres's port is purely
+internal (passed via `DATABASE_URL` at runtime, never baked in anywhere),
+so only it can be made dynamic without touching the build pipeline.
 
 ## What the CI build verifies on real Windows
 
@@ -137,7 +149,7 @@ Every build installs the MSIX, launches it, and fails if any of this breaks:
 | `zulivio.exe`'s own WebView2 control actually initialized (a distinct check from the HTTP health check — see `build-windows-msix.yml`'s comment on why) |
 | **Functional test**: `POST /api/v1/bootstrap` creates an organization + master owner, `POST /api/v1/auth/sessions` logs in and sets a session cookie, the frontend root page renders |
 | Process tree: `zulivio.exe` + exactly 2 `node.exe` + at least 1 `postgres.exe` |
-| All three ports (3100/4100/54329) bound to `127.0.0.1` only, never `0.0.0.0`/`::` |
+| All three ports (3100, 4100, and Postgres's dynamically-chosen one) bound to `127.0.0.1` only, never `0.0.0.0`/`::` |
 | Closing the app stops every child process — no orphaned `node.exe` or `postgres.exe` |
 | Silent uninstall removes the package and every process, but **preserves** `C:\ProgramData\Zulivio` (see the data-retention note in `build-windows-msix.yml`'s uninstall step) |
 | Windows App Certification Kit, best-effort |

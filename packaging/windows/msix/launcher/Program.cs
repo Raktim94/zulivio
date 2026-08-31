@@ -22,6 +22,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Net.Sockets;
 using System.Net.Http;
 using System.Runtime.InteropServices;
@@ -70,7 +71,21 @@ namespace Zulivio.Launcher
         // Token-substituted by build-msix.ps1.
         private const int BackendPort = @BACKEND_PORT@;
         private const int FrontendPort = @FRONTEND_PORT@;
-        private const int PostgresPort = @POSTGRES_PORT@;
+        // PostgreSQL's port is NOT a fixed token — it's chosen dynamically at
+        // startup via GetFreeTcpPort(). Real CI failure this works around:
+        // postgres.exe failed with "could not bind IPv4 address 127.0.0.1:
+        // Permission denied" on a hardcoded port — the signature of Windows'
+        // dynamically-reserved ephemeral port ranges rejecting a bind to a
+        // port that looks free but isn't excluded-range-free. Asking the OS
+        // itself for a free port (bind to port 0, read back what it assigned)
+        // is immune to this by construction: the OS's own ephemeral allocator
+        // already knows its own exclusion ranges and never hands one back.
+        // Backend/frontend ports stay fixed — the frontend's port is baked
+        // into the Next.js build's routes-manifest at compile time (see
+        // build-msix.ps1's routes-manifest verification step), so making it
+        // dynamic would require re-plumbing that build step; only Postgres's
+        // port is purely internal (passed via DATABASE_URL at runtime only),
+        // so it's the one that can be made dynamic with no such constraint.
         // Forward-slash relative path from the "frontend\" payload folder to
         // the actual Next.js standalone server.js — NOT always "server.js"
         // directly, because in this pnpm/Turborepo monorepo Next preserves
@@ -297,6 +312,23 @@ namespace Zulivio.Launcher
             }
         }
 
+        // Binds to port 0 on loopback and reads back whatever port the OS
+        // actually assigned, then immediately releases it. There is a small
+        // theoretical race between releasing this port and postgres binding
+        // it moments later, but this is the standard, widely-used pattern
+        // for "find a free port for a child process" and is what actually
+        // fixes the real bind failure below (a hardcoded port landing in a
+        // Windows-reserved ephemeral range) — the OS's own allocator already
+        // excludes those ranges when handing out port 0.
+        private static int GetFreeTcpPort()
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            listener.Stop();
+            return port;
+        }
+
         private async Task<string> StartPostgresAsync()
         {
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
@@ -304,6 +336,8 @@ namespace Zulivio.Launcher
             var pgLog = Path.Combine(LogsDir, "postgres.log");
             const string SuperUser = "zulivio_admin";
             const string DbName = "zulivio";
+            var postgresPort = GetFreeTcpPort();
+            Log("Chose dynamic PostgreSQL port " + postgresPort);
 
             // A data directory with no PG_VERSION marker is either genuinely
             // fresh or a leftover from an initdb that was interrupted midway
@@ -339,7 +373,7 @@ namespace Zulivio.Launcher
             // WaitForPortAsync — the same proven technique already used for
             // the frontend — which gives us our own bounded timeout instead
             // of trusting pg_ctl's internal one.
-            var startArgs = "start -D \"" + PgDataDir + "\" -o \"-p " + PostgresPort + " -c listen_addresses=127.0.0.1\" -l \"" + pgLog + "\"";
+            var startArgs = "start -D \"" + PgDataDir + "\" -o \"-p " + postgresPort + " -c listen_addresses=127.0.0.1\" -l \"" + pgLog + "\"";
             var startResult = RunTool(Path.Combine(pgBin, "pg_ctl.exe"), startArgs, timeoutMs: 30000);
             if (startResult.ExitCode != 0)
             {
@@ -378,16 +412,16 @@ namespace Zulivio.Launcher
                     throw new InvalidOperationException("pg_ctl start failed even after clearing a stale lock file. Log tail:\n" + startResult.Output);
                 }
             }
-            Log("pg_ctl start command issued (exit " + startResult.ExitCode + "), waiting for PostgreSQL to accept connections on 127.0.0.1:" + PostgresPort);
+            Log("pg_ctl start command issued (exit " + startResult.ExitCode + "), waiting for PostgreSQL to accept connections on 127.0.0.1:" + postgresPort);
 
-            var pgReady = await WaitForPortAsync(PostgresPort, 60);
+            var pgReady = await WaitForPortAsync(postgresPort, 60);
             if (!pgReady)
             {
                 throw new InvalidOperationException(
-                    "PostgreSQL did not accept a connection on 127.0.0.1:" + PostgresPort + " within 60s of pg_ctl start. pg_ctl output:\n" +
+                    "PostgreSQL did not accept a connection on 127.0.0.1:" + postgresPort + " within 60s of pg_ctl start. pg_ctl output:\n" +
                     startResult.Output + "\nSee " + pgLog + " for the server's own log.");
             }
-            Log("PostgreSQL accepting connections on 127.0.0.1:" + PostgresPort);
+            Log("PostgreSQL accepting connections on 127.0.0.1:" + postgresPort);
 
             // pg_ctl start does not hand back postgres's own Process object
             // (it forks and detaches) — read the PID it just wrote so the
@@ -420,11 +454,11 @@ namespace Zulivio.Launcher
                 Log("Creating the \"" + DbName + "\" database (first run)");
                 RunToolOrThrow(
                     Path.Combine(pgBin, "createdb.exe"),
-                    "-h 127.0.0.1 -p " + PostgresPort + " -U " + SuperUser + " " + DbName,
+                    "-h 127.0.0.1 -p " + postgresPort + " -U " + SuperUser + " " + DbName,
                     "createdb", pgLog);
             }
 
-            return "postgresql://" + SuperUser + "@127.0.0.1:" + PostgresPort + "/" + DbName + "?schema=public";
+            return "postgresql://" + SuperUser + "@127.0.0.1:" + postgresPort + "/" + DbName + "?schema=public";
         }
 
         // Graceful shutdown — NOT a job-object kill. Killing postgres.exe
