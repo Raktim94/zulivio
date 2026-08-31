@@ -383,40 +383,41 @@ Ok "frontend staged (entry: frontend\$ServerRelative)"
 # tracer is supposed to make .next/standalone fully self-contained — in
 # this pnpm(hoisted)+Turborepo+Next 15 combination, the framework package
 # itself apparently didn't survive tracing/staging intact for reasons not
-# fully root-caused. Rather than depend on Next's tracer being complete for
-# something this fundamental, explicitly ensure next/react/react-dom are
-# present in the staged frontend's own node_modules, copying from the
-# workspace root (a real, hoisted copy — see "Staging the backend" above)
-# if the tracer's own copy is missing.
+# fully root-caused. Checks actual RESOLUTION (require.resolve from
+# server.js's own directory), not mere existence somewhere in the tree —
+# an earlier version of this check used `Get-ChildItem -Recurse -Filter`,
+# which found an unrelated same-named "next" directory buried elsewhere in
+# node_modules and wrongly concluded nothing needed fixing, while the
+# actual resolution path (walking up from server.js) had none.
+$FrontendServerDir = Split-Path (Join-Path $AppFrontend $ServerRelative) -Parent
 $FrontendNodeModules = Join-Path $AppFrontend "node_modules"
+
+function Test-NodeResolves($pkg, $fromDir) {
+  Push-Location $fromDir
+  try {
+    & $NodeExe -e "require.resolve('$pkg')" 2>$null
+    return $LASTEXITCODE -eq 0
+  } finally { Pop-Location }
+}
+
 foreach ($pkg in @("next", "react", "react-dom")) {
-  $existing = Get-ChildItem -Path $AppFrontend -Recurse -Directory -Filter $pkg -ErrorAction SilentlyContinue | Select-Object -First 1
-  if (-not $existing) {
+  if (-not (Test-NodeResolves $pkg $FrontendServerDir)) {
     $pkgSrc = Join-Path $RepoRoot "node_modules\$pkg"
-    if (Test-Path $pkgSrc) {
-      Info "  '$pkg' missing from the staged frontend payload — copying from the workspace root as a fallback"
-      Copy-Tree $pkgSrc (Join-Path $FrontendNodeModules $pkg)
-    } else {
-      Info "  '$pkg' missing from the staged frontend payload AND not found at the workspace root — verification below will catch this"
-    }
+    if (-not (Test-Path $pkgSrc)) { Die "'$pkg' does not resolve from the staged frontend payload, and is not present at the workspace root ($pkgSrc) to fall back to" }
+    Info "  '$pkg' does not resolve from the staged frontend payload — copying from the workspace root as a fallback"
+    Copy-Tree $pkgSrc (Join-Path $FrontendNodeModules $pkg)
   }
 }
 
 # Verify from the staged payload itself, not source assumptions — resolve
-# exactly the way node.exe running the real server.js will.
+# exactly the way node.exe running the real server.js will, after any
+# fallback copy above.
 Info "verifying 'next'/'react'/'react-dom' resolve from the staged frontend payload"
-Push-Location (Split-Path (Join-Path $AppFrontend $ServerRelative) -Parent)
-try {
-  & $NodeExe -e @"
-const mods = ['next', 'react', 'react-dom'];
-for (const m of mods) {
-  try { require.resolve(m); }
-  catch (e) { console.error('FAILED ' + m + ': ' + e.message); process.exit(1); }
+foreach ($pkg in @("next", "react", "react-dom")) {
+  if (-not (Test-NodeResolves $pkg $FrontendServerDir)) {
+    Die "'$pkg' still does not resolve from the staged frontend payload even after the fallback copy from the workspace root"
+  }
 }
-console.log('  next/react/react-dom all resolve from the staged frontend payload');
-"@
-  if ($LASTEXITCODE -ne 0) { Die "a required frontend framework module failed to resolve from the staged payload" }
-} finally { Pop-Location }
 Ok "staged frontend framework modules verified"
 
 # --- Backend entry-point wrapper ---
