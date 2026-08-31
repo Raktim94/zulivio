@@ -325,8 +325,22 @@ namespace Zulivio.Launcher
                     "initdb", pgLog);
             }
 
-            var startArgs = "start -D \"" + PgDataDir + "\" -o \"-p " + PostgresPort + " -c listen_addresses=127.0.0.1\" -l \"" + pgLog + "\" -w -t 60";
-            var startResult = RunTool(Path.Combine(pgBin, "pg_ctl.exe"), startArgs);
+            // Deliberately NOT using pg_ctl's own `-w` (wait) flag — real
+            // CI failure: `pg_ctl start -w -t 60` never returned even though
+            // postgres.log showed the server came up and was accepting
+            // connections seconds later (confirmed by a checkpoint completing
+            // normally 5 minutes after "ready to accept connections", while
+            // pg_ctl itself was still blocked). Whatever the exact cause of
+            // pg_ctl's own wait-detection hanging on this runner, RunTool's
+            // WaitForExit has no timeout, so that hang froze the entire
+            // launcher indefinitely. Fixed by having pg_ctl just fork
+            // postgres and return immediately (it does this quickly
+            // regardless), then polling for the port ourselves below with
+            // WaitForPortAsync — the same proven technique already used for
+            // the frontend — which gives us our own bounded timeout instead
+            // of trusting pg_ctl's internal one.
+            var startArgs = "start -D \"" + PgDataDir + "\" -o \"-p " + PostgresPort + " -c listen_addresses=127.0.0.1\" -l \"" + pgLog + "\"";
+            var startResult = RunTool(Path.Combine(pgBin, "pg_ctl.exe"), startArgs, timeoutMs: 30000);
             if (startResult.ExitCode != 0)
             {
                 // A stale postmaster.pid from an unclean previous shutdown (e.g.
@@ -358,18 +372,27 @@ namespace Zulivio.Launcher
                 {
                     throw new InvalidOperationException("pg_ctl start failed and no stale lock file was found to clear. Log tail:\n" + startResult.Output);
                 }
-                startResult = RunTool(Path.Combine(pgBin, "pg_ctl.exe"), startArgs);
+                startResult = RunTool(Path.Combine(pgBin, "pg_ctl.exe"), startArgs, timeoutMs: 30000);
                 if (startResult.ExitCode != 0)
                 {
                     throw new InvalidOperationException("pg_ctl start failed even after clearing a stale lock file. Log tail:\n" + startResult.Output);
                 }
             }
-            Log("PostgreSQL started on 127.0.0.1:" + PostgresPort);
+            Log("pg_ctl start command issued (exit " + startResult.ExitCode + "), waiting for PostgreSQL to accept connections on 127.0.0.1:" + PostgresPort);
 
-            // pg_ctl start -w returns once the postmaster is accepting
-            // connections but does not hand back its Process object (it forks
-            // and detaches) — read the PID it just wrote so the running
-            // postgres.exe can be tracked for the job object / graceful stop.
+            var pgReady = await WaitForPortAsync(PostgresPort, 60);
+            if (!pgReady)
+            {
+                throw new InvalidOperationException(
+                    "PostgreSQL did not accept a connection on 127.0.0.1:" + PostgresPort + " within 60s of pg_ctl start. pg_ctl output:\n" +
+                    startResult.Output + "\nSee " + pgLog + " for the server's own log.");
+            }
+            Log("PostgreSQL accepting connections on 127.0.0.1:" + PostgresPort);
+
+            // pg_ctl start does not hand back postgres's own Process object
+            // (it forks and detaches) — read the PID it just wrote so the
+            // running postgres.exe can be tracked for the job object /
+            // graceful stop.
             var pidPath = Path.Combine(PgDataDir, "postmaster.pid");
             if (File.Exists(pidPath))
             {
@@ -444,7 +467,16 @@ namespace Zulivio.Launcher
         // pattern (BeginOutputReadLine/BeginErrorReadLine + WaitForExit) is
         // the standard safe one, same as StartChild uses for the long-lived
         // backend/frontend processes.
-        private static ToolResult RunTool(string exe, string args)
+        // timeoutMs is a hard backstop, not a normal-path concern for most
+        // callers (initdb/createdb/pg_ctl stop all return in well under a
+        // second to a few seconds) — added after a real CI hang where
+        // `pg_ctl start -w` never returned even though the server it
+        // started came up fine underneath it (see StartPostgresAsync's
+        // comment). A hung external tool with no timeout here would freeze
+        // this entire launcher indefinitely; ExitCode -1 is a sentinel (real
+        // process exit codes are never negative) that flows into the same
+        // "non-zero means failure" handling every caller already has.
+        private static ToolResult RunTool(string exe, string args, int timeoutMs = 120000)
         {
             var psi = new ProcessStartInfo
             {
@@ -463,7 +495,12 @@ namespace Zulivio.Launcher
                 p.Start();
                 p.BeginOutputReadLine();
                 p.BeginErrorReadLine();
-                p.WaitForExit();
+                if (!p.WaitForExit(timeoutMs))
+                {
+                    try { p.Kill(); } catch { /* best-effort */ }
+                    try { p.WaitForExit(5000); } catch { /* best-effort */ }
+                    return new ToolResult { ExitCode = -1, Output = output.ToString() + "\n[TIMED OUT after " + timeoutMs + "ms — process was killed]" };
+                }
                 return new ToolResult { ExitCode = p.ExitCode, Output = output.ToString() };
             }
         }
