@@ -43,6 +43,13 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+          # setup-node auto-detects the "packageManager": "pnpm@..." field in
+          # package.json and tries to invoke `pnpm` to set up its cache —
+          # before pnpm exists anywhere on this runner (build-msix.ps1 is
+          # what installs it, via `corepack enable`, later). Without this,
+          # the step fails outright with "Unable to locate executable file:
+          # pnpm" before the build even starts.
+          package-manager-cache: false
 
       - name: Resolve version
         id: ver
