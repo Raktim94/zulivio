@@ -228,7 +228,15 @@ jobs:
           Check "two node.exe children running" ((Get-Process node -ErrorAction SilentlyContinue | Measure-Object).Count -eq 2)
           Check "one postgres.exe running"      ((Get-Process postgres -ErrorAction SilentlyContinue | Measure-Object).Count -ge 1)
           Check "PostgreSQL data directory created" (Test-Path "C:\ProgramData\Zulivio\pgdata\PG_VERSION")
-          Check "field-encryption key persisted"    (Test-Path "C:\ProgramData\Zulivio\secrets\field-encryption.key")
+          # NOT checking the field-encryption key file here — FieldEncryptionService
+          # generates it lazily "on first use" (see apps/backend/src/common/crypto/
+          # field-encryption.service.ts), meaning the first time something actually
+          # encrypts/decrypts a stored credential (S3 backup config, Google Sheets
+          # service account, etc.) — not simply on backend startup. This test's
+          # functional-test step only exercises bootstrap + login, which never
+          # touches that code path, so the file genuinely does not exist yet at
+          # this point in a correct run — checking for it here was a test bug, not
+          # a real requirement.
 
           foreach ($portInfo in @(@{Port=4100;Name="backend"}, @{Port=3100;Name="frontend"})) {
             $conn = Get-NetTCPConnection -LocalPort $portInfo.Port -State Listen -ErrorAction SilentlyContinue
@@ -241,14 +249,23 @@ jobs:
           # ephemeral port ranges — a real CI failure hit "could not bind IPv4
           # address 127.0.0.1: Permission denied" on a hardcoded port that
           # happened to fall in one such range. Discover its actual port by
-          # process ownership instead of assuming a fixed number.
-          $pgProc = Get-Process postgres -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($pgProc) {
-            $pgConn = Get-NetTCPConnection -OwningProcess $pgProc.Id -State Listen -ErrorAction SilentlyContinue
+          # process ownership instead of assuming a fixed number — and
+          # specifically the POSTMASTER's PID from postmaster.pid, not just
+          # "any postgres.exe": Postgres runs several helper processes
+          # (checkpointer, background writer, walwriter, etc.), each a
+          # separate postgres.exe, and only the postmaster itself actually
+          # listens on the TCP port. A real CI run picking an arbitrary
+          # postgres.exe via `Select-Object -First 1` grabbed a non-listening
+          # helper and failed this check even though Postgres was correctly
+          # loopback-only the whole time.
+          $pgPidPath = "C:\ProgramData\Zulivio\pgdata\postmaster.pid"
+          $pgPid = if (Test-Path $pgPidPath) { (Get-Content $pgPidPath -TotalCount 1) } else { $null }
+          if ($pgPid) {
+            $pgConn = Get-NetTCPConnection -OwningProcess $pgPid -State Listen -ErrorAction SilentlyContinue
             $pgLoopbackOnly = ($pgConn | Measure-Object).Count -gt 0 -and (($pgConn | ForEach-Object { $_.LocalAddress } | Where-Object { $_ -notin @("127.0.0.1", "::1") } | Measure-Object).Count -eq 0)
-            Check "postgres (dynamic port) bound to loopback only (not 0.0.0.0/::)" $pgLoopbackOnly
+            Check "postgres postmaster (dynamic port) bound to loopback only (not 0.0.0.0/::)" $pgLoopbackOnly
           } else {
-            Check "postgres (dynamic port) bound to loopback only (not 0.0.0.0/::)" $false
+            Check "postgres postmaster (dynamic port) bound to loopback only (not 0.0.0.0/::)" $false
           }
           if ($fail -gt 0) { throw "$fail check(s) failed" }
 
