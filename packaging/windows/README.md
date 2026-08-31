@@ -64,7 +64,7 @@ unmodified application code.
 ```
 <MSIX install root>\
   runtime\node.exe                bundled Node.js
-  pgsql\bin\{initdb,pg_ctl,postgres,createdb}.exe   embedded PostgreSQL
+  pgsql\bin\{initdb,pg_ctl,postgres,createdb}.exe   embedded PostgreSQL (copied out on first run — see below)
   backend\
     node_modules\                 workspace-root hoisted deps
     apps\backend\{node_modules,dist,prisma,package.json}
@@ -74,12 +74,30 @@ unmodified application code.
   zulivio.exe                     the WebView2-hosted launcher
 
 C:\ProgramData\Zulivio\
+  pgsql\                          PostgreSQL binaries, copied here from the install
+                                   root on first run — see below
   pgdata\                         PostgreSQL data directory
   uploads\                        knowledge-base/backup file uploads
   secrets\field-encryption.key    auto-generated on first use
   logs\{launcher,backend,frontend,postgres}.log
   webview2-data\                  WebView2's per-app profile
 ```
+
+**Real, CI-confirmed gotcha: PostgreSQL binaries cannot run from inside the
+MSIX install root at all.** `initdb.exe`/`postgres.exe` fail with "Access is
+denied" the moment `initdb` tries to spawn `postgres.exe -V` as an internal
+check — even with `postgres.exe` genuinely present right next to it, and even
+though this package declares `runFullTrust`. Whatever the exact low-level
+cause (see "PostgreSQL running under an Administrator account" below —
+postgres's own privilege-dropping re-exec appears not to tolerate running
+from inside `C:\Program Files\WindowsApps\...`), the fix is
+`Program.cs`'s `EnsureWritablePostgresBinaries`: on first run, the ~300MB
+`pgsql\` tree is copied out to `C:\ProgramData\Zulivio\pgsql\`, and every
+Postgres tool invocation (`initdb`, `pg_ctl`, `createdb`) runs from that
+ordinary, unpackaged, writable location instead — where they behave exactly
+as they would for a manual install. This adds a one-time first-run copy
+delay (reflected in the "Preparing the local database…" status label) but
+no ongoing cost.
 
 Neither the install root nor `C:\ProgramData\Zulivio` contains a space,
 deliberately — those paths end up inside a Postgres connection URL, process

@@ -257,10 +257,50 @@ namespace Zulivio.Launcher
         // app on this single machine — the same threat model that already
         // lets nodedr-pos's SQLite file have no credential at all.
         // ---------------------------------------------------------------
+        // Real, CI-confirmed failure this works around: running initdb.exe
+        // directly from the MSIX install root (C:\Program Files\WindowsApps\
+        // ...) failed with "Access is denied" the moment initdb tried to
+        // spawn postgres.exe -V as an internal sanity check — even though
+        // postgres.exe genuinely exists right next to it, and even though
+        // this package declares runFullTrust. PostgreSQL's own Windows
+        // privilege-dropping mechanism (postgres/initdb re-executing
+        // themselves under a restricted token when launched by an admin —
+        // see packaging/windows/README.md's "PostgreSQL running under an
+        // Administrator account" note) apparently does not tolerate being
+        // invoked from inside a packaged app's install directory, whatever
+        // the exact low-level reason. The fix: copy the ~300MB pgsql\ tree
+        // out to a normal, unpackaged, writable location on first run —
+        // once initdb/pg_ctl/postgres run from an ordinary ProgramData
+        // path, they behave exactly as they would for a manual install.
+        private string EnsureWritablePostgresBinaries(string baseDir)
+        {
+            var pgRuntimeDir = Path.Combine(DataDir, "pgsql");
+            var pgBin = Path.Combine(pgRuntimeDir, "bin");
+            if (!File.Exists(Path.Combine(pgBin, "postgres.exe")))
+            {
+                Log("Copying embedded PostgreSQL binaries out of the read-only MSIX install root to " + pgRuntimeDir + " (first run) — required for initdb/postgres to run without \"Access is denied\"");
+                CopyDirectoryRecursive(Path.Combine(baseDir, "pgsql"), pgRuntimeDir);
+            }
+            return pgBin;
+        }
+
+        private static void CopyDirectoryRecursive(string sourceDir, string destDir)
+        {
+            Directory.CreateDirectory(destDir);
+            foreach (var file in Directory.GetFiles(sourceDir))
+            {
+                File.Copy(file, Path.Combine(destDir, Path.GetFileName(file)), overwrite: true);
+            }
+            foreach (var dir in Directory.GetDirectories(sourceDir))
+            {
+                CopyDirectoryRecursive(dir, Path.Combine(destDir, Path.GetFileName(dir)));
+            }
+        }
+
         private async Task<string> StartPostgresAsync()
         {
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            var pgBin = Path.Combine(baseDir, "pgsql", "bin");
+            var pgBin = EnsureWritablePostgresBinaries(baseDir);
             var pgLog = Path.Combine(LogsDir, "postgres.log");
             const string SuperUser = "zulivio_admin";
             const string DbName = "zulivio";
@@ -376,9 +416,10 @@ namespace Zulivio.Launcher
         {
             try
             {
-                var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                var pgBin = Path.Combine(baseDir, "pgsql", "bin");
-                var pgCtl = Path.Combine(pgBin, "pg_ctl.exe");
+                // Must match StartPostgresAsync's EnsureWritablePostgresBinaries
+                // location, not the read-only install root — see that
+                // method's comment for why pg_ctl can't run from there.
+                var pgCtl = Path.Combine(DataDir, "pgsql", "bin", "pg_ctl.exe");
                 if (!File.Exists(pgCtl)) return;
                 Log("Stopping PostgreSQL gracefully (pg_ctl stop -m fast)");
                 var result = RunTool(pgCtl, "stop -D \"" + PgDataDir + "\" -m fast -w -t 30");
