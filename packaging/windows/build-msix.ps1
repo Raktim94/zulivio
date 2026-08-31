@@ -382,25 +382,29 @@ if (Test-Path $PublicSrc) {
 if (-not (Test-Path (Join-Path $AppFrontend $ServerRelative))) { Die "server.js missing from the assembled frontend payload after copy" }
 Ok "frontend staged (entry: frontend\$ServerRelative)"
 
-# Comprehensive fallback, not a per-package whack-a-mole list: real CI runs
-# hit "Cannot find module 'next'" and, after fixing that narrowly, THEN hit
-# "Cannot find module 'styled-jsx/package.json'" (an internal Next
-# dependency this app never imports directly — required by
-# next/dist/server/require-hook.js) — proving Next's own file tracer is
-# leaving an unpredictable set of gaps in .next/standalone for this
-# pnpm(hoisted)+Turborepo+Next 15 combination, not just one specific
-# package. Rather than keep discovering and listing individual missing
-# modules one CI run at a time, merge the ACTUAL, complete workspace
-# node_modules (the same real, hoisted copy already proven to work for the
-# backend — see "Staging the backend" above) into the frontend's own
-# node_modules as a fallback layer underneath whatever the tracer already
-# got right. robocopy only touches files that are missing or differ, so
-# this fills every gap without disturbing anything the tracer already
-# staged correctly.
+# Fallback for gaps in Next's own file tracer: real CI runs hit "Cannot
+# find module 'next'" and, after fixing that narrowly, THEN hit "Cannot
+# find module 'styled-jsx/package.json'" (an internal Next dependency this
+# app never imports directly) — proving the tracer leaves gaps for this
+# pnpm(hoisted)+Turborepo+Next 15 combination, not just one package.
+#
+# A first attempt at a "comprehensive" fix merged the ENTIRE workspace
+# node_modules into the frontend payload — this technically works but was
+# a serious mistake: it duplicates the whole ~970-package tree (already
+# also copied once for the backend) into the payload a second time,
+# ballooning the MSIX to hundreds of thousands of files. A real CI run
+# with this in place had `makeappx pack` and `Add-AppxPackage` both take
+# 30+ minutes (normally under a minute) before the job was auto-cancelled.
+#
+# The correct fix is smaller and more precise: read `next`'s own
+# package.json for its actual declared dependencies (a bounded list of a
+# few dozen packages, not the whole workspace) and fall back to copying
+# only those specific packages if they don't already resolve — the same
+# targeted approach as the very first fix, just driven by Next's own
+# manifest instead of a guessed short list, so it can't miss a real
+# internal dependency the way guessing did.
 $FrontendServerDir = Split-Path (Join-Path $AppFrontend $ServerRelative) -Parent
 $FrontendNodeModules = Join-Path $AppFrontend "node_modules"
-Info "merging the complete workspace node_modules into the frontend payload as a fallback for anything Next's tracer omitted"
-Copy-Tree (Join-Path $RepoRoot "node_modules") $FrontendNodeModules
 
 function Test-NodeResolves($pkg, $fromDir) {
   Push-Location $fromDir
@@ -410,18 +414,35 @@ function Test-NodeResolves($pkg, $fromDir) {
   } finally { Pop-Location }
 }
 
-# Verify from the staged payload itself, not source assumptions — resolve
-# exactly the way node.exe running the real server.js will, after the
-# fallback merge above. next/react/react-dom are the app's own direct
-# framework dependencies; styled-jsx is checked explicitly because it's the
-# specific internal-dependency gap a real CI run already hit once.
-Info "verifying next/react/react-dom/styled-jsx resolve from the staged frontend payload"
-foreach ($pkg in @("next", "react", "react-dom", "styled-jsx/package.json")) {
+$nextPkgJsonPath = Join-Path $RepoRoot "node_modules\next\package.json"
+if (-not (Test-Path $nextPkgJsonPath)) { Die "next\package.json not found at the workspace root ($nextPkgJsonPath) — cannot determine its real dependency list for the frontend fallback" }
+$nextDeps = (Get-Content $nextPkgJsonPath -Raw | ConvertFrom-Json).dependencies.PSObject.Properties.Name
+$packagesToVerify = @("next", "react", "react-dom") + $nextDeps | Select-Object -Unique
+Info "checking $($packagesToVerify.Count) packages (next's own dependencies + react/react-dom) resolve from the staged frontend payload"
+
+foreach ($pkg in $packagesToVerify) {
   if (-not (Test-NodeResolves $pkg $FrontendServerDir)) {
-    Die "'$pkg' still does not resolve from the staged frontend payload even after merging the complete workspace node_modules"
+    $pkgSrc = Join-Path $RepoRoot "node_modules\$pkg"
+    if (-not (Test-Path $pkgSrc)) { Die "'$pkg' does not resolve from the staged frontend payload, and is not present at the workspace root ($pkgSrc) to fall back to" }
+    Info "  '$pkg' does not resolve from the staged frontend payload — copying from the workspace root as a fallback"
+    Copy-Tree $pkgSrc (Join-Path $FrontendNodeModules $pkg)
   }
 }
-Ok "staged frontend framework modules verified"
+
+# styled-jsx/package.json specifically, since that's the exact require call
+# that failed in a real CI run (next/dist/server/require-hook.js resolves
+# the package.json path directly, not just the package name).
+if (-not (Test-NodeResolves "styled-jsx/package.json" $FrontendServerDir)) {
+  Die "'styled-jsx/package.json' does not resolve from the staged frontend payload even after the dependency-driven fallback copy above"
+}
+
+# Re-verify everything after any fallback copies.
+foreach ($pkg in $packagesToVerify) {
+  if (-not (Test-NodeResolves $pkg $FrontendServerDir)) {
+    Die "'$pkg' still does not resolve from the staged frontend payload even after the fallback copy from the workspace root"
+  }
+}
+Ok "staged frontend framework modules verified ($($packagesToVerify.Count) packages checked)"
 
 # --- Backend entry-point wrapper ---
 Step "Writing the backend entry-point wrapper"
