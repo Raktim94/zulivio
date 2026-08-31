@@ -284,14 +284,51 @@ foreach ($item in @("node_modules", "dist", "prisma")) {
 Copy-Item (Join-Path $RepoRoot "apps\backend\package.json") (Join-Path $BackendAppDir "package.json")
 Ok "backend staged"
 
+# Re-generate the Prisma client directly inside the staged payload, rather
+# than trusting the pre-staging `prisma generate` + robocopy to have carried
+# the generated output over correctly. Real CI failure this works around:
+# the backend crash-looped at runtime with "TypeError: Cannot read
+# properties of undefined (reading 'EMPLOYEE')" on `Role.EMPLOYEE` —
+# @prisma/client loaded without throwing (the native-module check below
+# would have caught an outright load failure) but its generated enums were
+# missing, meaning whatever copy ended up in the payload was NOT the one
+# `prisma generate` actually populated. pnpm's hoisted mode still writes
+# @prisma/client's real content into a `.pnpm`-nested store path (confirmed
+# in this build's own log: "Generated Prisma Client ... to
+# .\..\..\node_modules\.pnpm\@prisma+client@...\node_modules\@prisma\client"),
+# and something about that layout apparently didn't survive staging intact.
+# Regenerating directly at the exact path the staged app will load from
+# eliminates that ambiguity regardless of the precise root cause.
+Step "Re-generating the Prisma client directly inside the staged payload"
+Push-Location $BackendAppDir
+try {
+  # prisma generate never connects to the database, but schema.prisma
+  # references env("DATABASE_URL") and Prisma validates that referenced
+  # env vars are at least set — a placeholder is enough.
+  $env:DATABASE_URL = "postgresql://placeholder@127.0.0.1:5432/placeholder"
+  & $NodeExe -e @"
+const { execFileSync } = require('child_process');
+const cli = require.resolve('prisma/build/index.js', { paths: [process.cwd()] });
+execFileSync(process.execPath, [cli, 'generate'], { stdio: 'inherit' });
+"@
+  if ($LASTEXITCODE -ne 0) { Die "prisma generate failed when re-run inside the staged payload" }
+} finally {
+  Pop-Location
+  Remove-Item Env:\DATABASE_URL -ErrorAction SilentlyContinue
+}
+Ok "Prisma client re-generated in the staged payload"
+
 # Verify from the PAYLOAD's own copy, not the source tree: robocopy's /XJ
 # (above) deliberately SKIPS any junction/reparse point rather than
 # following it, which is what fixed the Copy-Item hang/failure copying
 # node_modules — but a skip is silent, so if hoisting had left something
 # needed behind a reparse point, this staged copy would be missing it. This
 # would otherwise surface much later as a runtime "Cannot find module"
-# inside the packaged app instead of a build failure right here.
-Info "verifying native modules load from the staged (robocopied) backend payload"
+# inside the packaged app instead of a build failure right here. Also
+# explicitly checks Role (a generated enum), not just that requiring the
+# module doesn't throw — a bare require() succeeding was exactly how the
+# stale-client bug above passed this same check in an earlier build.
+Info "verifying native modules load from the staged backend payload"
 Push-Location $BackendAppDir
 try {
   & $NodeExe -e @"
@@ -300,11 +337,16 @@ for (const m of mods) {
   try { require(require.resolve(m, { paths: [process.cwd()] })); }
   catch (e) { console.error('FAILED ' + m + ': ' + e.message); process.exit(1); }
 }
-console.log('  all required native modules loaded from the staged payload');
+const { Role } = require(require.resolve('@prisma/client', { paths: [process.cwd()] }));
+if (!Role || !Role.EMPLOYEE) {
+  console.error('FAILED: @prisma/client loaded but Role.EMPLOYEE is missing — the generated client is stale/incomplete');
+  process.exit(1);
+}
+console.log('  all required native modules loaded, Role enum present, from the staged payload');
 "@
-  if ($LASTEXITCODE -ne 0) { Die "a required native module failed to load from the staged (robocopied) backend payload — /XJ may have skipped something needed" }
+  if ($LASTEXITCODE -ne 0) { Die "native module or generated-client verification failed against the staged backend payload" }
 } finally { Pop-Location }
-Ok "staged backend native modules verified"
+Ok "staged backend native modules and generated Prisma client verified"
 
 # --- Frontend: Next standalone output. In a monorepo, `server.js` is NOT
 #     necessarily at the standalone root — Next preserves the path from the

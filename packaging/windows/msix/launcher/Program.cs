@@ -181,7 +181,7 @@ namespace Zulivio.Launcher
                         ["CHECKPOINT_DISABLE"] = "1",
                         ["PRISMA_HIDE_UPDATE_MESSAGE"] = "1",
                     });
-                _jobObject.AddProcess(_backendProcess);
+                TryAddToJobObject(_backendProcess, "backend");
                 Log("Backend child process started (pid=" + _backendProcess.Id + ")");
 
                 var frontendEntry = Path.Combine(baseDir, "frontend", FrontendEntryRelative.Replace('/', Path.DirectorySeparatorChar));
@@ -197,7 +197,7 @@ namespace Zulivio.Launcher
                         ["HOSTNAME"] = "127.0.0.1",
                         ["NEXT_TELEMETRY_DISABLED"] = "1",
                     });
-                _jobObject.AddProcess(_frontendProcess);
+                TryAddToJobObject(_frontendProcess, "frontend");
                 Log("Frontend child process started (pid=" + _frontendProcess.Id + ")");
 
                 // Distinct from the frontend-port wait below: this specifically
@@ -402,7 +402,7 @@ namespace Zulivio.Launcher
                     try
                     {
                         _postgresProcess = Process.GetProcessById(pgPid);
-                        _jobObject.AddProcess(_postgresProcess);
+                        TryAddToJobObject(_postgresProcess, "postgres");
                     }
                     catch (Exception ex)
                     {
@@ -627,6 +627,30 @@ namespace Zulivio.Launcher
                 }
             }
             return false;
+        }
+
+        // Real CI failure this works around: assigning a freshly-spawned
+        // child node.exe to our own Job Object failed with
+        // AssignProcessToJobObject error 5 (ERROR_ACCESS_DENIED), even
+        // though the process was spawned directly by this app and normally
+        // has full access. Most likely explanation: Desktop Bridge (MSIX)
+        // apps and their process trees can already be members of a
+        // Windows-managed job object for packaged-app lifecycle tracking,
+        // and nesting an app-created job assignment on top of that isn't
+        // always permitted. The job object here is a crash-path backstop,
+        // not the primary cleanup mechanism (ShutDownChildProcesses's
+        // explicit Kill()/pg_ctl-stop calls are) — so a failure to add a
+        // process to it must not crash startup; log and continue instead.
+        private void TryAddToJobObject(Process process, string label)
+        {
+            try
+            {
+                _jobObject.AddProcess(process);
+            }
+            catch (Exception ex)
+            {
+                Log("Could not add " + label + " process (pid " + process.Id + ") to the job object — crash-path cleanup backstop won't cover it, but the normal shutdown path's explicit kill does not depend on this: " + ex.Message);
+            }
         }
 
         private void ShutDownChildProcesses()
