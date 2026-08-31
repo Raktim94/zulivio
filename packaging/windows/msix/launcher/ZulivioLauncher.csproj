@@ -1,0 +1,62 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Zulivio — MSIX foreground app.
+
+    Targets classic .NET Framework 4.8 deliberately (not modern .NET): 4.8
+    ships on every supported Windows 10/11 install already, so the package
+    stays framework-dependent with nothing extra to bundle or install.
+    windows-latest GitHub Actions runners have the .NET Framework 4.8
+    targeting pack preinstalled, so `dotnet build`/`dotnet publish` work here
+    with no extra setup — same pattern nodedr-pos's identical MSIX launcher
+    uses (packaging/windows/msix/launcher/ in that repo), copied here
+    deliberately for consistency between the two products' Windows builds.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>zulivio</AssemblyName>
+    <RootNamespace>Zulivio.Launcher</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <!-- MSIX identity/version/description live in AppxManifest.xml, not here. -->
+    <Deterministic>true</Deterministic>
+    <!--
+      Explicit x64 + Prefer32Bit=false, pinned for the exact reason recorded
+      in nodedr-pos's OpenPos.csproj: an SDK-style WinForms project with no
+      explicit PlatformTarget defaults to Prefer32Bit=true, which silently
+      runs the exe as 32-bit (WOW64) even on 64-bit Windows. Everything else
+      in this package is x64-only (AppxManifest ProcessorArchitecture="x64",
+      the bundled runtime\node.exe, the embedded PostgreSQL binaries, the
+      WebView2 native loader), and WebView2's native loader is architecture-
+      specific — a 32-bit host process loading the x64 WebView2Loader.dll
+      fails LoadLibrary with ERROR_BAD_FORMAT (surfaces as
+      BadImageFormatException / Store certification error 0x8007000B). This
+      is nodedr-pos's own real, previously-shipped certification failure —
+      pinning both properties here makes the mismatch structurally
+      impossible instead of dependent on SDK defaults. Do not remove either
+      line or reintroduce AnyCPU/Prefer32Bit=true.
+    -->
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <Platforms>x64</Platforms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      Pinned like every other third-party version in this packaging tree
+      (Node in build-msix.ps1's -NodeVersion, PostgreSQL's -PostgresVersion)
+      — NOT verified against nuget.org's current "latest" from this Linux
+      build environment (no network access to check here). Before a real
+      Store submission, confirm this is still a published, current version
+      at https://www.nuget.org/packages/Microsoft.Web.WebView2 and bump it
+      if not — `dotnet restore` fails loudly with a clear "package not
+      found" error if this version has been unlisted, so a stale pin fails
+      safely rather than silently building against something wrong.
+    -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
+  </ItemGroup>
+
+</Project>

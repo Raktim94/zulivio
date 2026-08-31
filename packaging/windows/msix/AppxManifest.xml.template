@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Zulivio — MSIX package manifest template.
+
+  A TEMPLATE, not a file makeappx can pack directly: build-msix.ps1
+  substitutes every @TOKEN@ before packing. Two tokens must come from YOUR
+  Partner Center account, never invented:
+
+    @PACKAGE_IDENTITY_NAME@       Partner Center -> your app -> Product
+                                   management -> App identity -> "Package/
+                                   Identity Name"
+    @PARTNER_CENTER_PUBLISHER_CN@ Same page -> "Publisher ID" (the CN=... string)
+
+  Pass them to build-msix.ps1 via -PackageIdentityName / -PublisherCn, or set
+  $env:ZULIVIO_MSIX_IDENTITY_NAME / $env:ZULIVIO_MSIX_PUBLISHER_CN. The build
+  fails loudly if either is still a placeholder — see build-msix.ps1. Until a
+  real Partner Center identity exists, every build (including CI) uses an
+  obvious throwaway test identity instead — see build-windows-msix.yml.
+
+  Declares Zulivio as a full-trust Win32 app (Desktop Bridge). zulivio.exe (a
+  WebView2-hosted window — see launcher/Program.cs) spawns an embedded
+  PostgreSQL instance plus the backend and frontend as plain child processes
+  when it opens, and stops all three (Postgres gracefully, via pg_ctl) when
+  it closes. There is no packaged Windows Service and no windows.service
+  extension, so this package only needs the one restricted capability every
+  Desktop Bridge app needs (runFullTrust) — same model nodedr-pos's own MSIX
+  package uses, see packaging/windows/README.md's "MSIX" section for the
+  reasoning and the trade-off it implies (foreground-only — no LAN access
+  from other devices while the app is closed, unlike the Docker/CasaOS
+  deployment).
+-->
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap rescap">
+
+  <Identity
+    Name="@PACKAGE_IDENTITY_NAME@"
+    Publisher="@PARTNER_CENTER_PUBLISHER_CN@"
+    Version="@VERSION@.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Zulivio</DisplayName>
+    <PublisherDisplayName>NODEDR INFOTECH PRIVATE LIMITED</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+    <Description>Zulivio — a self-hostable workforce-operations CRM: leads, pipeline, employee lifecycle, attendance, and assignment automation, running entirely on your own machine.</Description>
+  </Properties>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <!--
+    Not confirmed against a real Windows install by this build itself —
+    makeappx pack / the Windows App Certification Kit on the windows-latest
+    CI runner is the actual validation gate (see build-windows-msix.yml).
+    10.0.17763.0 (Windows 10 1809) is WebView2's own documented minimum OS.
+  -->
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.17763.0" />
+  </Dependencies>
+
+  <!--
+    runFullTrust is required for any Desktop Bridge (Win32-in-MSIX) app —
+    unavoidable here since the app spawns node.exe and postgres.exe child
+    processes, which a sandboxed UWP app cannot do. Still a RESTRICTED
+    capability reviewed case by case by Microsoft's certification team, but
+    it's the single most common one in the Store (every classic Win32 app
+    packaged as MSIX declares it). No packagedServices/localSystemServices —
+    there is no packaged Windows Service in this build.
+  -->
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+  <Applications>
+    <!--
+      zulivio.exe (packaging/windows/msix/launcher/) is the real foreground
+      app — a WebView2-hosted window. On launch it starts an embedded
+      PostgreSQL instance, waits for it, then starts the backend and
+      frontend as its own child processes, waits for the frontend's port,
+      then navigates the embedded WebView2 control to
+      http://localhost:@FRONTEND_PORT@. Closing the window stops the backend
+      and frontend, gracefully shuts down PostgreSQL (pg_ctl stop), and uses
+      a Win32 Job Object as a crash-path backstop for anything left running.
+      See packaging/windows/README.md's "MSIX (Microsoft Store)" section.
+    -->
+    <Application Id="Zulivio" Executable="zulivio.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Zulivio"
+        Description="Workforce-operations CRM — leads, pipeline, employees, attendance"
+        Square150x150Logo="Assets\Square150x150Logo.png"
+        Square44x44Logo="Assets\Square44x44Logo.png"
+        BackgroundColor="transparent">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" Square71x71Logo="Assets\Square71x71Logo.png" />
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+</Package>

@@ -42,6 +42,7 @@ Two ways to install, both built from the same code and pointed at the same
 | --- | --- | --- | --- |
 | 🐳 **Docker Compose** (any OS) | ✅ Done — the primary, most-used path | `git clone` + `./install.sh` (see [Quick start](#quick-start)) | Docker |
 | 🏠 **CasaOS / ZimaOS** | ✅ Ready to install now, official app store submission pending | Install from a compose URL — see [`casaos/docker-compose.yml`](casaos/docker-compose.yml) | Nothing — CasaOS/ZimaOS pulls pre-built images, no build step |
+| 🪟 **Windows (Microsoft Store, MSIX)** | 🧪 Built and CI-tested on real Windows, Partner Center submission pending | See [`packaging/windows/README.md`](packaging/windows/README.md) | Nothing — a self-contained desktop app with its own embedded database, no Docker |
 
 Both pull the same multi-arch (amd64/arm64) images published by
 [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml)

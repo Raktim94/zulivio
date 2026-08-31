@@ -70,7 +70,13 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
 
   const port = Number(process.env.PORT ?? 4100);
-  await app.listen(port, "0.0.0.0");
+  // Defaults to every interface (0.0.0.0), required for Docker/CasaOS where
+  // the container's exposed port must be reachable from the host's bridge
+  // network. The Windows MSIX desktop build is the one deployment target
+  // that must NOT be LAN-reachable (see packaging/windows/README.md) — it
+  // sets HOST=127.0.0.1 explicitly on the child process it spawns.
+  const host = process.env.HOST ?? "0.0.0.0";
+  await app.listen(port, host);
 }
 
 bootstrap().catch((error: unknown) => {

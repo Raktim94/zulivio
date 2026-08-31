@@ -1,0 +1,72 @@
+// Zulivio — MSIX backend entry point, spawned directly as a plain child
+// process by zulivio.exe (packaging/windows/msix/launcher/Program.cs) —
+// there is no Windows Service and no WinSW in this package.
+//
+// PORT/HOST/NODE_ENV/DATABASE_URL/CORS_ORIGIN/COOKIE_SECURE/BOOTSTRAP_DISABLED/
+// UPLOADS_DIR/FIELD_ENCRYPTION_KEY_PATH all come from the environment block
+// Program.cs's StartChild() sets on the child process it spawns for this
+// script (see the "backend" StartChild call in StartAsync). This wrapper
+// only adds what's specific to the MSIX path: running `prisma migrate
+// deploy` before every start.
+//
+// Why every start, not just the first: the Docker/CasaOS deployments run
+// migrations via a separate one-shot step (compose.yaml's `migrate`
+// service, or an inline `&&` in the CasaOS command — see
+// casaos/docker-compose.yml). MSIX has no equivalent install-time or
+// start-time hook to run that separately, so this wrapper runs it inline
+// every launch instead. `migrate deploy` only applies migrations not
+// already recorded, so this is a no-op after the very first run — it
+// covers first-run schema creation AND applying a future version's
+// migrations on upgrade, in one code path.
+//
+// cwd is deliberately the backend package directory itself
+// (apps/backend/apps/backend under the MSIX install root — see
+// build-msix.ps1's payload layout), matching where its own package.json/
+// node_modules/prisma folder live, so Prisma's schema/migrations path
+// resolution (relative to the current package) and its node_modules
+// resolution both work exactly as they do in the Docker image. Unlike
+// nodedr-pos's equivalent wrapper (which deliberately runs from a
+// *different* writable cwd to dodge a Prisma-cache EPERM bug specific to
+// its junction-based install layout), Zulivio's MSIX payload has no
+// junctions and no read-only install-root writes in Prisma's own path —
+// this wrapper's job is narrower: just run the migration, then start the
+// app.
+
+const path = require("path");
+const { execFileSync } = require("child_process");
+
+const backendDir = path.join(__dirname, "..", "backend", "apps", "backend");
+
+try {
+  // require.resolve with an explicit `paths` search root — NOT a hardcoded
+  // node_modules path — because the Windows build installs the workspace
+  // with `--node-linker=hoisted` (see build-msix.ps1), which hoists shared
+  // devDependencies like `prisma` up to the workspace-root node_modules
+  // rather than leaving them in apps/backend/node_modules. Node's own
+  // resolution algorithm (which this replicates) walks up parent
+  // directories looking for node_modules, so this finds `prisma` correctly
+  // regardless of exactly which level hoisting landed it at.
+  const prismaCli = require.resolve("prisma/build/index.js", { paths: [backendDir] });
+
+  // stdio captured explicitly (execFileSync's default "pipe", not
+  // "inherit") so the real output reaches backend.log — this process's own
+  // stdout/stderr are themselves redirected pipes (Program.cs launches it
+  // with RedirectStandardOutput/Error=true to capture them there).
+  const output = execFileSync(
+    process.execPath,
+    [prismaCli, "migrate", "deploy"],
+    { cwd: backendDir, env: process.env },
+  );
+  process.stdout.write(output);
+} catch (err) {
+  // Fall through rather than exit: the app's own DB calls (and the
+  // /api/health/ready check the launcher polls) will surface the real
+  // error if the schema truly isn't usable. Forward the real captured
+  // output (not just err.message) so a failure is actually diagnosable
+  // from backend.log instead of a bare exception line.
+  if (err.stdout) process.stdout.write(err.stdout);
+  if (err.stderr) process.stderr.write(err.stderr);
+  console.error("prisma migrate deploy failed at startup:", err.message);
+}
+
+require(path.join(backendDir, "dist", "src", "main.js"));
