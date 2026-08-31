@@ -59,4 +59,15 @@
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.2903.40" />
   </ItemGroup>
 
+  <!--
+    Classic .NET Framework (unlike .NET Core/5+) does not implicitly
+    reference System.Net.Http — Program.cs's WaitForHttpOkAsync (the
+    backend /api/health/ready poll) needs HttpClient, which fails to
+    compile with CS0234 "The type or namespace name 'Http' does not exist
+    in the namespace 'System.Net'" without this explicit reference.
+  -->
+  <ItemGroup>
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
 </Project>
