@@ -378,6 +378,47 @@ if (Test-Path $PublicSrc) {
 if (-not (Test-Path (Join-Path $AppFrontend $ServerRelative))) { Die "server.js missing from the assembled frontend payload after copy" }
 Ok "frontend staged (entry: frontend\$ServerRelative)"
 
+# Defensive fallback: a real CI run hit "Error: Cannot find module 'next'"
+# from the packaged server.js at runtime, even though Next's own file
+# tracer is supposed to make .next/standalone fully self-contained — in
+# this pnpm(hoisted)+Turborepo+Next 15 combination, the framework package
+# itself apparently didn't survive tracing/staging intact for reasons not
+# fully root-caused. Rather than depend on Next's tracer being complete for
+# something this fundamental, explicitly ensure next/react/react-dom are
+# present in the staged frontend's own node_modules, copying from the
+# workspace root (a real, hoisted copy — see "Staging the backend" above)
+# if the tracer's own copy is missing.
+$FrontendNodeModules = Join-Path $AppFrontend "node_modules"
+foreach ($pkg in @("next", "react", "react-dom")) {
+  $existing = Get-ChildItem -Path $AppFrontend -Recurse -Directory -Filter $pkg -ErrorAction SilentlyContinue | Select-Object -First 1
+  if (-not $existing) {
+    $pkgSrc = Join-Path $RepoRoot "node_modules\$pkg"
+    if (Test-Path $pkgSrc) {
+      Info "  '$pkg' missing from the staged frontend payload — copying from the workspace root as a fallback"
+      Copy-Tree $pkgSrc (Join-Path $FrontendNodeModules $pkg)
+    } else {
+      Info "  '$pkg' missing from the staged frontend payload AND not found at the workspace root — verification below will catch this"
+    }
+  }
+}
+
+# Verify from the staged payload itself, not source assumptions — resolve
+# exactly the way node.exe running the real server.js will.
+Info "verifying 'next'/'react'/'react-dom' resolve from the staged frontend payload"
+Push-Location (Split-Path (Join-Path $AppFrontend $ServerRelative) -Parent)
+try {
+  & $NodeExe -e @"
+const mods = ['next', 'react', 'react-dom'];
+for (const m of mods) {
+  try { require.resolve(m); }
+  catch (e) { console.error('FAILED ' + m + ': ' + e.message); process.exit(1); }
+}
+console.log('  next/react/react-dom all resolve from the staged frontend payload');
+"@
+  if ($LASTEXITCODE -ne 0) { Die "a required frontend framework module failed to resolve from the staged payload" }
+} finally { Pop-Location }
+Ok "staged frontend framework modules verified"
+
 # --- Backend entry-point wrapper ---
 Step "Writing the backend entry-point wrapper"
 Copy-Item (Join-Path $MsixDir "backend-service.js.template") (Join-Path $WrappersDir "backend-service.js")
