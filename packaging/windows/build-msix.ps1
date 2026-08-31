@@ -382,19 +382,25 @@ if (Test-Path $PublicSrc) {
 if (-not (Test-Path (Join-Path $AppFrontend $ServerRelative))) { Die "server.js missing from the assembled frontend payload after copy" }
 Ok "frontend staged (entry: frontend\$ServerRelative)"
 
-# Defensive fallback: a real CI run hit "Error: Cannot find module 'next'"
-# from the packaged server.js at runtime, even though Next's own file
-# tracer is supposed to make .next/standalone fully self-contained — in
-# this pnpm(hoisted)+Turborepo+Next 15 combination, the framework package
-# itself apparently didn't survive tracing/staging intact for reasons not
-# fully root-caused. Checks actual RESOLUTION (require.resolve from
-# server.js's own directory), not mere existence somewhere in the tree —
-# an earlier version of this check used `Get-ChildItem -Recurse -Filter`,
-# which found an unrelated same-named "next" directory buried elsewhere in
-# node_modules and wrongly concluded nothing needed fixing, while the
-# actual resolution path (walking up from server.js) had none.
+# Comprehensive fallback, not a per-package whack-a-mole list: real CI runs
+# hit "Cannot find module 'next'" and, after fixing that narrowly, THEN hit
+# "Cannot find module 'styled-jsx/package.json'" (an internal Next
+# dependency this app never imports directly — required by
+# next/dist/server/require-hook.js) — proving Next's own file tracer is
+# leaving an unpredictable set of gaps in .next/standalone for this
+# pnpm(hoisted)+Turborepo+Next 15 combination, not just one specific
+# package. Rather than keep discovering and listing individual missing
+# modules one CI run at a time, merge the ACTUAL, complete workspace
+# node_modules (the same real, hoisted copy already proven to work for the
+# backend — see "Staging the backend" above) into the frontend's own
+# node_modules as a fallback layer underneath whatever the tracer already
+# got right. robocopy only touches files that are missing or differ, so
+# this fills every gap without disturbing anything the tracer already
+# staged correctly.
 $FrontendServerDir = Split-Path (Join-Path $AppFrontend $ServerRelative) -Parent
 $FrontendNodeModules = Join-Path $AppFrontend "node_modules"
+Info "merging the complete workspace node_modules into the frontend payload as a fallback for anything Next's tracer omitted"
+Copy-Tree (Join-Path $RepoRoot "node_modules") $FrontendNodeModules
 
 function Test-NodeResolves($pkg, $fromDir) {
   Push-Location $fromDir
@@ -404,22 +410,15 @@ function Test-NodeResolves($pkg, $fromDir) {
   } finally { Pop-Location }
 }
 
-foreach ($pkg in @("next", "react", "react-dom")) {
-  if (-not (Test-NodeResolves $pkg $FrontendServerDir)) {
-    $pkgSrc = Join-Path $RepoRoot "node_modules\$pkg"
-    if (-not (Test-Path $pkgSrc)) { Die "'$pkg' does not resolve from the staged frontend payload, and is not present at the workspace root ($pkgSrc) to fall back to" }
-    Info "  '$pkg' does not resolve from the staged frontend payload — copying from the workspace root as a fallback"
-    Copy-Tree $pkgSrc (Join-Path $FrontendNodeModules $pkg)
-  }
-}
-
 # Verify from the staged payload itself, not source assumptions — resolve
-# exactly the way node.exe running the real server.js will, after any
-# fallback copy above.
-Info "verifying 'next'/'react'/'react-dom' resolve from the staged frontend payload"
-foreach ($pkg in @("next", "react", "react-dom")) {
+# exactly the way node.exe running the real server.js will, after the
+# fallback merge above. next/react/react-dom are the app's own direct
+# framework dependencies; styled-jsx is checked explicitly because it's the
+# specific internal-dependency gap a real CI run already hit once.
+Info "verifying next/react/react-dom/styled-jsx resolve from the staged frontend payload"
+foreach ($pkg in @("next", "react", "react-dom", "styled-jsx/package.json")) {
   if (-not (Test-NodeResolves $pkg $FrontendServerDir)) {
-    Die "'$pkg' still does not resolve from the staged frontend payload even after the fallback copy from the workspace root"
+    Die "'$pkg' still does not resolve from the staged frontend payload even after merging the complete workspace node_modules"
   }
 }
 Ok "staged frontend framework modules verified"
