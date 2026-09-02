@@ -43,7 +43,7 @@
 
   <Properties>
     <DisplayName>Zulivio</DisplayName>
-    <PublisherDisplayName>NODEDR INFOTECH PRIVATE LIMITED</PublisherDisplayName>
+    <PublisherDisplayName>NODEDR INFOTECH LIMITED</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
     <Description>Zulivio — a self-hostable workforce-operations CRM: leads, pipeline, employee lifecycle, attendance, and assignment automation, running entirely on your own machine.</Description>
   </Properties>
