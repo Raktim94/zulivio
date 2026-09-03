@@ -38,11 +38,17 @@ and isn't built yet before you rely on this in production.
 Two ways to install, both built from the same code and pointed at the same
 `http://<server>:3100` — pick whichever fits your setup.
 
+<p align="center">
+  <a href="https://apps.microsoft.com/store/detail/9NZ9JZN31RN0?cid=DevShareMCLPCS">
+    <img src="https://get.microsoft.com/entirestore.svg" alt="Get Zulivio from Microsoft Store" width="200">
+  </a>
+</p>
+
 | Platform | Status | Install | What it needs |
 | --- | --- | --- | --- |
 | 🐳 **Docker Compose** (any OS) | ✅ Done — the primary, most-used path | `git clone` + `./install.sh` (see [Quick start](#quick-start)) | Docker |
 | 🏠 **CasaOS / ZimaOS** | ✅ Ready to install now, official app store submission pending | Install from a compose URL — see [`casaos/docker-compose.yml`](casaos/docker-compose.yml) | Nothing — CasaOS/ZimaOS pulls pre-built images, no build step |
-| 🪟 **Windows (Microsoft Store, MSIX)** | 🧪 Built and CI-tested on real Windows, Partner Center submission pending | See [`packaging/windows/README.md`](packaging/windows/README.md) | Nothing — a self-contained desktop app with its own embedded database, no Docker |
+| 🪟 **Windows (Microsoft Store, MSIX)** | 🧪 Built and CI-tested on real Windows, Partner Center submission pending | [![Download from Microsoft Store](https://img.shields.io/badge/Download-Microsoft%20Store-0078D4?style=for-the-badge&logo=microsoft&logoColor=white)](https://apps.microsoft.com/store/detail/9NZ9JZN31RN0?cid=DevShareMCLPCS) | Nothing — a self-contained desktop app with its own embedded database, no Docker |
 
 Both pull the same multi-arch (amd64/arm64) images published by
 [`.github/workflows/docker-publish.yml`](.github/workflows/docker-publish.yml)
@@ -75,30 +81,333 @@ switch install methods later.
 All captured from a real running instance (Docker Compose, seeded with
 sample data) — not mockups.
 
-| | |
+<div align="center">
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/my-day.png" alt="My Day" width="100%">
+<br>
+<b>My Day — Telecaller's Dashboard</b>
+<br>
+<i>What to call, what's due, what's hot</i>
+<br><br>
+
+| Specification | Feature |
 |---|---|
-| **My Day** — the telecaller's queue: what to call, what's due, what's hot | **Lead board** — drag and drop across the telecalling pipeline |
-| ![My Day](docs/screenshots/my-day.png) | ![Lead board](docs/screenshots/lead-board.png) |
-| **Lead workspace** — call, qualify, log the outcome and schedule the follow-up on one screen | **Call disposition** — single-tap outcome, no long form |
-| ![Lead workspace](docs/screenshots/lead-workspace.png) | ![Call disposition](docs/screenshots/disposition.png) |
+| Queue Management | Prioritized lead queue with overdue alerts |
+| Today's Focus | Due-today tasks and follow-ups |
+| Quick Actions | One-tap call, WhatsApp, email initiation |
+| Status Tracking | Real-time task completion status |
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/lead-board.png" alt="Lead Board" width="100%">
+<br>
+<b>Lead Board — Drag & Drop Pipeline</b>
+<br>
+<i>Visual pipeline management across telecalling stages</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| Kanban View | 10-stage configurable pipeline |
+| Drag & Drop | Move leads between stages instantly |
+| Stage Tracking | New → Contacted → Connected → Interested → Won |
+| Filter Options | By owner, score, priority, date range |
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/lead-workspace.png" alt="Lead Workspace" width="100%">
+<br>
+<b>Lead Workspace — Single Screen CRM</b>
+<br>
+<i>Call, qualify, log outcome, schedule follow-up</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| Contact Hub | Call/WhatsApp/Email from one screen |
+| Stage Strip | Visual pipeline progress indicator |
+| Activity Timeline | Full history of interactions |
+| Follow-up Scheduling | Calendar-integrated task creation |
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/disposition.png" alt="Call Disposition" width="100%">
+<br>
+<b>Call Disposition — Quick Outcome Logging</b>
+<br>
+<i>Single-tap outcome, no long forms</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| Connected/Not Connected | Binary call status tracking |
+| Disposition Codes | Predefined outcome categories |
+| Duration Logging | Automatic call duration capture |
+| Notes | Quick text input for call details |
+</td>
+</tr>
+</table>
+
+</div>
 
 <details>
-<summary>More screenshots (follow-ups, CRM reports, workforce core, deals, data hub)</summary>
+<summary><b>More Screenshots — CRM Reports, Workforce, Deals & Data</b></summary>
 
-| | |
+<div align="center">
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/follow-ups.png" alt="Follow-ups" width="100%">
+<br>
+<b>Follow-ups — Smart Task Buckets</b>
+<br>
+<i>Overdue / Due now / Today / Tomorrow / Upcoming</i>
+<br><br>
+
+| Specification | Feature |
 |---|---|
-| **Follow-ups** — overdue / due now / today / tomorrow, completed and rescheduled inline | **CRM reports** — leads by stage and source, conversion, revenue |
-| ![Follow-ups](docs/screenshots/follow-ups.png) | ![CRM reports](docs/screenshots/crm-reports.png) |
-| **Telecaller performance** — calls, connect rate, meetings, follow-ups, revenue per rep | **CRM overview** — org-wide funnel, pipeline value, follow-up health |
-| ![Telecaller performance](docs/screenshots/team-performance.png) | ![CRM overview](docs/screenshots/crm-overview.png) |
-| **Master dashboard** — live headcount, assignment mix, who's on the clock | **Employee directory** — add/edit/reset-password/remove, all rank-guarded |
-| ![Master dashboard](docs/screenshots/dashboard.png) | ![Employees](docs/screenshots/employees.png) |
-| **Deal pipeline** — Kanban board across the opportunity pipeline | **Sales dashboard** — pipeline value, lead funnel, forecast by category and by rep |
-| ![Pipeline](docs/screenshots/pipeline.png) | ![Sales dashboard](docs/screenshots/sales-dashboard.png) |
-| **Employee front page** — "My Work", today's tips, shift controls | **Assignments** — status pipeline with guarded transitions |
-| ![Employee front page](docs/screenshots/employee-front-page.png) | ![Assignments](docs/screenshots/assignments.png) |
-| ![Attendance](docs/screenshots/attendance.png) | ![Knowledge base](docs/screenshots/knowledge.png) |
-| ![Data Hub](docs/screenshots/data-hub.png) | ![Sign in](docs/screenshots/login.png) |
+| Smart Buckets | Auto-categorized by urgency |
+| Inline Actions | Complete or reschedule in one click |
+| Visual Indicators | Color-coded priority levels |
+| Recurring Tasks | Support for repeated follow-ups |
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/crm-reports.png" alt="CRM Reports" width="100%">
+<br>
+<b>CRM Reports — Sales Analytics</b>
+<br>
+<i>Leads by stage, source, conversion, revenue</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| Lead Funnel | Visual conversion pipeline |
+| Source Analysis | Track lead acquisition channels |
+| Revenue Tracking | Pipeline value and closed deals |
+| Export Options | CSV and Google Sheets export |
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/team-performance.png" alt="Telecaller Performance" width="100%">
+<br>
+<b>Telecaller Performance — Team KPIs</b>
+<br>
+<i>Calls, connect rate, meetings, revenue per rep</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| Call Metrics | Volume, duration, connect rate |
+| Meeting Tracking | Booked vs completed meetings |
+| Revenue Attribution | Per-rep sales contribution |
+| Comparative Analysis | Side-by-side team comparison |
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/crm-overview.png" alt="CRM Overview" width="100%">
+<br>
+<b>CRM Overview — Organization Dashboard</b>
+<br>
+<i>Org-wide funnel, pipeline value, follow-up health</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| Executive View | Company-wide sales metrics |
+| Pipeline Health | Lead distribution across stages |
+| Trend Analysis | 14-day won/lost/new-leads chart |
+| Forecast Display | Weighted pipeline projections |
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/dashboard.png" alt="Master Dashboard" width="100%">
+<br>
+<b>Master Dashboard — Live Operations</b>
+<br>
+<i>Headcount, assignment mix, who's on the clock</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| Real-time Count | Live headcount and status |
+| Assignment Mix | Tasks by status breakdown |
+| Active Board | Who's working/on break right now |
+| Knowledge Stats | KB usage and training progress |
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/employees.png" alt="Employees" width="100%">
+<br>
+<b>Employee Directory — Role Management</b>
+<br>
+<i>Add, edit, reset password, remove — all rank-guarded</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| Role Hierarchy | 5-level permission system |
+| Auto-generated IDs | EMP-0001, EMP-0002... |
+| Secure Credentials | Temporary passwords (shown once) |
+| Session Control | Revoke all sessions on removal |
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/pipeline.png" alt="Deal Pipeline" width="100%">
+<br>
+<b>Deal Pipeline — Opportunity Management</b>
+<br>
+<i>Kanban board across the opportunity pipeline</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| 6-Stage Pipeline | New → Qualified → Proposal → Won/Lost |
+| Drag & Drop | Visual stage transitions |
+| Audit Trail | Full stage-change history |
+| Forecast Categories | Manager override with audit |
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/sales-dashboard.png" alt="Sales Dashboard" width="100%">
+<br>
+<b>Sales Dashboard — Revenue Analytics</b>
+<br>
+<i>Pipeline value, lead funnel, forecast by rep</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| Pipeline Value | Total and weighted forecast |
+| Lead Funnel | Source-to-conversion analysis |
+| Rep Performance | Individual sales attribution |
+| Win/Loss Charts | Deal outcome visualization |
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/employee-front-page.png" alt="Employee Front Page" width="100%">
+<br>
+<b>Employee Front Page — My Work</b>
+<br>
+<i>Today's tips, shift controls, active work</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| Today's Tasks | Prioritized work queue |
+| Shift Controls | Start/pause/end attendance |
+| Training Tips | Daily knowledge base feed |
+| Quick Status | Work/break status indicator |
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/assignments.png" alt="Assignments" width="100%">
+<br>
+<b>Assignments — Status Pipeline</b>
+<br>
+<i>Guarded transitions with audit trail</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| State Machine | ASSIGNED → IN_PROGRESS → COMPLETED |
+| Transition Guards | Invalid moves rejected server-side |
+| Outcome Notes | Document completion details |
+| Audit Trail | Full transition history logged |
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/attendance.png" alt="Attendance" width="100%">
+<br>
+<b>Attendance — Shift State Machine</b>
+<br>
+<i>Explicit state transitions with server timestamps</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| State Flow | logged_out → working → on_break |
+| Server Timestamps | Clock-in/out precision |
+| Session Control | One open session enforced |
+| Auto-close | Dangling breaks auto-resolved |
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/knowledge.png" alt="Knowledge Base" width="100%">
+<br>
+<b>Knowledge Base — Training Hub</b>
+<br>
+<i>PDF uploads, daily tips, role-targeted training</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| PDF Management | Upload, draft/publish lifecycle |
+| Training Assignment | Role/person-targeted docs |
+| Acknowledgement | Per-version read tracking |
+| Daily Tips | Feed on employee front page |
+</td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td align="center" width="50%">
+<img src="docs/screenshots/data-hub.png" alt="Data Hub" width="100%">
+<br>
+<b>Data Hub — Import/Export Center</b>
+<br>
+<i>CSV export, Google Sheets integration, bulk import</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| CSV Export | Employees, assignments, leads |
+| Google Sheets | Live sync with spreadsheet |
+| Bulk Import | Row-level error reporting |
+| Formula Protection | Spreadsheet injection guard |
+</td>
+<td align="center" width="50%">
+<img src="docs/screenshots/login.png" alt="Sign In" width="100%">
+<br>
+<b>Sign In — Secure Authentication</b>
+<br>
+<i>Argon2id hashing, session-based auth</i>
+<br><br>
+
+| Specification | Feature |
+|---|---|
+| Password Hashing | Argon2id (OWASP recommended) |
+| Session Tokens | Opaque, server-side only |
+| Cookie Security | httpOnly + SameSite=lax |
+| Session Revocation | Instant on logout/reset |
+</td>
+</tr>
+</table>
+
+</div>
+
+</details>
 
 </details>
 
