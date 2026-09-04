@@ -16,7 +16,9 @@ Developed by [NodeDR Infotech Private Limited](https://www.nodedr.com/)
 [![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)](package.json)
 [![NestJS](https://img.shields.io/badge/backend-NestJS%2011-E0234E?logo=nestjs&logoColor=white)](apps/backend)
 [![Next.js](https://img.shields.io/badge/frontend-Next.js%2015-000000?logo=next.js&logoColor=white)](apps/web)
-[![Tests](https://img.shields.io/badge/e2e%20tests-82%2F82%20passing-brightgreen)](apps/backend/test)
+[![Tests](https://img.shields.io/badge/e2e%20tests-142%2F142%20passing-brightgreen)](apps/backend/test)
+[![MCP](https://img.shields.io/badge/AI-MCP%20Server-8B5CF6?logo=modelcontextprotocol&logoColor=white)](#mcp-server)
+[![Microsoft Store](https://img.shields.io/badge/Download-Microsoft%20Store-0078D4?style=for-the-badge&logo=microsoft&logoColor=white)](https://apps.microsoft.com/store/detail/9NZ9JZN31RN0?cid=DevShareMCLPCS)
 
 </div>
 
@@ -690,22 +692,53 @@ integration works.
 
 ## MCP server
 
-Zulivio exposes a [Model Context Protocol](https://modelcontextprotocol.io)
-server so an AI assistant (Claude, ChatGPT, or any other MCP-capable client)
-can act on your Zulivio account directly — read your tasks, check the sales
-dashboard, log attendance, create a lead, and so on.
+Zulivio ships with a built-in [Model Context Protocol](https://modelcontextprotocol.io)
+(MCP) server, enabling AI assistants like Claude, ChatGPT, and any MCP-capable client to
+directly interact with your Zulivio instance. Ask your AI to check tasks, review the sales
+dashboard, clock in, or create a lead — all through natural language.
 
-**Security model:** each connection is a personal API key, not a shared
-credential. A key carries no permissions of its own — it just resolves to
-the employee who created it, so the assistant can only ever do what that
-employee could already do in the app (the exact same role/RBAC/scope checks
-the REST API enforces apply to every MCP call). The tool list is a
-deliberately curated subset of the API, not a full mirror: nothing
-destructive is reachable this way — no deleting employees, no role changes,
-no backup restore, no bulk operations.
+### What is MCP?
 
-**1. Generate a key** — Settings → API Keys → Create key. Copy the token
-immediately; it's shown exactly once.
+The Model Context Protocol is an open standard that lets AI assistants connect to external
+data sources and tools in a secure, standardized way. Think of it as a universal adapter
+between your AI and your business tools. Zulivio implements the MCP Streamable HTTP
+transport, making it compatible with all major AI platforms.
+
+### Design philosophy
+
+The MCP integration follows Zulivio's core security principles:
+
+- **Zero-trust by default** — every MCP call goes through the same RBAC/scope checks as the REST API
+- **Curated tool surface** — only safe, read-heavy operations are exposed; no destructive actions
+- **Personal API keys** — each key resolves to the employee who created it, carrying their exact permissions
+- **No synthetic permissions** — the AI can only do what the employee could already do in the app
+
+### Architecture
+
+```
+AI Assistant (Claude/ChatGPT/etc.)
+        │
+        ▼
+  MCP Client (Streamable HTTP)
+        │
+        ▼
+  Zulivio MCP Endpoint (/api/v1/mcp)
+        │
+        ├── AuthGuard (API key → employee lookup)
+        ├── RBAC Guard (role hierarchy enforcement)
+        ├── Scope Guard (org-scoped data access)
+        │
+        ▼
+  NestJS Service Layer (same as REST API)
+        │
+        ▼
+  Prisma → PostgreSQL
+```
+
+### Getting started
+
+**1. Generate an API key** — Settings → API Keys → Create key. Copy the token immediately;
+it's shown exactly once.
 
 **2. Test the connection** (replace both placeholders):
 
@@ -717,46 +750,58 @@ curl -X POST https://<your-zulivio-domain>/api/v1/mcp \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
 ```
 
-A working connection returns a JSON-RPC response listing the tools below.
+A working connection returns a JSON-RPC response listing the available tools.
 
-**3. Connect a client.** The endpoint is `https://<your-zulivio-domain>/api/v1/mcp`,
-authenticated with an `Authorization: Bearer <your-api-key>` header — how
-you supply that depends on the client:
+**3. Connect your AI client:**
 
-- **Claude.ai / ChatGPT connectors** (native remote-MCP support): add a
-  connector, paste the endpoint URL, and set the `Authorization` header to
-  `Bearer <your-api-key>` in its custom-headers field.
-- **Claude Desktop / other config-file clients** (via
-  [`mcp-remote`](https://www.npmjs.com/package/mcp-remote), since these
-  don't speak Streamable HTTP directly):
-  ```json
-  {
-    "mcpServers": {
-      "zulivio": {
-        "command": "npx",
-        "args": [
-          "-y", "mcp-remote",
-          "https://<your-zulivio-domain>/api/v1/mcp",
-          "--header", "Authorization:Bearer ${ZULIVIO_API_KEY}"
-        ],
-        "env": { "ZULIVIO_API_KEY": "<your-api-key>" }
-      }
+| Platform | Setup |
+|----------|-------|
+| **Claude.ai** | Add connector → paste endpoint URL → set `Authorization: Bearer <key>` in custom headers |
+| **ChatGPT** | Add connector → paste endpoint URL → set `Authorization: Bearer <key>` in custom headers |
+| **Claude Desktop** | Use `mcp-remote` proxy (see config below) |
+| **Other MCP clients** | Endpoint: `https://<your-domain>/api/v1/mcp` with Bearer auth |
+
+<details>
+<summary>Claude Desktop configuration (click to expand)</summary>
+
+```json
+{
+  "mcpServers": {
+    "zulivio": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote",
+        "https://<your-zulivio-domain>/api/v1/mcp",
+        "--header", "Authorization:Bearer ${ZULIVIO_API_KEY}"
+      ],
+      "env": { "ZULIVIO_API_KEY": "<your-api-key>" }
     }
   }
-  ```
+}
+```
+</details>
 
-**Tools exposed:**
+### Available tools
 
-| Tool | Type | Notes |
-| --- | --- | --- |
-| `list_employees` | Read | Scoped by caller's role, same as the Employees page |
-| `my_attendance_status` | Read | logged_out / working / on_break |
-| `start_attendance` / `end_attendance` | Write | Clock in/out |
-| `list_my_tasks` | Read | Assignments owned by the caller |
-| `update_task_status` | Write | Guarded by the same status state machine and ownership checks as the app |
-| `list_leads` | Read | Caller's own leads, or all if Manager+ |
-| `create_lead` | Write | Optional `autoAssign` to run the org's assignment rule |
-| `sales_dashboard` | Read | Manager+ only, scoped to the caller's reporting subtree |
+| Tool | Type | Description |
+|------|------|-------------|
+| `list_employees` | Read | List employees scoped by your role (same as Employees page) |
+| `my_attendance_status` | Read | Check current attendance state: logged_out / working / on_break |
+| `start_attendance` | Write | Clock in (start a work session) |
+| `end_attendance` | Write | Clock out (end current work session) |
+| `list_my_tasks` | Read | View assignments assigned to you |
+| `update_task_status` | Write | Update task status (guarded by state machine) |
+| `list_leads` | Read | View leads (own leads, or all if Manager+) |
+| `create_lead` | Write | Create a new lead with optional auto-assignment |
+| `sales_dashboard` | Read | View sales metrics (Manager+ only, scoped to reporting subtree) |
+
+### Security
+
+- API keys are personal — they resolve to the employee who created them
+- All RBAC, scope, and state machine checks apply identically to MCP calls
+- No destructive operations (delete, role changes, backup restore) are exposed
+- Keys can be revoked instantly from Settings → API Keys
+- See [`SECURITY_AUDIT_REPORT.md`](./SECURITY_AUDIT_REPORT.md) for full audit details
 
 Revoke a key any time from Settings → API Keys — it stops working
 immediately, no restart needed.
