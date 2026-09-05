@@ -341,7 +341,7 @@ export function LeadList({
           </div>
           <p className="mt-2 text-xs text-muted">
             Prefer moving a bad batch to a loss stage with a reason over deleting it — that stays reversible and keeps
-            history. Reach for "Delete permanently" only when the rows themselves need to go, e.g. a bad test import.
+            history. Reach for &ldquo;Delete permanently&rdquo; only when the rows themselves need to go, e.g. a bad test import.
           </p>
         </Card>
       )}
