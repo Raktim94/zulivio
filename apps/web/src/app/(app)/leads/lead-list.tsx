@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import type {
   EmployeeSummary,
+  LeadLossReason,
   LeadPriority,
   LeadScoreConfigSummary,
   LeadSearchResult,
@@ -13,7 +14,17 @@ import type {
 } from "@zulivio/types";
 import { api, ApiError } from "@/lib/api";
 import { Badge, Button, Card, EmptyState, ErrorState, Input, Select, Spinner, useToast } from "@/components/ui";
-import { PriorityBadge, ScoreBadge, bandFor, formatWhen } from "@/components/crm";
+import { LOSS_REASON_LABEL, PriorityBadge, ScoreBadge, bandFor, formatWhen } from "@/components/crm";
+
+const LOSS_REASONS: LeadLossReason[] = [
+  "NOT_INTERESTED",
+  "NO_BUDGET",
+  "WRONG_NUMBER",
+  "DUPLICATE",
+  "COMPETITOR",
+  "NOT_NOW",
+  "LOST",
+];
 
 const STATUS_TONE: Record<LeadStatus, "neutral" | "success" | "warning" | "danger" | "info"> = {
   NEW: "info",
@@ -79,6 +90,7 @@ export function LeadList({
   const [bulkOwnerId, setBulkOwnerId] = useState("");
   const [bulkStageId, setBulkStageId] = useState("");
   const [bulkTag, setBulkTag] = useState("");
+  const [bulkLossReason, setBulkLossReason] = useState<LeadLossReason>("NOT_INTERESTED");
 
   const params = new URLSearchParams({ page: String(page), pageSize: "25", sort: filters.sort });
   if (filters.q.trim()) params.set("q", filters.q.trim());
@@ -112,18 +124,21 @@ export function LeadList({
 
   const bulk = useMutation({
     mutationFn: ({ path, body }: { path: string; body: Record<string, unknown> }) =>
-      api.post<{ assigned?: number; moved?: number; tagged?: number; skipped?: { reason: string }[] }>(
+      api.post<{ assigned?: number; moved?: number; tagged?: number; deleted?: number; skipped?: { reason: string }[] }>(
         `/api/v1/leads/bulk/${path}`,
         { leadIds: [...selected], ...body },
       ),
     onSuccess: (result) => {
-      const count = result.assigned ?? result.moved ?? result.tagged ?? 0;
+      const count = result.assigned ?? result.moved ?? result.tagged ?? result.deleted ?? 0;
       const skipped = result.skipped?.length ?? 0;
-      toast.push(`${count} lead${count === 1 ? "" : "s"} updated${skipped ? `, ${skipped} skipped` : ""}`, "success");
+      const verb = result.deleted !== undefined ? "deleted" : "updated";
+      toast.push(`${count} lead${count === 1 ? "" : "s"} ${verb}${skipped ? `, ${skipped} skipped` : ""}`, "success");
       invalidate();
     },
     onError: (err) => toast.push(err instanceof ApiError ? err.message : "Bulk action failed", "error"),
   });
+
+  const selectedStage = stages.find((s) => s.id === bulkStageId);
 
   function update<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -267,10 +282,31 @@ export function LeadList({
                   </option>
                 ))}
               </Select>
+              {selectedStage?.isLost && (
+                <Select
+                  className="w-40"
+                  value={bulkLossReason}
+                  onChange={(e) => setBulkLossReason(e.target.value as LeadLossReason)}
+                  aria-label="Reason"
+                >
+                  {LOSS_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {LOSS_REASON_LABEL[r]}
+                    </option>
+                  ))}
+                </Select>
+              )}
               <Button
                 variant="secondary"
                 disabled={!bulkStageId || bulk.isPending}
-                onClick={() => bulk.mutate({ path: "stage", body: { stageId: bulkStageId } })}
+                onClick={() =>
+                  bulk.mutate({
+                    path: "stage",
+                    body: selectedStage?.isLost
+                      ? { stageId: bulkStageId, lossReason: bulkLossReason }
+                      : { stageId: bulkStageId },
+                  })
+                }
               >
                 Move
               </Button>
@@ -287,12 +323,25 @@ export function LeadList({
               </Button>
             </div>
 
+            <Button
+              variant="danger"
+              disabled={bulk.isPending}
+              onClick={() => {
+                if (confirm(`Permanently delete ${selected.size} lead${selected.size === 1 ? "" : "s"}? This can't be undone.`)) {
+                  bulk.mutate({ path: "delete", body: {} });
+                }
+              }}
+            >
+              Delete permanently
+            </Button>
+
             <a href="/api/v1/exports/leads.csv" className="ml-auto">
               <Button variant="secondary">Export all as CSV</Button>
             </a>
           </div>
           <p className="mt-2 text-xs text-muted">
-            Bulk delete is deliberately not offered — leads are disqualified with a reason, never destroyed.
+            Prefer moving a bad batch to a loss stage with a reason over deleting it — that stays reversible and keeps
+            history. Reach for "Delete permanently" only when the rows themselves need to go, e.g. a bad test import.
           </p>
         </Card>
       )}

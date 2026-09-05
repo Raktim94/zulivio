@@ -27,7 +27,16 @@ const LEAD_COLUMNS = ["fullName", "email", "phone", "company", "source", "territ
 const LEAD_FIELD_ALIASES: Record<string, string[]> = {
   fullName: ["full_name", "fullName", "name", "full name", "contact_name", "contact name"],
   email: ["email", "email address"],
-  phone: ["phone", "phone number", "mobile", "phone_local_10d", "phone local 10d", "contact_phone"],
+  phone: [
+    "phone",
+    "phone number",
+    "mobile",
+    "phone_local_10d",
+    "phone local 10d",
+    "contact_phone",
+    "public phone",
+    "public_phone",
+  ],
   company: ["company", "company_name", "company name", "business_name", "business name"],
   source: ["source"],
   territory: ["territory", "region"],

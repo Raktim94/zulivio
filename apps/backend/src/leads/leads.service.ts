@@ -30,7 +30,7 @@ import { ChangeLeadStageDto } from "./dto/change-lead-stage.dto";
 import { UpdateQualificationDto } from "./dto/update-qualification.dto";
 import { LogCallDto } from "./dto/log-call.dto";
 import { CreateLeadNoteDto } from "./dto/create-lead-note.dto";
-import { BulkAssignLeadsDto, BulkStageLeadsDto, BulkTagLeadsDto } from "./dto/bulk-lead-action.dto";
+import { BulkAssignLeadsDto, BulkDeleteLeadsDto, BulkStageLeadsDto, BulkTagLeadsDto } from "./dto/bulk-lead-action.dto";
 import { LeadAccessService } from "./lead-access.service";
 import { LeadActivityService, DISPOSITIONS_BY_OUTCOME } from "./lead-activity.service";
 import { LeadScoringService } from "./lead-scoring.service";
@@ -961,13 +961,40 @@ export class LeadsService {
 
     for (const lead of leads) {
       try {
-        await this.changeStage(actor, lead.id, { stageId: dto.stageId });
+        await this.changeStage(actor, lead.id, {
+          stageId: dto.stageId,
+          lossReason: dto.lossReason,
+          lossNotes: dto.lossNotes,
+        });
         moved += 1;
       } catch (error) {
         skipped.push({ leadId: lead.id, reason: (error as Error).message });
       }
     }
     return { requested: dto.leadIds.length, matched: leads.length, moved, skipped };
+  }
+
+  /**
+   * Permanent, batched counterpart to `remove()` — same cleanup (detach
+   * converted opportunities, drop activities/follow-ups, delete the leads)
+   * run across every requested id in one transaction instead of one lead at
+   * a time. Prefer `bulkChangeStage` into a loss stage for routine cleanup;
+   * this is for when the rows themselves need to go, e.g. a bad import.
+   */
+  async bulkDelete(actor: AuthenticatedEmployee, dto: BulkDeleteLeadsDto) {
+    const leads = await this.loadBulkTargets(actor, dto.leadIds);
+    const ids = leads.map((lead) => lead.id);
+
+    if (ids.length > 0) {
+      await this.prisma.$transaction([
+        this.prisma.opportunity.updateMany({ where: { leadId: { in: ids } }, data: { leadId: null } }),
+        this.prisma.leadActivity.deleteMany({ where: { leadId: { in: ids } } }),
+        this.prisma.leadFollowUp.deleteMany({ where: { leadId: { in: ids } } }),
+        this.prisma.lead.deleteMany({ where: { id: { in: ids } } }),
+      ]);
+    }
+
+    return { requested: dto.leadIds.length, matched: leads.length, deleted: ids.length };
   }
 
   /** Adds tags without dropping existing ones — bulk tagging is additive by design. */

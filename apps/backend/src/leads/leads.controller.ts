@@ -11,7 +11,7 @@ import { LogCallDto } from "./dto/log-call.dto";
 import { CreateLeadNoteDto } from "./dto/create-lead-note.dto";
 import { CreateFollowUpDto } from "./dto/follow-up.dto";
 import { UpdateLeadScoreConfigDto } from "./dto/update-lead-score-config.dto";
-import { BulkAssignLeadsDto, BulkStageLeadsDto, BulkTagLeadsDto } from "./dto/bulk-lead-action.dto";
+import { BulkAssignLeadsDto, BulkDeleteLeadsDto, BulkStageLeadsDto, BulkTagLeadsDto } from "./dto/bulk-lead-action.dto";
 import { LeadFollowUpsService } from "./lead-follow-ups.service";
 import { AuthGuard } from "../common/guards/auth.guard";
 import { CurrentEmployee } from "../common/decorators/current-employee.decorator";
@@ -127,6 +127,11 @@ export class LeadsController {
   @Post("bulk/tag")
   async bulkTag(@CurrentEmployee() actor: AuthenticatedEmployee, @Body() dto: BulkTagLeadsDto) {
     return this.leadsService.bulkTag(actor, dto);
+  }
+
+  @Post("bulk/delete")
+  async bulkDelete(@CurrentEmployee() actor: AuthenticatedEmployee, @Body() dto: BulkDeleteLeadsDto) {
+    return this.leadsService.bulkDelete(actor, dto);
   }
 
   @Get(":id")
