@@ -11,7 +11,13 @@ import { LogCallDto } from "./dto/log-call.dto";
 import { CreateLeadNoteDto } from "./dto/create-lead-note.dto";
 import { CreateFollowUpDto } from "./dto/follow-up.dto";
 import { UpdateLeadScoreConfigDto } from "./dto/update-lead-score-config.dto";
-import { BulkAssignLeadsDto, BulkDeleteLeadsDto, BulkStageLeadsDto, BulkTagLeadsDto } from "./dto/bulk-lead-action.dto";
+import {
+  BulkAssignLeadsDto,
+  BulkDeleteLeadsDto,
+  BulkStageLeadsDto,
+  BulkTagLeadsDto,
+  DeleteAllLeadsDto,
+} from "./dto/bulk-lead-action.dto";
 import { LeadFollowUpsService } from "./lead-follow-ups.service";
 import { AuthGuard } from "../common/guards/auth.guard";
 import { CurrentEmployee } from "../common/decorators/current-employee.decorator";
@@ -132,6 +138,17 @@ export class LeadsController {
   @Post("bulk/delete")
   async bulkDelete(@CurrentEmployee() actor: AuthenticatedEmployee, @Body() dto: BulkDeleteLeadsDto) {
     return this.leadsService.bulkDelete(actor, dto);
+  }
+
+  /**
+   * Deletes every lead matching `dto`'s filters (or every lead in scope,
+   * with no filters) — used by "select all matching this filter" on the
+   * Leads list, and by Data Hub's "delete all leads" danger zone.
+   */
+  @Post("bulk/delete-all")
+  async bulkDeleteAll(@CurrentEmployee() actor: AuthenticatedEmployee, @Body() dto: DeleteAllLeadsDto) {
+    // dto.acknowledge exists only as a client tripwire — the filters below are what LeadsService reads.
+    return this.leadsService.deleteAllMatching(actor, dto);
   }
 
   @Get(":id")

@@ -360,9 +360,30 @@ export class LeadsService {
    * breaking change for no benefit.
    */
   async search(actor: AuthenticatedEmployee, filters: LeadSearchFilters) {
-    const scopeWhere = await this.access.leadScopeWhere(actor);
     const page = Math.max(1, filters.page ?? 1);
     const pageSize = Math.min(Math.max(1, filters.pageSize ?? 25), MAX_PAGE_SIZE);
+    const where = await this.buildFilterWhere(actor, filters);
+
+    const [items, total] = await this.prisma.$transaction([
+      this.prisma.lead.findMany({
+        where,
+        include: { owner: OWNER_SELECT, stage: true },
+        orderBy: resolveSort(filters.sort),
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      this.prisma.lead.count({ where }),
+    ]);
+
+    return { items, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+  }
+
+  /** Same filter semantics as {@link search}, factored out so `deleteAllMatching` can reuse it. */
+  private async buildFilterWhere(
+    actor: AuthenticatedEmployee,
+    filters: LeadSearchFilters,
+  ): Promise<Prisma.LeadWhereInput> {
+    const scopeWhere = await this.access.leadScopeWhere(actor);
 
     // customFields holds whatever a CSV import didn't have a real column
     // for (category/city/rating/outreach_angle/...) — Prisma can't filter
@@ -379,7 +400,7 @@ export class LeadsService {
         ).map((row) => row.id)
       : [];
 
-    const where: Prisma.LeadWhereInput = {
+    return {
       organizationId: actor.organizationId,
       ...scopeWhere,
       ...(filters.status ? { status: filters.status } : {}),
@@ -412,19 +433,31 @@ export class LeadsService {
         : {}),
       ...(filters.q ? buildSearchWhere(filters.q, customFieldMatchIds) : {}),
     };
+  }
 
-    const [items, total] = await this.prisma.$transaction([
-      this.prisma.lead.findMany({
-        where,
-        include: { owner: OWNER_SELECT, stage: true },
-        orderBy: resolveSort(filters.sort),
-        skip: (page - 1) * pageSize,
-        take: pageSize,
-      }),
-      this.prisma.lead.count({ where }),
+  /**
+   * Deletes every lead matching `filters` (or every lead in the actor's
+   * scope, if `filters` is empty) in one shot — the "select all matching
+   * this filter, not just this page" counterpart to `bulkDelete`'s
+   * id-list, and the engine behind Data Hub's "delete all leads" danger
+   * zone when called with no filters. Same cascade as `bulkDelete`, but
+   * driven off the `where` clause directly instead of a loaded id list so
+   * there's no cap on how many rows one call can remove.
+   */
+  async deleteAllMatching(actor: AuthenticatedEmployee, filters: LeadSearchFilters) {
+    const where = await this.buildFilterWhere(actor, filters);
+    const matched = await this.prisma.lead.count({ where });
+
+    if (matched === 0) return { matched: 0, deleted: 0 };
+
+    const [, , , deleted] = await this.prisma.$transaction([
+      this.prisma.opportunity.updateMany({ where: { fromLead: where }, data: { leadId: null } }),
+      this.prisma.leadActivity.deleteMany({ where: { lead: where } }),
+      this.prisma.leadFollowUp.deleteMany({ where: { lead: where } }),
+      this.prisma.lead.deleteMany({ where }),
     ]);
 
-    return { items, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) };
+    return { matched, deleted: deleted.count };
   }
 
   /** Everything the lead detail workspace renders, in one round trip. */

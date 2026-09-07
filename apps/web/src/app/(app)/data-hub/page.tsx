@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
-import { Button, Card, ErrorState, FileInput, Input, Spinner } from "@/components/ui";
+import { Button, Card, ErrorState, FileInput, Input, Spinner, useToast } from "@/components/ui";
 import { isManagerOrAbove } from "@/lib/use-current-employee";
 import { useRequireRole } from "@/lib/use-require-role";
 
@@ -114,7 +114,66 @@ export default function DataHubPage() {
           <GoogleSheetsSyncForm />
         )}
       </Card>
+
+      <DeleteAllLeadsCard />
     </div>
+  );
+}
+
+function DeleteAllLeadsCard() {
+  const toast = useToast();
+  const [confirmText, setConfirmText] = useState("");
+  const [result, setResult] = useState<{ matched: number; deleted: number } | null>(null);
+
+  const deleteAll = useMutation({
+    mutationFn: () =>
+      api.post<{ matched: number; deleted: number }>("/api/v1/leads/bulk/delete-all", { acknowledge: true }),
+    onSuccess: (res) => {
+      setResult(res);
+      setConfirmText("");
+      toast.push(`${res.deleted} lead${res.deleted === 1 ? "" : "s"} deleted`, "success");
+    },
+    onError: (err) => toast.push(err instanceof ApiError ? err.message : "Delete failed", "error"),
+  });
+
+  return (
+    <Card className="border-coral/40 bg-coral/5">
+      <h2 className="mb-2 text-sm font-medium text-coral">Danger zone: delete all leads</h2>
+      <p className="mb-4 text-sm text-muted">
+        Permanently removes every lead currently visible to you — for an org-wide role that&apos;s every lead in the
+        organization, for a manager that&apos;s your team&apos;s leads — along with their activity and follow-ups.
+        This can&apos;t be undone. Use it to clear test or demo data; for cleaning up one bad batch, prefer the{" "}
+        <Link href="/leads" className="underline">Leads</Link> list&apos;s filtered bulk delete instead, which stays
+        scoped to what you&apos;ve filtered for.
+      </p>
+      <div className="flex flex-wrap items-end gap-3">
+        <label className="flex flex-col gap-1 text-xs text-muted">
+          Type DELETE to confirm
+          <Input
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            className="w-48"
+            aria-label="Type DELETE to confirm"
+          />
+        </label>
+        <Button
+          variant="danger"
+          disabled={confirmText !== "DELETE" || deleteAll.isPending}
+          onClick={() => {
+            if (confirm("Permanently delete ALL leads visible to you? This can't be undone.")) {
+              deleteAll.mutate();
+            }
+          }}
+        >
+          {deleteAll.isPending ? "Deleting…" : "Delete all leads"}
+        </Button>
+      </div>
+      {result && (
+        <p className="mt-3 text-sm text-ink">
+          {result.deleted} lead{result.deleted === 1 ? "" : "s"} deleted.
+        </p>
+      )}
+    </Card>
   );
 }
 

@@ -87,6 +87,7 @@ export function LeadList({
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [selectAllMatching, setSelectAllMatching] = useState(false);
   const [bulkOwnerId, setBulkOwnerId] = useState("");
   const [bulkStageId, setBulkStageId] = useState("");
   const [bulkTag, setBulkTag] = useState("");
@@ -120,7 +121,34 @@ export function LeadList({
     queryClient.invalidateQueries({ queryKey: ["leads"] });
     queryClient.invalidateQueries({ queryKey: ["reports"] });
     setSelected(new Set());
+    setSelectAllMatching(false);
   }
+
+  /** Mirrors the query params built above, but as a POST body for bulk/delete-all. */
+  function filterBody() {
+    const body: Record<string, unknown> = { acknowledge: true };
+    if (filters.q.trim()) body.q = filters.q.trim();
+    if (filters.status) body.status = filters.status;
+    if (filters.stageId) body.stageId = filters.stageId;
+    if (filters.ownerId) body.ownerId = filters.ownerId;
+    if (filters.source.trim()) body.source = filters.source.trim();
+    if (filters.priority) body.priority = filters.priority;
+    if (filters.minScore) body.minScore = Number(filters.minScore);
+    if (filters.followUpTo) body.followUpTo = new Date(filters.followUpTo).toISOString();
+    if (filters.createdFrom) body.createdFrom = new Date(filters.createdFrom).toISOString();
+    if (filters.unassigned) body.unassigned = true;
+    if (filters.overdue) body.overdue = true;
+    return body;
+  }
+
+  const deleteAll = useMutation({
+    mutationFn: () => api.post<{ matched: number; deleted: number }>("/api/v1/leads/bulk/delete-all", filterBody()),
+    onSuccess: (result) => {
+      toast.push(`${result.deleted} lead${result.deleted === 1 ? "" : "s"} deleted`, "success");
+      invalidate();
+    },
+    onError: (err) => toast.push(err instanceof ApiError ? err.message : "Delete failed", "error"),
+  });
 
   const bulk = useMutation({
     mutationFn: ({ path, body }: { path: string; body: Record<string, unknown> }) =>
@@ -143,6 +171,7 @@ export function LeadList({
   function update<K extends keyof Filters>(key: K, value: Filters[K]) {
     setFilters((prev) => ({ ...prev, [key]: value }));
     setPage(1);
+    setSelectAllMatching(false);
   }
 
   function toggle(id: string) {
@@ -250,10 +279,58 @@ export function LeadList({
         </div>
       </Card>
 
-      {canBulkAct && selected.size > 0 && (
+      {canBulkAct && selectAllMatching && (
+        <Card className="border-coral/40 bg-coral/5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm font-medium text-ink">
+              All {data?.total ?? 0} leads matching your filters are selected — not just this page.
+            </p>
+            <div className="flex gap-2">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSelectAllMatching(false);
+                  setSelected(new Set());
+                }}
+              >
+                Clear selection
+              </Button>
+              <Button
+                variant="danger"
+                disabled={deleteAll.isPending || !data?.total}
+                onClick={() => {
+                  const total = data?.total ?? 0;
+                  if (
+                    confirm(
+                      `Permanently delete all ${total} lead${total === 1 ? "" : "s"} matching your filters? This can't be undone.`,
+                    )
+                  ) {
+                    deleteAll.mutate();
+                  }
+                }}
+              >
+                {deleteAll.isPending ? "Deleting…" : `Delete all ${data?.total ?? 0} permanently`}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {canBulkAct && !selectAllMatching && selected.size > 0 && (
         <Card className="border-emerald/40 bg-emerald/5">
           <div className="flex flex-wrap items-end gap-3">
-            <p className="text-sm font-medium text-ink">{selected.size} selected</p>
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium text-ink">{selected.size} selected</p>
+              {allOnPageSelected && (data?.total ?? 0) > rows.length && (
+                <button
+                  type="button"
+                  className="text-left text-xs text-emerald underline"
+                  onClick={() => setSelectAllMatching(true)}
+                >
+                  Select all {data?.total} leads matching your filters instead of just this page
+                </button>
+              )}
+            </div>
 
             <div className="flex items-end gap-2">
               <Select className="w-44" value={bulkOwnerId} onChange={(e) => setBulkOwnerId(e.target.value)} aria-label="Assign to">
