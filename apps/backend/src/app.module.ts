@@ -29,6 +29,7 @@ import { MeModule } from "./me/me.module";
 import { SalesHeadModule } from "./sales-head/sales-head.module";
 import { ApiKeysModule } from "./api-keys/api-keys.module";
 import { McpModule } from "./mcp/mcp.module";
+import { MissedCallsModule } from "./missed-calls/missed-calls.module";
 
 @Module({
   imports: [
@@ -60,6 +61,7 @@ import { McpModule } from "./mcp/mcp.module";
     SalesHeadModule,
     ApiKeysModule,
     McpModule,
+    MissedCallsModule,
   ],
   providers: [
     // Global safety net: every route requires an authenticated session

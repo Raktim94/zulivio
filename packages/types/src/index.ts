@@ -74,6 +74,23 @@ export interface ApiKeyCreated {
   createdAt: string;
 }
 
+/**
+ * The MASTER_OWNER-only org-wide view (GET/POST/DELETE /api/v1/api-keys/org)
+ * — every key across every employee, e.g. per-device MacroDroid tokens the
+ * owner issued and handed out. issuedBy is null for a key an employee
+ * created for themselves via the personal Settings > API Keys tab.
+ */
+export interface OrgApiKeySummary {
+  id: string;
+  name: string;
+  lastFour: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+  employee: { id: string; fullName: string; employeeNumber: string };
+  issuedBy: { id: string; fullName: string } | null;
+}
+
 export interface EmployeeSummary {
   id: string;
   employeeNumber: string;

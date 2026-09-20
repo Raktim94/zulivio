@@ -10,9 +10,10 @@ import type {
   BackupStatusData,
   EmployeeSummary,
   GoogleSheetsStatusData,
+  OrgApiKeySummary,
 } from "@zulivio/types";
 import { api, ApiError } from "@/lib/api";
-import { Badge, Button, Card, ErrorState, Input, Spinner, Tabs, TabPanel, useToast } from "@/components/ui";
+import { Badge, Button, Card, ErrorState, Input, Select, Spinner, Tabs, TabPanel, useToast } from "@/components/ui";
 import { useCurrentEmployee, isMasterOwner } from "@/lib/use-current-employee";
 import { ChangePasswordForm } from "@/components/change-password-form";
 
@@ -929,7 +930,191 @@ function IntegrationsTab() {
           </div>
         )}
       </Card>
+
+      <MacroDroidCard />
     </div>
+  );
+}
+
+/**
+ * Missed Call Capture: each device gets its own token (issued here, not
+ * self-served) — MacroDroid's "Call Missed" trigger POSTs it to the
+ * webhook below, which logs the caller against an existing lead or opens a
+ * new one owned by whichever employee's phone/token received the call. A
+ * lost phone or an employee who leaves only needs their own token revoked.
+ */
+function MacroDroidCard() {
+  const queryClient = useQueryClient();
+  const { push } = useToast();
+
+  const { data: employees } = useQuery<EmployeeSummary[]>({
+    queryKey: ["employees"],
+    queryFn: () => api.get<EmployeeSummary[]>("/api/v1/employees"),
+  });
+
+  const { data: keys, isLoading, error: listError } = useQuery<OrgApiKeySummary[]>({
+    queryKey: ["api-keys", "org"],
+    queryFn: () => api.get<OrgApiKeySummary[]>("/api/v1/api-keys/org"),
+  });
+
+  const [employeeId, setEmployeeId] = useState("");
+  const [deviceName, setDeviceName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [justIssued, setJustIssued] = useState<ApiKeyCreated | null>(null);
+
+  const activeEmployees = (employees ?? []).filter((e) => e.employmentStatus === "ACTIVE");
+
+  const issueToken = useMutation({
+    mutationFn: () =>
+      api.post<ApiKeyCreated>("/api/v1/api-keys/org", { employeeId, name: `MacroDroid – ${deviceName}` }),
+    onSuccess: (created) => {
+      setCreateError(null);
+      setDeviceName("");
+      setEmployeeId("");
+      setJustIssued(created);
+      queryClient.invalidateQueries({ queryKey: ["api-keys", "org"] });
+    },
+    onError: (err) => setCreateError(err instanceof ApiError ? err.message : "Could not issue that token"),
+  });
+
+  const revokeToken = useMutation({
+    mutationFn: (id: string) => api.delete(`/api/v1/api-keys/org/${id}`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["api-keys", "org"] }),
+  });
+
+  async function copyToken(token: string) {
+    try {
+      await navigator.clipboard.writeText(token);
+      push("Copied to clipboard.", "success");
+    } catch {
+      push("Could not copy — select and copy the token manually.", "error");
+    }
+  }
+
+  const webhookUrl =
+    typeof window !== "undefined" ? `${window.location.origin}/api/v1/integrations/macrodroid/missed-call` : "";
+
+  return (
+    <Card className="max-w-2xl">
+      <h2 className="mb-1 text-sm font-medium text-ink">Missed Call Capture (MacroDroid)</h2>
+      <p className="mb-4 text-sm text-muted">
+        Issue a token for an employee&apos;s phone, then set up a MacroDroid macro on that phone: trigger{" "}
+        <strong>Call Missed → Any Number</strong>, action <strong>HTTP Request → POST</strong> to the URL below with
+        header <code className="rounded bg-surface px-1 py-0.5">Authorization: Bearer &lt;token&gt;</code> and a JSON
+        body of <code className="rounded bg-surface px-1 py-0.5">{"{ phoneNumber, callerName, deviceName }"}</code>{" "}
+        (MacroDroid&apos;s <code className="rounded bg-surface px-1 py-0.5">{"{call_number}"}</code>/
+        <code className="rounded bg-surface px-1 py-0.5">{"{call_name}"}</code> magic text). Every missed call is
+        matched to an existing lead or creates one, owned by that employee, with a callback follow-up due right away.
+      </p>
+
+      {webhookUrl && (
+        <div className="mb-4 flex items-center gap-2">
+          <code className="min-w-0 flex-1 break-all rounded-md bg-surface px-2 py-1.5 text-xs">{webhookUrl}</code>
+          <Button variant="secondary" className="px-3 py-1.5 text-xs" onClick={() => copyToken(webhookUrl)}>
+            Copy URL
+          </Button>
+        </div>
+      )}
+
+      {justIssued && (
+        <div className="mb-4 rounded-lg border border-emerald/30 bg-emerald/5 p-3">
+          <p className="mb-2 text-sm font-medium text-ink">
+            &quot;{justIssued.name}&quot; issued — copy it into MacroDroid now, it won&apos;t be shown again:
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <code className="min-w-0 flex-1 break-all rounded-md bg-surface px-2 py-1.5 text-xs">
+              {justIssued.token}
+            </code>
+            <Button variant="secondary" className="px-3 py-1.5 text-xs" onClick={() => copyToken(justIssued.token)}>
+              Copy
+            </Button>
+            <button type="button" className="text-xs text-muted underline" onClick={() => setJustIssued(null)}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
+      {createError && <ErrorState message={createError} />}
+      <form
+        className="mb-6 flex flex-wrap gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setCreateError(null);
+          issueToken.mutate();
+        }}
+      >
+        <Select
+          aria-label="Employee"
+          value={employeeId}
+          onChange={(e) => setEmployeeId(e.target.value)}
+          className="max-w-xs"
+          required
+        >
+          <option value="" disabled>
+            Assign to employee…
+          </option>
+          {activeEmployees.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.fullName} ({e.employeeNumber})
+            </option>
+          ))}
+        </Select>
+        <Input
+          aria-label="Device name"
+          placeholder="Device name, e.g. Sales Phone 1"
+          value={deviceName}
+          onChange={(e) => setDeviceName(e.target.value)}
+          className="max-w-xs"
+          required
+        />
+        <Button type="submit" disabled={issueToken.isPending || !employeeId || !deviceName.trim()}>
+          {issueToken.isPending ? "Issuing..." : "Issue token"}
+        </Button>
+      </form>
+
+      <h3 className="mb-2 text-xs font-medium text-muted">Issued device tokens (all employees)</h3>
+      {isLoading ? (
+        <Spinner />
+      ) : listError ? (
+        <ErrorState message="Could not load device tokens." />
+      ) : !keys || keys.length === 0 ? (
+        <p className="text-sm text-muted">No tokens issued yet.</p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {keys.map((key) => (
+            <li
+              key={key.id}
+              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3 text-sm"
+            >
+              <div>
+                <p className="text-ink">
+                  {key.name} <span className="text-muted">(····{key.lastFour})</span>
+                </p>
+                <p className="text-xs text-muted">
+                  {key.employee.fullName} ({key.employee.employeeNumber})
+                  {key.issuedBy && ` · issued by ${key.issuedBy.fullName}`} · created{" "}
+                  {new Date(key.createdAt).toLocaleDateString()}
+                  {key.lastUsedAt && ` · last used ${new Date(key.lastUsedAt).toLocaleString()}`}
+                </p>
+              </div>
+              {key.revokedAt ? (
+                <Badge tone="neutral">Revoked</Badge>
+              ) : (
+                <Button
+                  variant="danger"
+                  className="px-3 py-1.5 text-xs"
+                  disabled={revokeToken.isPending}
+                  onClick={() => revokeToken.mutate(key.id)}
+                >
+                  Revoke
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
   );
 }
 

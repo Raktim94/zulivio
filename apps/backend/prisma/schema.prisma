@@ -92,6 +92,7 @@ model Employee {
 
   sessions             Session[]
   apiKeys              ApiKey[]
+  apiKeysIssued        ApiKey[]            @relation("ApiKeyIssuedBy")
   assignmentsOwned     Assignment[]        @relation("AssignmentOwner")
   assignmentsCreated   Assignment[]        @relation("AssignmentCreatedBy")
   workSessions         WorkSession[]
@@ -142,10 +143,21 @@ model Session {
 // existing role/RBAC/scope check applies unchanged to key-authenticated
 // requests, exactly as if that employee were logged in. lastFour is
 // display-only (e.g. "zlv_••••ab12"), never used for lookup.
+//
+// issuedById is null for the normal self-service case (Settings > API
+// Keys, an employee creating a key for themselves). It's set when a
+// MASTER_OWNER issues a key *for* another employee instead — e.g. a
+// per-device token handed to an employee's phone for the MacroDroid missed
+// -call integration (see missed-calls/). Same table, same auth path, just
+// an audit trail of who provisioned it, so a departing employee or lost
+// device's key can be found and revoked without hunting through a second
+// token system.
 model ApiKey {
   id         String    @id @default(uuid())
   employeeId String
   employee   Employee  @relation(fields: [employeeId], references: [id])
+  issuedById String?
+  issuedBy   Employee? @relation("ApiKeyIssuedBy", fields: [issuedById], references: [id])
   name       String
   tokenHash  String    @unique
   lastFour   String
