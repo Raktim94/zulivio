@@ -4,10 +4,21 @@ packages:
 overrides:
   lodash: ^4.18.1
   postcss: ^8.5.25
-  sharp: ^0.35.3
-  '@nestjs/swagger>js-yaml': ^4.3.1
+  sharp: ^0.35.4
+  # Blanket, not scoped to @nestjs/swagger: the other js-yaml consumer in
+  # the tree (@istanbuljs/load-nyc-config, via jest's coverage tooling)
+  # only calls the shared `.load()` API, which exists unchanged on both the
+  # v3 and v4 lines, so collapsing it onto v4 here is safe and closes the
+  # v3.15.1 CVE too instead of leaving a second unpatched copy in the graph.
+  js-yaml: ^4.3.2
   uuid: ^11.1.1
   deepmerge-ts: ^8.0.0
+  hono: ^4.13.5
+  fast-uri: ^3.1.6
+  qs: ^6.16.0
+  ip-address: ^10.5.1
+  next: ^15.5.24
+  multer: ^2.4.0
 allowBuilds:
   "@prisma/client": true
   "@prisma/engines": true
