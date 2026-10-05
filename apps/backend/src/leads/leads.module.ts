@@ -20,6 +20,6 @@ import { CallingModule } from "../calling/calling.module";
     LeadScoringService,
     LeadFollowUpsService,
   ],
-  exports: [LeadsService, LeadScoringService, LeadActivityService, LeadFollowUpsService],
+  exports: [LeadsService, LeadAccessService, LeadScoringService, LeadActivityService, LeadFollowUpsService],
 })
 export class LeadsModule {}

@@ -1,4 +1,5 @@
 import type { AuthenticatedEmployee } from "../common/guards/auth.guard";
+import type { AuthenticatedDevice } from "../mobile-calls/mobile-device.guard";
 
 // Matches the module-augmentation pattern @types/cookie-parser itself uses
 // (declare module "express" { interface Request {...} }), rather than the
@@ -9,6 +10,7 @@ declare module "express" {
     employee?: AuthenticatedEmployee;
     sessionId?: string;
     apiKeyId?: string;
+    mobileDevice?: AuthenticatedDevice;
   }
 }
 

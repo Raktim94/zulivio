@@ -25,6 +25,7 @@ import type {
 import { api, ApiError } from "@/lib/api";
 import { Badge, Button, Card, Dialog, ErrorState, Input, Select, Spinner, useToast } from "@/components/ui";
 import { DispositionDialog, FollowUpDialog } from "@/components/lead-dialogs";
+import { LeadCalls } from "@/components/lead-calls";
 import {
   ACTIVITY_LABEL,
   DISPOSITION_LABEL,
@@ -221,6 +222,8 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       </Card>
+
+      <LeadCalls leadId={lead.id} />
 
       {/* The next action, given its own prominence — it is the whole job. */}
       <Card className="border-emerald/40 bg-emerald/5">

@@ -67,6 +67,10 @@ model Organization {
   leadActivities          LeadActivity[]
   leadFollowUps           LeadFollowUp[]
   leadScoreConfig         LeadScoreConfig?
+  mobileDevices           MobileDevice[]
+  mobileCalls             MobileCall[]
+  // Null = keep mobile call history forever.
+  callRetentionDays       Int?
 
   @@map("organizations")
 }
@@ -108,6 +112,8 @@ model Employee {
   leadActivities          LeadActivity[]       @relation("LeadActivityActor")
   followUpsAssigned       LeadFollowUp[]       @relation("FollowUpAssignee")
   followUpsCreated        LeadFollowUp[]       @relation("FollowUpCreatedBy")
+  mobileDevices           MobileDevice[]
+  mobileCalls             MobileCall[]
 
   @@unique([organizationId, employeeNumber])
   // Global, not per-org: login and bootstrap both resolve an employee by
@@ -530,6 +536,7 @@ model Lead {
   activities     LeadActivity[]
   followUps      LeadFollowUp[]
   assignments    Assignment[]
+  mobileCalls    MobileCall[]
 
   @@index([organizationId, status])
   @@index([organizationId, ownerId])
@@ -938,4 +945,106 @@ model WorkflowRun {
 
   @@index([organizationId, employeeId, status])
   @@map("workflow_runs")
+}
+
+// ---------------------------------------------------------------------------
+// Mobile call history (Android -> Zulivio). Metadata only: never audio, SMS
+// or contacts. See docs/integrations/mobile-calls.md.
+// ---------------------------------------------------------------------------
+
+enum MobileDeviceStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum MobileCallType {
+  INCOMING
+  OUTGOING
+  MISSED
+  REJECTED
+  BLOCKED
+  UNKNOWN
+}
+
+// A registered phone. It authenticates with its own bearer token (shown
+// once, only the SHA-256 hash is stored — the token is 192 bits of CSPRNG
+// output, so a fast hash is appropriate, same as Session/ApiKey). The token
+// resolves server-side to organizationId + employeeId; the phone never
+// supplies either. `deviceKey` is the human-chosen label the phone echoes
+// back as `device_id` (a mismatch is rejected).
+model MobileDevice {
+  id                 String             @id @default(uuid())
+  organizationId     String
+  organization       Organization       @relation(fields: [organizationId], references: [id])
+  employeeId         String
+  employee           Employee           @relation(fields: [employeeId], references: [id])
+  deviceKey          String
+  name               String
+  phoneNumber        String?
+  status             MobileDeviceStatus @default(ACTIVE)
+  tokenHash          String             @unique
+  tokenLastFour      String
+  tokenRotatedAt     DateTime           @default(now())
+  createdById        String?
+  lastSeenAt         DateTime?
+  lastTestAt         DateTime?
+  lastSyncAt         DateTime?
+  // androidCallId of the newest call this device has synced, so a native
+  // app can resume incremental syncs without re-sending everything.
+  lastExternalCallId String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  calls MobileCall[]
+
+  @@unique([organizationId, deviceKey])
+  @@index([organizationId, employeeId])
+  @@map("mobile_devices")
+}
+
+model MobileCall {
+  id             String       @id @default(uuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  deviceId       String
+  device         MobileDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  employeeId     String
+  employee       Employee     @relation(fields: [employeeId], references: [id])
+  leadId         String?
+  lead           Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  phoneNumberOriginal   String
+  phoneNumberNormalized String
+  // Last 10 digits — the country-code-agnostic key used for lead matching.
+  phoneLast10           String
+  contactName           String?
+
+  callType        MobileCallType
+  startedAt       DateTime
+  endedAt         DateTime?
+  durationSeconds Int            @default(0)
+
+  simSlot String?
+  simName String?
+
+  androidCallId String?
+  externalId    String?
+  // Idempotency key, unique per organization: "ext:<deviceId>:<id>" when the
+  // phone supplied an id, else a fingerprint hash. See mobile-calls.service.
+  dedupKey      String
+  source        String  @default("api")
+  metadata      Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  syncedAt  DateTime @default(now())
+
+  @@unique([organizationId, dedupKey])
+  @@index([organizationId, startedAt])
+  @@index([organizationId, employeeId, startedAt])
+  @@index([organizationId, deviceId, startedAt])
+  @@index([organizationId, phoneLast10])
+  @@index([organizationId, callType, startedAt])
+  @@index([organizationId, leadId, startedAt])
+  @@map("mobile_calls")
 }

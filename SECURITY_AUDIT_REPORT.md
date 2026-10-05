@@ -54,7 +54,7 @@ Findings are ordered by severity. Each entry: Location, Impact, Root cause, Fix,
 ### 6. `helmet` / security headers missing
 - **Location:** `main.ts`
 - **Impact:** no `X-Content-Type-Options`, `X-Frame-Options`, HSTS, etc. by default.
-- **Fix:** `helmet()` added. CSP is on by default (`DISABLE_CSP` opts out); HSTS stays opt-in via `COOKIE_SECURE`, since forcing HSTS on would break a plain-HTTP LAN reverse proxy (documented precedent: `COOKIE_SECURE` in `auth.controller.ts`) — CSP has no such conflict, it only governs allowed script/style/resource origins, not HTTP vs HTTPS transport.
+- **Fix:** `helmet()` added. CSP is on by default (no opt-out); HSTS stays opt-in via `COOKIE_SECURE`, since forcing HSTS on would break a plain-HTTP LAN reverse proxy (documented precedent: `COOKIE_SECURE` in `auth.controller.ts`) — CSP has no such conflict, it only governs allowed script/style/resource origins, not HTTP vs HTTPS transport.
 - **Status:** Fixed.
 - **2026-08-21 correction:** CodeQL flagged this as an insecure Helmet config (`main.ts:43`) — the original fix had CSP off by default too, conflating it with HSTS's genuine opt-in requirement. Corrected to on-by-default; see `main.ts`.
 

@@ -1,5 +1,6 @@
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { ValidationPipe } from "@nestjs/common";
 import cookieParser from "cookie-parser";
 import helmet from "helmet";
@@ -32,28 +33,25 @@ function allowedOrigins(): string[] {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: ["error", "warn", "log"],
   });
 
-  // CSP only restricts which script/style/resource origins responses may
-  // reference — unlike HSTS it has nothing to do with HTTP vs HTTPS
-  // transport, so there's no reason to disable it for a plain-HTTP LAN
-  // reverse proxy. On by default (Helmet's own sane defaults); DISABLE_CSP
-  // is an escape hatch for an install that needs to load something Helmet's
-  // default policy would block (flagged by CodeQL as an insecure Helmet
-  // config while this was off by default — see SECURITY_AUDIT_REPORT.md #6).
+  // Helmet's default CSP is always on — it only restricts which origins a
+  // response may reference and has nothing to do with HTTP vs HTTPS, so
+  // there is no deployment that needs it off (the former DISABLE_CSP opt-out
+  // was flagged by CodeQL js/insecure-helmet-configuration and has been
+  // removed; see SECURITY_AUDIT_REPORT.md #6).
   //
   // HSTS is different: it forces browsers to upgrade this origin to HTTPS
   // going forward, which genuinely breaks a plain-HTTP LAN reverse proxy
   // (see the COOKIE_SECURE comment in auth.controller.ts) — so that one
   // stays opt-in, tied to the same flag that marks an HTTPS deployment.
-  app.use(
-    helmet({
-      contentSecurityPolicy: process.env.DISABLE_CSP === "true" ? false : undefined,
-      hsts: process.env.COOKIE_SECURE === "true",
-    }),
-  );
+  const hstsEnabled = process.env.COOKIE_SECURE === "true";
+  app.use(hstsEnabled ? helmet() : helmet({ hsts: false }));
+  // Bulk call-history uploads (POST /api/v1/mobile/calls/bulk) carry up to a
+  // few hundred records; Express's 100kb default is too small for that.
+  app.useBodyParser("json", { limit: "1mb" });
   app.use(cookieParser());
   app.use(createCsrfOriginCheck(allowedOrigins()));
   app.enableCors({

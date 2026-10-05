@@ -16,6 +16,7 @@ import { api, ApiError } from "@/lib/api";
 import { Badge, Button, Card, ErrorState, Input, Select, Spinner, Tabs, TabPanel, useToast } from "@/components/ui";
 import { useCurrentEmployee, isMasterOwner } from "@/lib/use-current-employee";
 import { ChangePasswordForm } from "@/components/change-password-form";
+import { MobileDevicesPanel } from "@/components/mobile-devices";
 
 const STATUS_TONE: Record<BackupRecord["status"], "neutral" | "success" | "warning" | "danger" | "info"> = {
   PENDING: "info",
@@ -34,6 +35,7 @@ export default function SettingsPage() {
   const { data: employee, isLoading: employeeLoading } = useCurrentEmployee();
   const [tab, setTab] = useState("profile");
   const owner = isMasterOwner(employee?.role);
+  const admin = owner || employee?.role === "COMPANY_ADMIN";
 
   if (employeeLoading || !employee) return <Spinner />;
 
@@ -44,6 +46,7 @@ export default function SettingsPage() {
     { id: "api-keys", label: "API Keys" },
     ...(owner ? [{ id: "backups", label: "Backups & Activity" }] : []),
     ...(owner ? [{ id: "integrations", label: "Integrations" }] : []),
+    ...(admin ? [{ id: "mobile-devices", label: "Mobile Devices" }] : []),
   ];
 
   return (
@@ -67,6 +70,11 @@ export default function SettingsPage() {
       <TabPanel id="api-keys" active={tab}>
         <ApiKeysTab />
       </TabPanel>
+      {admin && (
+        <TabPanel id="mobile-devices" active={tab}>
+          <MobileDevicesPanel />
+        </TabPanel>
+      )}
       {owner && (
         <TabPanel id="backups" active={tab}>
           <BackupsAndActivityTab />

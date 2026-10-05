@@ -28,7 +28,7 @@ acknowledge within a few days.
   organizations, ID-guessing across the boundary asserted to `404` on every
   employee/assignment/lead/opportunity/attendance/audit-log route).
 - `helmet` security headers on every response, including CSP (on by
-  default; `DISABLE_CSP` is an escape hatch). HSTS stays opt-in via
+  default; there is no opt-out). HSTS stays opt-in via
   `COOKIE_SECURE`, since forcing it on would break self-hosted LAN
   deployments behind a plain-HTTP reverse proxy.
 - CSRF defense in depth: the session cookie is `SameSite=lax` (blocks

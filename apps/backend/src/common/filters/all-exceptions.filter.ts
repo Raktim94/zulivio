@@ -41,6 +41,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     }
 
     response.status(status).json({
+      success: false,
       error: {
         code: isHttp ? exception.constructor.name : "InternalServerError",
         message,
