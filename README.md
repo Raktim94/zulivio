@@ -12,6 +12,8 @@
 
 Developed by [NodeDR Infotech Private Limited](https://www.nodedr.com/)
 
+**[Project website](https://zulivio.nodedr.com/)** · **[Case study](https://www.raktimranjit.com/projects/zulivio)** · **[Maintainer: Raktim Ranjit](https://www.raktimranjit.com/)**
+
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)](package.json)
 [![NestJS](https://img.shields.io/badge/backend-NestJS%2011-E0234E?logo=nestjs&logoColor=white)](apps/backend)
