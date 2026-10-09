@@ -12,7 +12,16 @@
   "bugs": {
     "url": "https://github.com/Raktim94/zulivio/issues"
   },
-  "homepage": "https://github.com/Raktim94/zulivio#readme",
+  "homepage": "https://zulivio.nodedr.com/",
+  "keywords": [
+    "crm",
+    "workforce-management",
+    "employee-management",
+    "attendance",
+    "self-hosted",
+    "open-source",
+    "offline-first"
+  ],
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
