@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+message: "If you use Zulivio in research, teaching, or a public project, please cite it."
+type: software
+title: "Zulivio"
+authors:
+  - family-names: Ranjit
+    given-names: Raktim
+    website: https://www.raktimranjit.com/
+repository-code: https://github.com/Raktim94/zulivio
+url: https://zulivio.nodedr.com/
+license: AGPL-3.0-only
+abstract: "Open-source, self-hostable CRM and workforce-operations software."
