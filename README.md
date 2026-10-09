@@ -1084,3 +1084,8 @@ AGPL-3.0-only. See [LICENSE](LICENSE).
 Built by [NodeDR Infotech Private Limited](https://www.nodedr.com/)
 
 </div>
+
+
+## Case study
+
+Read the [Zulivio case study](https://www.raktimranjit.com/projects/zulivio) for the product background and design decisions.
