@@ -1091,3 +1091,5 @@ Built by [NodeDR Infotech Private Limited](https://www.nodedr.com/)
 ## Case study
 
 Read the [Zulivio case study](https://www.raktimranjit.com/projects/zulivio) for the product background and design decisions.
+
+Maintainer: [Raktim Ranjit](https://www.raktimranjit.com/)
