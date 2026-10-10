@@ -1077,7 +1077,8 @@ playbook, go/no-go checklists, and adoption safeguards — lives in
 
 ## License
 
-AGPL-3.0-only. See [LICENSE](LICENSE).
+AGPL-3.0-only. See [LICENSE](LICENSE) for the standard license text and
+[NOTICE.md](NOTICE.md) for the project copyright notice.
 
 <div align="center">
 
