@@ -9,7 +9,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={clsx(
-        "rounded-xl border border-border bg-surface p-5 shadow-[0_1px_2px_rgba(16,38,53,0.04),0_1px_1px_rgba(16,38,53,0.03)]",
+        "rounded-xl border border-border bg-surface p-5",
         className,
       )}
       {...props}
@@ -25,10 +25,10 @@ export function Button({
   return (
     <button
       className={clsx(
-        "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100",
-        variant === "primary" && "bg-emerald text-white shadow-sm shadow-emerald/20 hover:bg-emerald-dark",
+        "inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors duration-150 disabled:cursor-not-allowed disabled:opacity-50",
+        variant === "primary" && "bg-emerald text-white hover:bg-emerald-dark",
         variant === "secondary" && "border border-border bg-surface text-ink hover:bg-canvas",
-        variant === "danger" && "bg-coral text-white shadow-sm shadow-coral/20 hover:opacity-90",
+        variant === "danger" && "bg-coral text-white hover:opacity-90",
         className,
       )}
       {...props}
@@ -40,7 +40,7 @@ export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElem
   return (
     <input
       className={clsx(
-        "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-emerald focus:ring-1 focus:ring-emerald",
+        "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-emerald",
         className,
       )}
       {...props}
@@ -56,7 +56,7 @@ export function PasswordInput({ className, ...props }: InputHTMLAttributes<HTMLI
       <input
         type={visible ? "text" : "password"}
         className={clsx(
-          "w-full rounded-lg border border-border bg-surface px-3 py-2 pr-10 text-sm outline-none focus:border-emerald focus:ring-1 focus:ring-emerald",
+          "w-full rounded-lg border border-border bg-surface px-3 py-2 pr-10 text-sm outline-none focus:border-emerald",
           className,
         )}
         {...props}
@@ -78,7 +78,7 @@ export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectE
   return (
     <select
       className={clsx(
-        "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-emerald focus:ring-1 focus:ring-emerald",
+        "w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm outline-none focus:border-emerald",
         className,
       )}
       {...props}

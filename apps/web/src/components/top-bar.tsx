@@ -41,7 +41,7 @@ export function TopBar({
     .toUpperCase();
 
   return (
-    <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-border bg-surface/90 px-4 backdrop-blur md:px-6">
+    <header className="sticky top-0 z-10 flex h-14 items-center justify-between border-b border-border bg-surface/90 px-4 backdrop-blur md:px-6">
       <div className="flex items-center gap-2">
         {mobileMenuButton}
         <h1 className="text-base font-semibold text-ink">{title}</h1>

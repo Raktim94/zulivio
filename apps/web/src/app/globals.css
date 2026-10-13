@@ -1,61 +1,69 @@
 @import "tailwindcss";
 
 /*
- * Three theme states: "system" (default, follows prefers-color-scheme),
- * or an explicit "light"/"dark" stamped as data-theme on <html> by the
- * ThemeToggle. Tailwind v4 compiles `@theme` tokens to CSS custom
- * properties on :root, so overriding those variables re-themes every
- * `bg-canvas`, `text-ink`, etc. utility without touching component markup.
+ * Design tokens follow DESIGN.md (repo root), shared with NodeDR WhatsApp
+ * Automation: cool-grey canvas, hairline borders, one emerald accent.
+ * Token NAMES are unchanged (canvas/surface/emerald/coral/...) so every
+ * existing utility re-themes without touching component markup.
+ * "coral" now carries the danger red, "amber" the warning tone.
+ * Three theme states: "system" (default), or an explicit "light"/"dark"
+ * stamped as data-theme on <html> by the ThemeToggle.
  */
 @theme {
-  --color-navy: #102635;
-  --color-canvas: #f6f7f4;
+  --font-sans: Inter, ui-sans-serif, system-ui, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Devanagari", sans-serif;
+  --color-navy: #14212a;
+  --color-canvas: #f6f7f8;
   --color-surface: #ffffff;
-  /* Former value #168b65 measured 4.27:1 as both white-on-emerald (every
-     primary Button, sitewide) and emerald-text-on-white (8+ links) — under
-     WCAG AA's 4.5:1 (axe-core scan, see TODO.md). This is the former
-     --color-emerald-dark shade promoted to default (passes at ~6.2:1);
-     emerald-dark shifted one step further down so the hover-darken effect
-     still reads as a real state change. */
-  --color-emerald: #106e51;
-  --color-emerald-dark: #0d5841;
-  --color-coral: #e66e58;
-  --color-amber: #d99a2b;
+  /* emerald/white = 5.3:1, passes AA for both fills and text on white */
+  --color-emerald: #0b7a5a;
+  --color-emerald-dark: #096249;
+  --color-coral: #b91c1c;
+  --color-amber: #b45309;
   --color-indigo: #5b5bd6;
-  --color-ink: #17262e;
-  /* #64748b (Tailwind slate-500) measured 4.42:1 against --color-canvas —
-     just under WCAG AA's 4.5:1 for normal text (caught by an axe-core scan,
-     see TODO.md). slate-600 clears it (~7:1) while staying a muted gray. */
-  --color-muted: #475569;
-  --color-border: #e2e5e0;
+  --color-ink: #14212a;
+  --color-muted: #43535e;
+  --color-border: #e3e7ea;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-canvas: #0c1720;
-    --color-surface: #142430;
-    --color-emerald: #2dbb8d;
-    --color-emerald-dark: #43d6a5;
-    --color-coral: #f08a76;
-    --color-amber: #eab34a;
+    --color-canvas: #0e1418;
+    --color-surface: #151d23;
+    --color-emerald: #2fbf92;
+    --color-emerald-dark: #52d2a9;
+    --color-coral: #f87171;
+    --color-amber: #f5b544;
     --color-indigo: #8484e8;
-    --color-ink: #eef2f1;
-    --color-muted: #93a4ac;
-    --color-border: #24363f;
+    --color-ink: #eaf0f2;
+    --color-muted: #a9b8c1;
+    --color-border: #26323a;
   }
 }
 
 :root[data-theme="dark"] {
-  --color-canvas: #0c1720;
-  --color-surface: #142430;
-  --color-emerald: #2dbb8d;
-  --color-emerald-dark: #43d6a5;
-  --color-coral: #f08a76;
-  --color-amber: #eab34a;
+  --color-canvas: #0e1418;
+  --color-surface: #151d23;
+  --color-emerald: #2fbf92;
+  --color-emerald-dark: #52d2a9;
+  --color-coral: #f87171;
+  --color-amber: #f5b544;
   --color-indigo: #8484e8;
-  --color-ink: #eef2f1;
-  --color-muted: #93a4ac;
-  --color-border: #24363f;
+  --color-ink: #eaf0f2;
+  --color-muted: #a9b8c1;
+  --color-border: #26323a;
+}
+
+/* Dark emerald is light, so text on it must be dark (DESIGN.md: --brand-ink). */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .bg-emerald.text-white,
+  :root:not([data-theme="light"]) .bg-coral.text-white { color: #06231a; }
+}
+:root[data-theme="dark"] .bg-emerald.text-white,
+:root[data-theme="dark"] .bg-coral.text-white { color: #06231a; }
+
+:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-canvas), 0 0 0 4px var(--color-emerald);
 }
 
 body {
@@ -65,8 +73,11 @@ body {
 body {
   background: var(--color-canvas);
   color: var(--color-ink);
-  font-family:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
 }
 
 * {
