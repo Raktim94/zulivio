@@ -14,6 +14,11 @@ Developed by [NodeDR Infotech Private Limited](https://www.nodedr.com/)
 
 **[Try Zulivio](https://zulivio.nodedr.com/)** · **[Case study](https://www.raktimranjit.com/projects/zulivio)** · **[Maintainer: Raktim Ranjit](https://www.raktimranjit.com/)**
 
+<p align="center">
+  <img src="docs/assets/hero-animated.svg" alt="Zulivio: animated overview with an illustrative sample screen" width="100%">
+</p>
+
+
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)](package.json)
 [![NestJS](https://img.shields.io/badge/backend-NestJS%2011-E0234E?logo=nestjs&logoColor=white)](apps/backend)
@@ -438,6 +443,11 @@ sample data) — not mockups.
   frontend and backend API contracts.
 
 ## Quick start
+
+<p align="center">
+  <img src="docs/assets/install-animated.svg" alt="Animated terminal: clone the repo and run install.sh" width="100%">
+</p>
+
 
 Requires [Docker](https://docs.docker.com/get-docker/) and Docker Compose
 (bundled with current Docker Desktop/Engine).
