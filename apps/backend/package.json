@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1111.0",
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "^1.31.0",
     "@nestjs/common": "^11.2.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.2.1",
