@@ -23,7 +23,6 @@ Developed by [NodeDR Infotech Private Limited](https://www.nodedr.com/)
 [![Node](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)](package.json)
 [![NestJS](https://img.shields.io/badge/backend-NestJS%2011-E0234E?logo=nestjs&logoColor=white)](apps/backend)
 [![Next.js](https://img.shields.io/badge/frontend-Next.js%2015-000000?logo=next.js&logoColor=white)](apps/web)
-[![Tests](https://img.shields.io/badge/e2e%20tests-142%2F142%20passing-brightgreen)](apps/backend/test)
 [![MCP](https://img.shields.io/badge/AI-MCP%20Server-8B5CF6?logo=modelcontextprotocol&logoColor=white)](#mcp-server)
 [![Microsoft Store](https://img.shields.io/badge/Download-Microsoft%20Store-0078D4?style=for-the-badge&logo=microsoft&logoColor=white)](https://apps.microsoft.com/store/detail/9NZ9JZN31RN0?cid=DevShareMCLPCS)
 
@@ -37,10 +36,9 @@ dashboard, and CSV/Google Sheets import-export. Built to run on your own
 hardware — no subscription, no data leaving your server — and to be
 CasaOS/ZimaOS installable.
 
-This is the **core workforce-operations slice** of a much larger product
-vision — see [ROADMAP.md](ROADMAP.md) for the full multi-department plan and
-[Scope and limitations](#scope-and-limitations) below for exactly what is
-and isn't built yet before you rely on this in production.
+The sales CRM adds leads, call logs, follow-ups, lead scoring and assignment
+rules alongside these workforce workflows. Read [Scope and limitations](#scope-and-limitations)
+for deployment requirements and the capabilities outside the current release.
 
 ## Get Zulivio
 
@@ -55,7 +53,7 @@ Two ways to install, both built from the same code and pointed at the same
 
 | Platform | Status | Install | What it needs |
 | --- | --- | --- | --- |
-| 🐳 **Docker Compose** (any OS) | ✅ Done — the primary, most-used path | `git clone` + `./install.sh` (see [Quick start](#quick-start)) | Docker |
+| 🐳 **Docker Compose** (any OS) | ✅ Docker deployment | `git clone` + `./install.sh` (see [Quick start](#quick-start)) | Docker |
 | 🏠 **CasaOS / ZimaOS** | ✅ Ready to install now, official app store submission pending | Install from a compose URL — see [`casaos/docker-compose.yml`](casaos/docker-compose.yml) | Nothing — CasaOS/ZimaOS pulls pre-built images, no build step |
 | 🪟 **Windows (Microsoft Store, MSIX)** | 🧪 Built and CI-tested on real Windows, Partner Center submission pending | [![Download from Microsoft Store](https://img.shields.io/badge/Download-Microsoft%20Store-0078D4?style=for-the-badge&logo=microsoft&logoColor=white)](https://apps.microsoft.com/store/detail/9NZ9JZN31RN0?cid=DevShareMCLPCS) | Nothing — a self-contained desktop app with its own embedded database, no Docker |
 
@@ -1039,8 +1037,8 @@ variables) rather than everyday requests.
 
 ## Scope and limitations
 
-This build intentionally implements the **workforce-operations core** of a
-much larger specification, not the full spec. Explicitly **not** built yet:
+Zulivio provides sales CRM and workforce operations. The current release has
+the following specific limitations:
 
 - No contacts/accounts objects or multiple pipelines per organization —
   leads/opportunities exist on a single default pipeline per org; a
