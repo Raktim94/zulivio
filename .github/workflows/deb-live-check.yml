@@ -35,7 +35,7 @@ jobs:
           echo "no answer (last code $code)" >&2; exit 1
       - name: Installed version is the latest release
         run: |
-          latest=$(curl -fsSL https://api.github.com/repos/Raktim94/zulivio/releases/latest | sed -n 's/.*"tag_name": *"v\{0,1\}\([^"]*\)".*/\1/p' | head -n1)
+          latest=$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/Raktim94/zulivio/releases/latest | sed -n 's|.*/releases/tag/v\{0,1\}||p')
           have=$(dpkg-query -W -f='${Version}' zulivio)
           echo "latest=$latest installed=$have"; [ "$latest" = "$have" ]
       - name: Remove and purge

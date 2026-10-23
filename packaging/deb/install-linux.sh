@@ -54,7 +54,9 @@ else
   VERSION="${ZULIVIO_VERSION:-}"
   if [ -z "$VERSION" ]; then
     say "Finding the latest release"
-    VERSION="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | sed -n 's/.*"tag_name": *"v\{0,1\}\([^"]*\)".*/\1/p' | head -n1)"
+    # The /releases/latest redirect has no API rate limit (shared networks get HTTP 403 from api.github.com); the API is the fallback.
+    VERSION="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" 2>/dev/null | sed -n 's|.*/releases/tag/v\{0,1\}||p' || true)"
+    [ -n "$VERSION" ] || VERSION="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" | sed -n 's/.*"tag_name": *"v\{0,1\}\([^"]*\)".*/\1/p' | head -n1)"
     [ -n "$VERSION" ] || die "Could not determine the latest version. Set ZULIVIO_VERSION, for example ZULIVIO_VERSION=1.12.0."
   fi
   VERSION="${VERSION#v}"
