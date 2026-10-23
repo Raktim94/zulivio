@@ -1,0 +1,45 @@
+name: Live install check
+
+# Runs the exact command shown on the website, on a clean native runner of each architecture: downloads the
+# latest release, verifies its checksum, installs it, waits for the app to answer, then removes and purges it.
+# Run it by hand after publishing a release or changing the website's installer.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    name: curl | sudo bash (${{ matrix.arch }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, runner: ubuntu-24.04 }
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Install from the website, as a visitor would
+        run: curl -fsSL https://zulivio.nodedr.com/install-linux.sh | sudo bash
+      - name: Wait for the app to answer
+        run: |
+          for _ in $(seq 1 120); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3100/ || true)
+            case "$code" in 2*|3*) echo "answered HTTP $code"; exit 0;; esac; sleep 5
+          done
+          systemctl status zulivio --no-pager || true; docker ps -a || true
+          echo "no answer (last code $code)" >&2; exit 1
+      - name: Installed version is the latest release
+        run: |
+          latest=$(curl -fsSL https://api.github.com/repos/Raktim94/zulivio/releases/latest | sed -n 's/.*"tag_name": *"v\{0,1\}\([^"]*\)".*/\1/p' | head -n1)
+          have=$(dpkg-query -W -f='${Version}' zulivio)
+          echo "latest=$latest installed=$have"; [ "$latest" = "$have" ]
+      - name: Remove and purge
+        run: |
+          sudo apt-get remove -y zulivio
+          ! systemctl is-active --quiet zulivio.service
+          sudo apt-get purge -y zulivio
