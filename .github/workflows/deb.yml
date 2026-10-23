@@ -60,10 +60,34 @@ jobs:
       - name: Install, answer, reinstall, remove, purge
         run: sudo DEB="$PWD/$(ls dist/*_${{ matrix.arch }}.deb)" packaging/deb/test.sh
 
+  # Debian 12 has no docker-compose-v2 package; the installer adds Docker's own apt repository. This proves the package's
+  # dependencies resolve on a stock Debian 12 image after exactly that step (a full run needs a VM with systemd and Docker).
+  deps-debian12:
+    name: Dependencies resolve on Debian 12
+    needs: build
+    runs-on: ubuntu-24.04
+    container: debian:12
+    steps:
+      - uses: actions/download-artifact@v4
+        with: { name: debs, path: dist }
+      - name: Add Docker's repository as the installer does, then simulate the install
+        run: |
+          set -eu
+          apt-get update -qq && apt-get install -y -qq curl ca-certificates >/dev/null
+          . /etc/os-release
+          install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL "https://download.docker.com/linux/${ID}/gpg" -o /etc/apt/keyrings/docker.asc
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/${ID} ${VERSION_CODENAME} stable" > /etc/apt/sources.list.d/docker.list
+          apt-get update -qq
+          apt-get install -s -y ./dist/*_amd64.deb | grep -E "^Inst (docker-ce|docker-compose-plugin|zulivio) "
+          # And without Docker's repository the same simulation must fail clearly, which is why the one-command installer exists.
+          rm /etc/apt/sources.list.d/docker.list && apt-get update -qq
+          if apt-get install -s -y ./dist/*_amd64.deb >/dev/null 2>&1; then echo "note: resolves on stock Debian 12 without Docker's repository"; else echo "as expected: stock Debian 12 needs Docker's repository (the installer adds it)"; fi
+
   publish:
     name: Publish release assets
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != ''
-    needs: [build, test]
+    needs: [build, test, deps-debian12]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
