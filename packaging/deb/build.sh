@@ -10,13 +10,15 @@ ver="${1:?version, e.g. 1.2.3}"; ver="${ver#v}"
 archs="${2:-amd64 arm64}"; out="${OUT_DIR:-$root/dist}"; mkdir -p "$out"
 for arch in $archs; do
   stage=$(mktemp -d); pkg="$stage/p"
-  mkdir -p "$pkg/DEBIAN" "$pkg/usr/lib/$PKG" "$pkg/etc/$PKG" "$pkg/lib/systemd/system" "$pkg/usr/share/doc/$PKG"
+  mkdir -p "$pkg/DEBIAN" "$pkg/usr/lib/$PKG" "$pkg/usr/share/$PKG" "$pkg/lib/systemd/system" "$pkg/usr/share/doc/$PKG"
   sed "s/@VERSION@/$ver/g" "$here/docker-compose.yml" > "$pkg/usr/lib/$PKG/docker-compose.yml"
-  sed "s/@VERSION@/$ver/g" "$here/$PKG.env" > "$pkg/etc/$PKG/$PKG.env"
+  # Shipped as an example; postinst creates /etc/$PKG/$PKG.env from it once, so the settings and generated secrets
+  # (which match the data volumes) survive remove, purge and upgrades.
+  sed "s/@VERSION@/$ver/g" "$here/$PKG.env" > "$pkg/usr/share/$PKG/$PKG.env.example"
   install -m 0644 "$here/$PKG.service" "$pkg/lib/systemd/system/$PKG.service"
+  if [ -d "$here/bin" ]; then mkdir -p "$pkg/usr/bin"; install -m 0755 "$here"/bin/* "$pkg/usr/bin/"; fi
   install -m 0644 "$root/LICENSE" "$pkg/usr/share/doc/$PKG/copyright"
   printf '%s (%s) stable; urgency=medium\n\n  * %s %s. See %s\n\n -- Raktim Ranjit <ranjitraktim5@gmail.com>  %s\n' "$PKG" "$ver" "$TITLE" "$ver" "$DOCS" "$(date -R)" | gzip -9n > "$pkg/usr/share/doc/$PKG/changelog.Debian.gz"
-  echo "/etc/$PKG/$PKG.env" > "$pkg/DEBIAN/conffiles"
   for s in postinst prerm postrm; do install -m 0755 "$here/$s" "$pkg/DEBIAN/$s"; done
   find "$pkg" -type d -exec chmod 0755 {} +
   size=$(du -sk "$pkg" | cut -f1)

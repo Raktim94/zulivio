@@ -27,5 +27,17 @@ sum=$(sha256sum "/etc/$PKG/$PKG.env"); apt-get install -y --reinstall "$DEB"
 step "remove"; apt-get remove -y "$PKG"
 ! systemctl is-active --quiet "$PKG.service" || { echo "service still active after remove" >&2; exit 1; }
 [ -z "$(docker ps -q --filter "label=com.docker.compose.project=$PROJECT")" ] || { echo "containers still running after remove" >&2; exit 1; }
-step "purge"; apt-get purge -y "$PKG"; docker compose --project-name "$PROJECT" down -v >/dev/null 2>&1 || true
+[ -f "/etc/$PKG/$PKG.env" ] || { echo "settings were removed by apt remove" >&2; exit 1; }
+step "purge keeps settings and data"; sum=$(sha256sum "/etc/$PKG/$PKG.env"); apt-get purge -y "$PKG"
+[ -f "/etc/$PKG/$PKG.env" ] && [ "$sum" = "$(sha256sum "/etc/$PKG/$PKG.env")" ] || { echo "settings changed or vanished on purge" >&2; exit 1; }
+step "reinstall after purge reuses settings and data"
+DEB_FILE="$DEB" bash "$here/install-linux.sh"
+[ "$sum" = "$(sha256sum "/etc/$PKG/$PKG.env")" ] || { echo "settings regenerated after purge (would not match the data volumes)" >&2; exit 1; }
+ok=0; for _ in $(seq 1 120); do
+  code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT$PATHCHECK" || true)
+  case "$code" in 2*|3*) ok=1; break;; esac; sleep 5
+done
+[ "$ok" = 1 ] || { docker compose --project-name "$PROJECT" logs --tail 60 || true; echo "app did not answer after reinstall (last code $code)" >&2; exit 1; }
+echo "answered HTTP $code after purge and reinstall"
+step "clean up everything"; apt-get purge -y "$PKG"; docker compose --project-name "$PROJECT" down -v >/dev/null 2>&1 || true; rm -rf "/etc/$PKG"
 echo OK

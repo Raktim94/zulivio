@@ -43,3 +43,4 @@ jobs:
           sudo apt-get remove -y zulivio
           ! systemctl is-active --quiet zulivio.service
           sudo apt-get purge -y zulivio
+          test -f /etc/zulivio/zulivio.env

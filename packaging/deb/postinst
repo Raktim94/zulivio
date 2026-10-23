@@ -2,7 +2,12 @@
 set -e
 ENVF=/etc/zulivio/zulivio.env
 if [ "$1" = configure ]; then
-  # First install: replace every @SECRET@ with a fresh random value. Upgrades keep the existing file.
+  # First install: create the settings file from the shipped example. It is never overwritten or removed by apt.
+  if [ ! -f "$ENVF" ]; then
+    install -d -m 0755 /etc/zulivio
+    install -m 0600 /usr/share/zulivio/zulivio.env.example "$ENVF"
+  fi
+  # Replace every @SECRET@ with a fresh random value (only a new file has any).
   if grep -q '@SECRET@' "$ENVF" 2>/dev/null; then
     tmp=$(mktemp)
     while IFS= read -r line; do
