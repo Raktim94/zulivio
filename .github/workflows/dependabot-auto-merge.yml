@@ -1,8 +1,9 @@
 name: Dependabot security auto-merge
 
-# Merges Dependabot *security* PRs (patch/minor only) once every check on the PR
-# has passed. Version-bump PRs and major bumps are left for manual review.
-# No code from the PR is checked out or executed here.
+# Squash-merges a Dependabot *security* PR (patch/minor only) once at least one
+# CI check has run and every check has passed. A PR with no CI, any failing
+# check, or a major bump is left open for manual review. Nothing from the PR is
+# checked out or executed here.
 on:
   pull_request_target:
     types: [opened, reopened, synchronize]
@@ -17,12 +18,15 @@ concurrency:
 
 jobs:
   auto-merge:
-    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]' &&
+      github.event.pull_request.base.ref == github.event.repository.default_branch
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
       - id: meta
-        uses: dependabot/fetch-metadata@v2
+        # dependabot/fetch-metadata v2.4.0, pinned to a commit
+        uses: dependabot/fetch-metadata@08eff52bf64351f401fb50d4972fa95b9f2c2d1b
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -36,15 +40,20 @@ jobs:
           sleep 90  # let CI workflows register on the PR
           for i in $(seq 1 60); do
             rollup=$(gh pr view "$PR" --repo "$REPO" --json statusCheckRollup --jq '.statusCheckRollup')
-            failed=$(jq '[.[] | select((.conclusion // "") | IN("FAILURE","TIMED_OUT","CANCELLED","ACTION_REQUIRED","STARTUP_FAILURE")) , select((.state // "") | IN("FAILURE","ERROR"))] | length' <<<"$rollup")
+            failed=$(jq '[.[] | select(((.conclusion // "") | IN("FAILURE","TIMED_OUT","CANCELLED","ACTION_REQUIRED","STARTUP_FAILURE")) or ((.state // "") | IN("FAILURE","ERROR")))] | length' <<<"$rollup")
             pending=$(jq '[.[] | select(((.status // "COMPLETED") != "COMPLETED") or ((.state // "") == "PENDING"))] | length' <<<"$rollup")
+            passed=$(jq '[.[] | select(((.conclusion // "") == "SUCCESS") or ((.state // "") == "SUCCESS"))] | length' <<<"$rollup")
+
             if [ "$failed" -gt 0 ]; then
-              echo "A check failed; leaving PR for manual review."
               gh pr comment "$PR" --repo "$REPO" --body "Security auto-merge skipped: a check failed. Needs manual review."
               exit 1
             fi
-            if [ "$pending" -eq 0 ]; then
+            if [ "$pending" -eq 0 ] && [ "$passed" -gt 0 ]; then
               gh pr merge "$PR" --repo "$REPO" --squash --delete-branch
+              exit 0
+            fi
+            if [ "$pending" -eq 0 ] && [ "$i" -ge 10 ]; then
+              gh pr comment "$PR" --repo "$REPO" --body "Security auto-merge skipped: no passing CI check ran on this PR, so there is nothing to gate the merge. Review and merge manually."
               exit 0
             fi
             sleep 30
