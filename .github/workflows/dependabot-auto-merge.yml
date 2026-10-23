@@ -1,0 +1,52 @@
+name: Dependabot security auto-merge
+
+# Merges Dependabot *security* PRs (patch/minor only) once every check on the PR
+# has passed. Version-bump PRs and major bumps are left for manual review.
+# No code from the PR is checked out or executed here.
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: dependabot-auto-merge-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  auto-merge:
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Wait for checks, then merge
+        if: steps.meta.outputs.ghsa-id != '' && steps.meta.outputs.update-type != 'version-update:semver-major'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          sleep 90  # let CI workflows register on the PR
+          for i in $(seq 1 60); do
+            rollup=$(gh pr view "$PR" --repo "$REPO" --json statusCheckRollup --jq '.statusCheckRollup')
+            failed=$(jq '[.[] | select((.conclusion // "") | IN("FAILURE","TIMED_OUT","CANCELLED","ACTION_REQUIRED","STARTUP_FAILURE")) , select((.state // "") | IN("FAILURE","ERROR"))] | length' <<<"$rollup")
+            pending=$(jq '[.[] | select(((.status // "COMPLETED") != "COMPLETED") or ((.state // "") == "PENDING"))] | length' <<<"$rollup")
+            if [ "$failed" -gt 0 ]; then
+              echo "A check failed; leaving PR for manual review."
+              gh pr comment "$PR" --repo "$REPO" --body "Security auto-merge skipped: a check failed. Needs manual review."
+              exit 1
+            fi
+            if [ "$pending" -eq 0 ]; then
+              gh pr merge "$PR" --repo "$REPO" --squash --delete-branch
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "Timed out waiting for checks."; exit 1
