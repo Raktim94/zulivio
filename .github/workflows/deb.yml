@@ -1,0 +1,83 @@
+name: Debian package
+
+# Builds zulivio for amd64 and arm64 and proves it works: installs it on a native runner of each architecture,
+# waits for the app to answer, reinstalls, removes and purges it (packaging/deb/test.sh). A release is published
+# only by running this workflow by hand with a version: it attaches the .deb files and SHA-256 checksums to the
+# GitHub release v<version>.
+
+on:
+  pull_request:
+    paths: ["packaging/deb/**", ".github/workflows/deb.yml"]
+  push:
+    branches: [main]
+    paths: ["packaging/deb/**", ".github/workflows/deb.yml"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build and publish, for example 1.12.0. Leave empty to build and test only."
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deb-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build both architectures
+        run: |
+          VERSION="${{ github.event.inputs.version }}"; VERSION="${VERSION#v}"
+          [ -n "$VERSION" ] || VERSION="1.12.0"
+          packaging/deb/build.sh "$VERSION"
+          for f in dist/*.deb; do dpkg-deb -I "$f" | head -12; done
+      - name: Scripts parse
+        run: for f in packaging/deb/postinst packaging/deb/prerm packaging/deb/postrm packaging/deb/build.sh packaging/deb/test.sh; do bash -n "$f"; done
+      - uses: actions/upload-artifact@v4
+        with: { name: debs, path: "dist/*", if-no-files-found: error }
+
+  test:
+    name: Install and remove (${{ matrix.arch }})
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, runner: ubuntu-24.04 }
+          - { arch: arm64, runner: ubuntu-24.04-arm }
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with: { name: debs, path: dist }
+      - name: Verify checksum
+        run: cd dist && sha256sum -c ./*_${{ matrix.arch }}.deb.sha256
+      - name: Install, answer, reinstall, remove, purge
+        run: sudo DEB="$PWD/$(ls dist/*_${{ matrix.arch }}.deb)" packaging/deb/test.sh
+
+  publish:
+    name: Publish release assets
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.version != ''
+    needs: [build, test]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with: { name: debs, path: dist }
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ github.event.inputs.version }}"; VERSION="${VERSION#v}"; TAG="v$VERSION"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* packaging/deb/install-linux.sh --clobber
+          else
+            gh release create "$TAG" dist/* packaging/deb/install-linux.sh --target "${{ github.sha }}" --title "Zulivio $VERSION" --notes "Packages for Ubuntu and Debian (amd64 and arm64). They install a systemd service that runs the version-pinned Docker images. One command: curl -fsSL https://zulivio.nodedr.com/install-linux.sh | sudo bash   Or: sudo apt install ./zulivio_${VERSION}_<arch>.deb  Guide: https://zulivio.nodedr.com/docs"
+          fi

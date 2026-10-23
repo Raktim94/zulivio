@@ -1,0 +1,16 @@
+[Unit]
+Description=Zulivio (Docker Compose)
+Documentation=https://zulivio.nodedr.com/docs
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+TimeoutStartSec=900
+ExecStart=/usr/bin/docker compose --project-name zulivio --env-file /etc/zulivio/zulivio.env -f /usr/lib/zulivio/docker-compose.yml up -d --remove-orphans
+ExecStop=/usr/bin/docker compose --project-name zulivio --env-file /etc/zulivio/zulivio.env -f /usr/lib/zulivio/docker-compose.yml down
+
+[Install]
+WantedBy=multi-user.target

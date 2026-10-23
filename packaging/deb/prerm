@@ -1,0 +1,8 @@
+#!/bin/sh
+set -e
+case "$1" in
+  remove|deconfigure)
+    systemctl stop zulivio.service >/dev/null 2>&1 || true
+    systemctl disable zulivio.service >/dev/null 2>&1 || true ;;
+esac
+exit 0

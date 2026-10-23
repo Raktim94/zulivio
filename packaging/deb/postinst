@@ -1,0 +1,26 @@
+#!/bin/sh
+set -e
+ENVF=/etc/zulivio/zulivio.env
+if [ "$1" = configure ]; then
+  # First install: replace every @SECRET@ with a fresh random value. Upgrades keep the existing file.
+  if grep -q '@SECRET@' "$ENVF" 2>/dev/null; then
+    tmp=$(mktemp)
+    while IFS= read -r line; do
+      case "$line" in
+        *@SECRET@*) s=$(head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n'); printf '%s\n' "${line%%@SECRET@*}$s${line#*@SECRET@}" ;;
+        *) printf '%s\n' "$line" ;;
+      esac
+    done < "$ENVF" > "$tmp"
+    cat "$tmp" > "$ENVF"; rm -f "$tmp"
+  fi
+  chmod 0600 "$ENVF"
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  systemctl enable zulivio.service >/dev/null 2>&1 || true
+  if [ -d /run/systemd/system ]; then
+    # Starting pulls the images; do not fail the install if Docker is not ready.
+    systemctl restart zulivio.service >/dev/null 2>&1 || \
+      echo "zulivio: could not start yet; check Docker, then run: sudo systemctl start zulivio" >&2
+  fi
+  echo "Zulivio is installed. Open http://localhost:3100 (first start pulls the images and can take a few minutes)."
+fi
+exit 0
