@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to build and publish, for example 1.12.0. Leave empty to build and test only."
+        description: "Version to build and publish, for example 1.12.1. Leave empty to build and test only."
         required: false
         default: ""
 
@@ -33,7 +33,7 @@ jobs:
       - name: Build both architectures
         run: |
           VERSION="${{ github.event.inputs.version }}"; VERSION="${VERSION#v}"
-          [ -n "$VERSION" ] || VERSION="1.12.0"
+          [ -n "$VERSION" ] || VERSION="1.12.1"
           packaging/deb/build.sh "$VERSION"
           for f in dist/*.deb; do dpkg-deb -I "$f" | head -12; done
       - name: Scripts parse
