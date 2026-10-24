@@ -208,9 +208,11 @@ x-casaos:
   scheme: http
   port_map: "2996"
   version: "1.12.1"
-  update_at: "2026-10-05"
+  update_at: "2026-10-24"
   release_notes:
     en_US: |-
+      1.12.1: security update: zod 4.6.6 (fixes a memory-exhaustion advisory). No behaviour changes.
+
       1.12.0: added Mobile Call History — register company phones under
       Settings > Mobile Devices (per-device token, shown once), sync call
       metadata in real time (MacroDroid) or in bulk (a future Android app, or
