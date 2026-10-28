@@ -38,7 +38,7 @@ jobs:
           for f in dist/*.deb; do dpkg-deb -I "$f" | head -12; done
       - name: Scripts parse
         run: for f in packaging/deb/postinst packaging/deb/prerm packaging/deb/postrm packaging/deb/build.sh packaging/deb/test.sh; do bash -n "$f"; done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with: { name: debs, path: "dist/*", if-no-files-found: error }
 
   test:
