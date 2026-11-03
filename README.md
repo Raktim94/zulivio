@@ -1102,3 +1102,7 @@ Built by [NodeDR Infotech Private Limited](https://www.nodedr.com/)
 Read the [Zulivio case study](https://www.raktimranjit.com/projects/zulivio) for the product background and design decisions.
 
 Maintainer: [Raktim Ranjit](https://www.raktimranjit.com/)
+
+## Commercial licence
+
+Licensed under the AGPL-3.0. A [commercial licence](COMMERCIAL-LICENSE.md) is available on request for use without the AGPL obligations. The Zulivio name and logo are not covered by the AGPL.
