@@ -53,7 +53,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: debs, path: dist }
       - name: Verify checksum
         run: cd dist && sha256sum -c ./*_${{ matrix.arch }}.deb.sha256
@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-24.04
     container: debian:12
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: debs, path: dist }
       - name: Add Docker's repository as the installer does, then simulate the install
         run: |
@@ -93,7 +93,7 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with: { name: debs, path: dist }
       - name: Create or update the release
         env:
