@@ -88,15 +88,16 @@ export default function SalesDashboardPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis dataKey="stageName" fontSize={12} />
                 <YAxis fontSize={12} />
-                <Tooltip formatter={(v: number) => [`₹${v.toLocaleString()}`, "Value"]} />
+                <Tooltip formatter={(v) => [`₹${Number(v).toLocaleString()}`, "Value"]} />
                 <Bar
                   dataKey="value"
                   fill="#168b65"
                   radius={[4, 4, 0, 0]}
                   cursor="pointer"
-                  onClick={(bar: { stageName: string; opportunityIds: string[] }) =>
-                    setDrillDown({ label: bar.stageName, ids: bar.opportunityIds })
-                  }
+                  onClick={(bar) => {
+                    const d = (bar.payload ?? bar) as { stageName: string; opportunityIds: string[] };
+                    setDrillDown({ label: d.stageName, ids: d.opportunityIds });
+                  }}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -147,7 +148,7 @@ export default function SalesDashboardPage() {
                     <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(v: number) => `₹${v.toLocaleString()}`} />
+                <Tooltip formatter={(v) => `₹${Number(v).toLocaleString()}`} />
               </PieChart>
             </ResponsiveContainer>
           )}

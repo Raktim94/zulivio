@@ -183,7 +183,7 @@ function TeamPerformancePanel({ range }: { range: string }) {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                   <XAxis dataKey="stageName" {...AXIS} angle={-30} textAnchor="end" height={60} interval={0} />
                   <YAxis {...AXIS} allowDecimals={false} />
-                  <Tooltip {...TOOLTIP_STYLE} formatter={(v: number) => [v, "Leads"]} />
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(v) => [Number(v), "Leads"]} />
                   <Bar dataKey="count" fill={SERIES.primary} radius={[4, 4, 0, 0]} name="Leads" />
                 </BarChart>
               </ResponsiveContainer>
@@ -203,7 +203,7 @@ function TeamPerformancePanel({ range }: { range: string }) {
                   dataKey="count"
                   nameKey="source"
                   outerRadius={90}
-                  label={(entry: { source: string; count: number }) => `${entry.source} (${entry.count})`}
+                  label={(entry: { name?: string | number; value?: number }) => `${entry.name} (${entry.value})`}
                 >
                   {data.leadsBySource.map((_, i) => (
                     <Cell key={i} fill={CATEGORICAL[i % CATEGORICAL.length]} />
@@ -338,7 +338,7 @@ function CrmOverviewPanel({ range }: { range: string }) {
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                 <XAxis type="number" {...AXIS} allowDecimals={false} />
                 <YAxis type="category" dataKey="label" {...AXIS} width={110} interval={0} />
-                <Tooltip {...TOOLTIP_STYLE} formatter={(v: number) => [v, "Leads"]} />
+                <Tooltip {...TOOLTIP_STYLE} formatter={(v) => [Number(v), "Leads"]} />
                 <Bar dataKey="count" fill={SERIES.secondary} radius={[0, 4, 4, 0]} name="Leads" />
               </BarChart>
             </ResponsiveContainer>
@@ -357,7 +357,7 @@ function CrmOverviewPanel({ range }: { range: string }) {
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                   <XAxis dataKey="stageName" {...AXIS} />
                   <YAxis {...AXIS} />
-                  <Tooltip {...TOOLTIP_STYLE} formatter={(v: number) => [`₹${v.toLocaleString()}`, "Value"]} />
+                  <Tooltip {...TOOLTIP_STYLE} formatter={(v) => [`₹${Number(v).toLocaleString()}`, "Value"]} />
                   <Bar dataKey="value" fill={SERIES.primary} radius={[4, 4, 0, 0]} name="Value" />
                 </BarChart>
               </ResponsiveContainer>
