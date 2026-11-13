@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import type { EmployeeSummary, EmploymentStatus, Role } from "@zulivio/types";
 import { api, ApiError } from "@/lib/api";
-import { Badge, Button, Card, ErrorState, Input, Select, Spinner } from "@/components/ui";
+import { Badge, Button, Card, ErrorState, Input, Select, Spinner, useConfirm } from "@/components/ui";
 import { isManagerOrAbove } from "@/lib/use-current-employee";
 import { useRequireRole } from "@/lib/use-require-role";
 
@@ -14,6 +14,7 @@ const EMPLOYMENT_STATUSES: EmploymentStatus[] = ["ACTIVE", "SUSPENDED", "ON_LEAV
 
 export default function EmployeesPage() {
   const queryClient = useQueryClient();
+  const ask = useConfirm();
   const { employee: currentEmployee, isLoading: authLoading, authorized } = useRequireRole(isManagerOrAbove);
   const { data, isLoading, error } = useQuery<EmployeeSummary[]>({
     queryKey: ["employees"],
@@ -173,7 +174,7 @@ export default function EmployeesPage() {
           <ErrorState message="Could not load employees." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
+            <table className="stack-table w-full text-left text-sm">
               <thead className="text-xs text-muted">
                 <tr>
                   <th className="pb-2">Number</th>
@@ -201,21 +202,21 @@ export default function EmployeesPage() {
                     />
                   ) : (
                     <tr key={emp.id} className="border-t border-border">
-                      <td className="py-2 font-mono text-xs">{emp.employeeNumber}</td>
-                      <td className="py-2">{emp.fullName}</td>
-                      <td className="py-2">{emp.role.replace("_", " ")}</td>
-                      <td className="py-2">{emp.department ?? "—"}</td>
-                      <td className="py-2">
+                      <td data-label="Number" className="py-2 font-mono text-xs">{emp.employeeNumber}</td>
+                      <td data-label="Name" className="py-2">{emp.fullName}</td>
+                      <td data-label="Role" className="py-2">{emp.role.replace("_", " ")}</td>
+                      <td data-label="Department" className="py-2">{emp.department ?? "—"}</td>
+                      <td data-label="Status" className="py-2">
                         <Badge tone={emp.employmentStatus === "ACTIVE" ? "success" : "neutral"}>
                           {emp.employmentStatus}
                         </Badge>
                       </td>
-                      <td className="py-2">
+                      <td data-label="Report" className="py-2">
                         <Link href={`/reports/${emp.id}`} className="text-emerald underline">
                           View
                         </Link>
                       </td>
-                      <td className="py-2 text-right">
+                      <td data-label="Actions" className="py-2 text-right">
                         {isSelf ? (
                           <span className="text-xs text-muted">You</span>
                         ) : (
@@ -230,8 +231,8 @@ export default function EmployeesPage() {
                               Edit
                             </button>
                             <button
-                              onClick={() => {
-                                if (confirm(`Reset ${emp.fullName}'s password? This signs them out immediately.`)) {
+                              onClick={async () => {
+                                if (await ask({ title: "Reset password?", message: `${emp.fullName} is signed out immediately and must set a new password.`, confirmLabel: "Reset password" })) {
                                   setRowError(null);
                                   resetPassword.mutate(emp.id);
                                 }
@@ -242,8 +243,8 @@ export default function EmployeesPage() {
                             </button>
                             {emp.employmentStatus !== "SEPARATED" && (
                               <button
-                                onClick={() => {
-                                  if (confirm(`Remove ${emp.fullName}? This revokes their access.`)) {
+                                onClick={async () => {
+                                  if (await ask({ title: "Remove employee?", message: `${emp.fullName}'s access is revoked immediately, including their phones.`, confirmLabel: "Remove" })) {
                                     setRowError(null);
                                     removeEmployee.mutate(emp.id);
                                   }
@@ -255,12 +256,13 @@ export default function EmployeesPage() {
                             )}
                             {emp.employmentStatus === "SEPARATED" && (
                               <button
-                                onClick={() => {
+                                onClick={async () => {
                                   if (
-                                    confirm(
-                                      `Permanently delete ${emp.fullName}? This cannot be undone. Their record only ` +
-                                        "deletes if they have no lead/assignment/attendance history — otherwise you'll see why not.",
-                                    )
+                                    await ask({
+                                      title: "Permanently delete employee?",
+                                      message: `${emp.fullName}'s record is deleted. This cannot be undone. It only deletes if they have no lead, assignment or attendance history — otherwise you'll see why not.`,
+                                      confirmLabel: "Delete permanently",
+                                    })
                                   ) {
                                     setRowError(null);
                                     purgeEmployee.mutate(emp.id);
@@ -305,10 +307,10 @@ function EditRow({
 
   return (
     <tr className="border-t border-border bg-canvas">
-      <td className="py-2 font-mono text-xs">{employee.employeeNumber}</td>
-      <td className="py-2">{employee.fullName}</td>
-      <td className="py-2">
-        <Select value={role} onChange={(e) => setRole(e.target.value as Role)} className="py-1">
+      <td data-label="Number" className="py-2 font-mono text-xs">{employee.employeeNumber}</td>
+      <td data-label="Name" className="py-2">{employee.fullName}</td>
+      <td data-label="Role" className="py-2">
+        <Select value={role} onChange={(e) => setRole(e.target.value as Role)} className="py-1" aria-label={`Role for ${employee.fullName}`}>
           {ROLES.map((r) => (
             <option key={r} value={r}>
               {r.replace("_", " ")}
@@ -316,14 +318,15 @@ function EditRow({
           ))}
         </Select>
       </td>
-      <td className="py-2">
-        <Input value={department} onChange={(e) => setDepartment(e.target.value)} className="py-1" />
+      <td data-label="Department" className="py-2">
+        <Input value={department} onChange={(e) => setDepartment(e.target.value)} className="py-1" aria-label={`Department for ${employee.fullName}`} />
       </td>
-      <td className="py-2">
+      <td data-label="Status" className="py-2">
         <Select
           value={employmentStatus}
           onChange={(e) => setEmploymentStatus(e.target.value as EmploymentStatus)}
           className="py-1"
+          aria-label={`Status for ${employee.fullName}`}
         >
           {EMPLOYMENT_STATUSES.map((s) => (
             <option key={s} value={s}>
@@ -332,8 +335,8 @@ function EditRow({
           ))}
         </Select>
       </td>
-      <td className="py-2 text-xs text-muted">—</td>
-      <td className="py-2 text-right">
+      <td data-label="Report" className="py-2 text-xs text-muted">—</td>
+      <td data-label="Actions" className="py-2 text-right">
         <div className="flex justify-end gap-3">
           <button
             onClick={() => onSave({ role, department, employmentStatus })}

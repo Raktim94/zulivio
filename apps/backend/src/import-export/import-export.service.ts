@@ -148,6 +148,47 @@ export class ImportExportService {
     private readonly googleSheets: GoogleSheetsService,
   ) {}
 
+  /**
+   * Counts of every core record type and how they link to each other, for the
+   * Data Hub relations map. Manager-or-above only, scoped to the organization.
+   */
+  async getRelationsOverview(actor: AuthenticatedEmployee) {
+    if (!isManagerOrAbove(actor.role)) throw new ForbiddenException("Managers and above only");
+    const organizationId = actor.organizationId;
+    const org = { organizationId };
+    const [
+      employees, leads, opportunities, assignments, pipelines,
+      leadsOwned, leadsConverted, leadsUnowned, opportunitiesFromLeads,
+      assignmentsOnLeads, assignmentsOnOpportunities, assignmentsUnlinked,
+      assignmentsOwned, opportunitiesOwned, opportunitiesInPipeline,
+    ] = await Promise.all([
+      this.prisma.employee.count({ where: org }),
+      this.prisma.lead.count({ where: org }),
+      this.prisma.opportunity.count({ where: org }),
+      this.prisma.assignment.count({ where: org }),
+      this.prisma.pipeline.count({ where: org }),
+      this.prisma.lead.count({ where: { ...org, ownerId: { not: null } } }),
+      this.prisma.lead.count({ where: { ...org, convertedOpportunityId: { not: null } } }),
+      this.prisma.lead.count({ where: { ...org, ownerId: null } }),
+      this.prisma.opportunity.count({ where: { ...org, convertedFromLead: { isNot: null } } }),
+      this.prisma.assignment.count({ where: { ...org, leadId: { not: null } } }),
+      this.prisma.assignment.count({ where: { ...org, opportunityId: { not: null } } }),
+      this.prisma.assignment.count({ where: { ...org, leadId: null, opportunityId: null } }),
+      this.prisma.assignment.count({ where: { ...org, ownerId: { not: null } } }),
+      this.prisma.opportunity.count({ where: { ...org, ownerId: { not: null } } }),
+      this.prisma.opportunity.count({ where: { ...org, pipelineId: { not: "" } } }),
+    ]);
+    return {
+      entities: { employees, leads, opportunities, assignments, pipelines },
+      links: {
+        leadsOwned, leadsConverted, opportunitiesFromLeads,
+        assignmentsOnLeads, assignmentsOnOpportunities,
+        assignmentsOwned, opportunitiesOwned, opportunitiesInPipeline,
+      },
+      attention: { leadsUnowned, assignmentsUnlinked },
+    };
+  }
+
   private requireManager(actor: AuthenticatedEmployee) {
     if (!isManagerOrAbove(actor.role)) {
       throw new ForbiddenException("Import/export is restricted to managers and above");

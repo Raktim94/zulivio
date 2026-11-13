@@ -137,7 +137,7 @@ export default function DocsPage() {
           {/* Architecture */}
           <Card className="mb-6">
             <h3 className="mb-3 text-sm font-semibold text-ink">Architecture</h3>
-            <pre className="overflow-x-auto rounded-md bg-canvas p-3 text-xs text-ink">
+            <pre tabIndex={0} className="overflow-x-auto rounded-md bg-canvas p-3 text-xs text-ink">
 {`AI Assistant (Claude/ChatGPT/etc.)
         │
         ▼
@@ -165,7 +165,7 @@ export default function DocsPage() {
               https://&lt;your-zulivio-domain&gt;/api/v1/mcp
             </code>
             <p className="mb-2 mt-4 text-xs font-medium text-muted">Test the connection</p>
-            <pre className="overflow-x-auto rounded-md bg-canvas p-3 text-xs text-ink">
+            <pre tabIndex={0} className="overflow-x-auto rounded-md bg-canvas p-3 text-xs text-ink">
 {`curl -X POST https://<your-zulivio-domain>/api/v1/mcp \\
   -H "Authorization: Bearer <your-api-key>" \\
   -H "Content-Type: application/json" \\
@@ -177,7 +177,7 @@ export default function DocsPage() {
           {/* Client Setup */}
           <Card className="mb-6">
             <h3 className="mb-3 text-sm font-semibold text-ink">Connect Your AI Client</h3>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Scrollable table">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border text-left">
@@ -209,7 +209,7 @@ export default function DocsPage() {
 
           {/* Tools Table */}
           <h3 className="mb-3 text-sm font-semibold text-ink">Available Tools</h3>
-          <div className="overflow-x-auto rounded-xl border border-border">
+          <div className="overflow-x-auto rounded-xl border border-border" tabIndex={0} role="region" aria-label="Scrollable table">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-canvas/60 text-left">
@@ -259,6 +259,49 @@ export default function DocsPage() {
             </a>
             .
           </p>
+        </section>
+
+        {/* Integrations & API */}
+        <section>
+          <h2 className="text-xl font-semibold text-ink">Integrations &amp; API</h2>
+          <p className="mt-2 text-sm text-muted">
+            Company Admins manage <strong>API clients</strong> (organization-level credentials with explicit scopes, expiry and instant revocation),
+            <strong> signed webhooks</strong> (with retries, delivery history and secret rotation) and <strong>telephony providers</strong> (call events from a
+            business phone system) under <em>Integrations &amp; API</em>. These are separate from personal API keys used by MCP, and from employee logins.
+          </p>
+          <Card className="mt-4 text-sm text-muted">
+            <p>
+              Reference: authentication, scopes, errors, pagination, rate limits, idempotency, webhook signature verification (Node and Python examples), retries and
+              versioning —{" "}
+              <a href="https://github.com/Raktim94/zulivio/blob/main/docs/integrations/api.md" target="_blank" rel="noreferrer" className="text-emerald-dark underline">
+                docs/integrations/api.md
+              </a>
+              .
+            </p>
+          </Card>
+        </section>
+
+        {/* Android app */}
+        <section>
+          <h2 className="text-xl font-semibold text-ink">Android app</h2>
+          <p className="mt-2 text-sm text-muted">
+            A native app for telecallers: My Day, leads, follow-ups, calls, contacts import and tasks, connecting only to <em>your</em> Zulivio server over HTTPS. Calls are
+            started with the phone&apos;s dialer and the result is recorded by the person who made the call — Android does not let ordinary apps read every call, so Zulivio
+            doesn&apos;t claim to; for complete capture, connect a telephony provider.
+          </p>
+          <Card className="mt-4 text-sm text-muted">
+            <p>
+              Guide, build and install:{" "}
+              <a href="https://github.com/Raktim94/zulivio/blob/main/docs/mobile-android.md" target="_blank" rel="noreferrer" className="text-emerald-dark underline">
+                docs/mobile-android.md
+              </a>
+              . What is collected and where it goes:{" "}
+              <a href="https://github.com/Raktim94/zulivio/blob/main/docs/privacy-mobile.md" target="_blank" rel="noreferrer" className="text-emerald-dark underline">
+                docs/privacy-mobile.md
+              </a>
+              .
+            </p>
+          </Card>
         </section>
 
         {/* Quick Links */}

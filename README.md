@@ -676,6 +676,17 @@ only by hiding a button in the UI.
   fallback for headless/CasaOS-config-driven deployments — Settings takes
   priority when both are present. See Environment variables below.
 
+## Android app
+
+A native Kotlin / Jetpack Compose app for telecallers and employees lives in [`apps/mobile-android`](apps/mobile-android). It connects only to **your** Zulivio server (HTTPS), supports My Day, leads, follow-ups, call results, contacts import with duplicate review, tasks and attendance, works offline through an encrypted outbox, and stores its sign-in in the Android Keystore.
+
+* It **does not** read the call log or ask for any call permission: calls are started with the dialer and the result is recorded by the user. For complete call capture, connect a business phone system under **Integrations & API → Telephony**.
+* Guide, build/install and limitations: [`docs/mobile-android.md`](docs/mobile-android.md) · what is collected and where it goes: [`docs/privacy-mobile.md`](docs/privacy-mobile.md).
+
+## Integrations & API
+
+**Integrations & API** (Company Admin and above) manages organization-level **API clients** with explicit scopes (`/api/v1/ext`), HMAC-signed **webhooks** with retries and delivery history, and **telephony providers**. These are separate from personal API keys (MCP) and employee sessions. Reference: [`docs/integrations/api.md`](docs/integrations/api.md).
+
 ## Google Sheets integration
 
 The Google Sheets adapter is real, not a mock — but it only activates when
@@ -912,7 +923,7 @@ DATABASE_URL="postgresql://postgres:test@localhost:55432/zulivio_test" \
 docker rm -f zulivio-test-pg
 ```
 
-At last run: **142/142 tests passing** — bootstrap/login/logout, privilege
+At last run (2026-11-13): **309 e2e tests + 22 unit tests passing** (`pnpm test` runs the unit tests; the e2e suites must run serially — each one wipes the database it runs against — which `pnpm test:e2e` does). The Android app has 23 JVM unit tests (`apps/mobile-android`: `./gradlew :app:testDebugUnitTest`). The e2e suite covers — beyond the list below — device-bound mobile sign-in and token rotation/replay/revocation, the phone route allow-list, contact import and duplicate handling, idempotent writes, scoped API clients, signed webhooks (retries, SSRF), and telephony-provider signatures. The original core coverage — bootstrap/login/logout, privilege
 escalation blocked (on both create and edit), cross-employee report access
 blocked, owner edit/reset-password/remove on subordinates, a dedicated
 cross-tenant isolation suite (two independent organizations, ID-guessing

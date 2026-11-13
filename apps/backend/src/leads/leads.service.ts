@@ -270,6 +270,10 @@ export class LeadsService {
       this.prisma.leadActivity.deleteMany({ where: { leadId: id } }),
       this.prisma.leadFollowUp.deleteMany({ where: { leadId: id } }),
       this.prisma.lead.delete({ where: { id: lead.id } }),
+      // Deleting a lead also removes its timeline, so the fact that it happened (and who did it) must outlive it.
+      this.prisma.auditEvent.create({
+        data: { organizationId: actor.organizationId, actorId: actor.id, action: "lead.deleted", targetType: "lead", targetId: lead.id, metadata: { status: lead.status, ownerId: lead.ownerId } },
+      }),
     ]);
 
     return { success: true };
@@ -460,6 +464,12 @@ export class LeadsService {
       this.prisma.leadActivity.deleteMany({ where: { lead: where } }),
       this.prisma.leadFollowUp.deleteMany({ where: { lead: where } }),
       this.prisma.lead.deleteMany({ where }),
+      this.prisma.auditEvent.create({
+        data: {
+          organizationId: actor.organizationId, actorId: actor.id, action: "lead.delete_all_matching", targetType: "lead",
+          metadata: { matched, filters: Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined && v !== "")) as Prisma.InputJsonObject },
+        },
+      }),
     ]);
 
     return { matched, deleted: deleted.count };
@@ -1053,6 +1063,9 @@ export class LeadsService {
         this.prisma.leadActivity.deleteMany({ where: { leadId: { in: ids } } }),
         this.prisma.leadFollowUp.deleteMany({ where: { leadId: { in: ids } } }),
         this.prisma.lead.deleteMany({ where: { id: { in: ids } } }),
+        this.prisma.auditEvent.create({
+          data: { organizationId: actor.organizationId, actorId: actor.id, action: "lead.bulk_deleted", targetType: "lead", metadata: { count: ids.length, leadIds: ids.slice(0, 200) } },
+        }),
       ]);
     }
 

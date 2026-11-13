@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
-import { Button, Card, ErrorState, FileInput, Input, Spinner, useToast } from "@/components/ui";
+import { ArrowRight, Download } from "lucide-react";
+import { Badge, Button, Card, ErrorState, FileInput, Input, Skeleton, Spinner, useConfirm, useToast } from "@/components/ui";
 import { isManagerOrAbove } from "@/lib/use-current-employee";
 import { useRequireRole } from "@/lib/use-require-role";
 
@@ -27,74 +28,65 @@ export default function DataHubPage() {
   if (!authorized) return null; // redirecting
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-xl font-semibold text-ink">Data Hub</h1>
-        <p className="text-sm text-muted">
-          CSV and Google Sheets import/export for employees, assignments, leads, and opportunities. This same lead
-          importer is also available on the <Link href="/leads" className="text-emerald underline">Leads</Link> page,
-          next to lead management.
+        <p className="mt-1 max-w-2xl text-sm text-muted">
+          See how your records connect, spot the gaps, then import or export each type in one place.
         </p>
       </div>
 
-      <Card>
-        <h2 className="mb-4 text-sm font-medium text-ink">CSV export</h2>
-        <div className="flex flex-wrap gap-3">
-          <a href="/api/v1/exports/employees.csv">
-            <Button variant="secondary">Export employees.csv</Button>
-          </a>
-          <a href="/api/v1/exports/assignments.csv">
-            <Button variant="secondary">Export assignments.csv</Button>
-          </a>
-          <a href="/api/v1/exports/leads.csv">
-            <Button variant="secondary">Export leads.csv</Button>
-          </a>
-          <a href="/api/v1/exports/opportunities.csv">
-            <Button variant="secondary">Export opportunities.csv</Button>
-          </a>
+      <RelationsMap />
+
+      <section aria-labelledby="entities-heading" className="flex flex-col gap-3">
+        <h2 id="entities-heading" className="text-sm font-semibold text-ink">Import and export</h2>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <EntityCard
+            title="Employees"
+            exportPath="/api/v1/exports/employees.csv"
+            importEndpoint="/api/v1/imports/employees/csv"
+            hint={
+              <>
+                Needs <code className="rounded bg-canvas px-1">full_name</code> and{" "}
+                <code className="rounded bg-canvas px-1">email</code>. Optional:{" "}
+                <code className="rounded bg-canvas px-1">role</code>,{" "}
+                <code className="rounded bg-canvas px-1">department</code>.
+              </>
+            }
+          />
+          <EntityCard
+            title="Leads"
+            exportPath="/api/v1/exports/leads.csv"
+            importEndpoint="/api/v1/imports/leads/csv"
+            hint={
+              <>
+                Needs <code className="rounded bg-canvas px-1">full_name</code> or{" "}
+                <code className="rounded bg-canvas px-1">company</code>. Optional:{" "}
+                <code className="rounded bg-canvas px-1">email</code>,{" "}
+                <code className="rounded bg-canvas px-1">phone</code>,{" "}
+                <code className="rounded bg-canvas px-1">source</code>. Other columns are kept as custom fields.
+              </>
+            }
+            footer={<Link href="/leads" className="text-emerald underline">Also available on the Leads page</Link>}
+          />
+          <EntityCard
+            title="Opportunities"
+            exportPath="/api/v1/exports/opportunities.csv"
+            importEndpoint="/api/v1/imports/opportunities/csv"
+            hint={
+              <>
+                Needs <code className="rounded bg-canvas px-1">title</code>. Optional:{" "}
+                <code className="rounded bg-canvas px-1">company</code>,{" "}
+                <code className="rounded bg-canvas px-1">amount</code> (e.g. 1500.00) or{" "}
+                <code className="rounded bg-canvas px-1">amountMinor</code>,{" "}
+                <code className="rounded bg-canvas px-1">expectedCloseDate</code>. Lands in the default pipeline&apos;s
+                first stage.
+              </>
+            }
+          />
+          <EntityCard title="Assignments" exportPath="/api/v1/exports/assignments.csv" />
         </div>
-      </Card>
-
-      <CsvImportCard
-        title="Import employees from CSV"
-        endpoint="/api/v1/imports/employees/csv"
-        hint={
-          <>
-            Header row must include <code className="rounded bg-canvas px-1">full_name</code>,{" "}
-            <code className="rounded bg-canvas px-1">email</code>, and optionally{" "}
-            <code className="rounded bg-canvas px-1">role</code>, <code className="rounded bg-canvas px-1">department</code>.
-          </>
-        }
-      />
-
-      <CsvImportCard
-        title="Import leads from CSV"
-        endpoint="/api/v1/imports/leads/csv"
-        hint={
-          <>
-            Header row must include <code className="rounded bg-canvas px-1">full_name</code> or{" "}
-            <code className="rounded bg-canvas px-1">company</code> (used as the lead name if{" "}
-            <code className="rounded bg-canvas px-1">full_name</code> is blank), and optionally{" "}
-            <code className="rounded bg-canvas px-1">email</code>, <code className="rounded bg-canvas px-1">phone</code>,{" "}
-            <code className="rounded bg-canvas px-1">source</code>. Any other columns are kept as custom fields.
-          </>
-        }
-      />
-
-      <CsvImportCard
-        title="Import opportunities from CSV"
-        endpoint="/api/v1/imports/opportunities/csv"
-        hint={
-          <>
-            Header row must include <code className="rounded bg-canvas px-1">title</code>, and optionally{" "}
-            <code className="rounded bg-canvas px-1">company</code>,{" "}
-            <code className="rounded bg-canvas px-1">amount</code> (major currency units, e.g. 1500.00) or{" "}
-            <code className="rounded bg-canvas px-1">amountMinor</code>,{" "}
-            <code className="rounded bg-canvas px-1">expectedCloseDate</code>. Lands in the default pipeline&apos;s
-            first stage.
-          </>
-        }
-      />
+      </section>
 
       <Card>
         <div className="mb-4 flex items-center justify-between">
@@ -122,6 +114,7 @@ export default function DataHubPage() {
 
 function DeleteAllLeadsCard() {
   const toast = useToast();
+  const ask = useConfirm();
   const [confirmText, setConfirmText] = useState("");
   const [result, setResult] = useState<{ matched: number; deleted: number } | null>(null);
 
@@ -159,8 +152,8 @@ function DeleteAllLeadsCard() {
         <Button
           variant="danger"
           disabled={confirmText !== "DELETE" || deleteAll.isPending}
-          onClick={() => {
-            if (confirm("Permanently delete ALL leads visible to you? This can't be undone.")) {
+          onClick={async () => {
+            if (await ask({ title: "Delete all leads?", message: "Every lead visible to you is permanently deleted, with its call and note history. This can't be undone.", confirmLabel: "Delete all leads" })) {
               deleteAll.mutate();
             }
           }}
@@ -177,14 +170,143 @@ function DeleteAllLeadsCard() {
   );
 }
 
-function CsvImportCard({
+interface Overview {
+  entities: { employees: number; leads: number; opportunities: number; assignments: number; pipelines: number };
+  links: {
+    leadsOwned: number;
+    leadsConverted: number;
+    opportunitiesFromLeads: number;
+    assignmentsOnLeads: number;
+    assignmentsOnOpportunities: number;
+    assignmentsOwned: number;
+    opportunitiesOwned: number;
+    opportunitiesInPipeline: number;
+  };
+  attention: { leadsUnowned: number; assignmentsUnlinked: number };
+}
+
+function RelationsMap() {
+  const { data, isLoading, isError } = useQuery<Overview>({
+    queryKey: ["data-hub", "overview"],
+    queryFn: () => api.get("/api/v1/data/overview"),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-busy="true">
+        {[0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-24" />)}
+      </div>
+    );
+  }
+  if (isError || !data) return <ErrorState message="Couldn't load the relations overview. Refresh to try again." />;
+
+  const { entities: e, links: l, attention: a } = data;
+  const nodes = [
+    { label: "Employees", count: e.employees, href: "/employees" },
+    { label: "Leads", count: e.leads, href: "/leads" },
+    { label: "Opportunities", count: e.opportunities, href: "/pipeline" },
+    { label: "Assignments", count: e.assignments, href: "/assignments" },
+  ];
+  const relations = [
+    { from: "Employee", to: "Lead", verb: "owns", value: l.leadsOwned, total: e.leads, href: "/leads" },
+    { from: "Lead", to: "Opportunity", verb: "converted into", value: l.leadsConverted, total: e.leads, href: "/pipeline" },
+    { from: "Employee", to: "Opportunity", verb: "owns", value: l.opportunitiesOwned, total: e.opportunities, href: "/pipeline" },
+    { from: "Employee", to: "Assignment", verb: "owns", value: l.assignmentsOwned, total: e.assignments, href: "/assignments" },
+    { from: "Assignment", to: "Lead", verb: "linked to", value: l.assignmentsOnLeads, total: e.assignments, href: "/assignments" },
+    { from: "Assignment", to: "Opportunity", verb: "linked to", value: l.assignmentsOnOpportunities, total: e.assignments, href: "/assignments" },
+  ];
+  const issues = [
+    a.leadsUnowned > 0 && { text: `${a.leadsUnowned} lead${a.leadsUnowned === 1 ? "" : "s"} with no owner`, href: "/leads" },
+    a.assignmentsUnlinked > 0 && {
+      text: `${a.assignmentsUnlinked} assignment${a.assignmentsUnlinked === 1 ? "" : "s"} not linked to a lead or opportunity`,
+      href: "/assignments",
+    },
+  ].filter(Boolean) as { text: string; href: string }[];
+
+  return (
+    <section aria-labelledby="relations-heading" className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="relations-heading" className="text-sm font-semibold text-ink">How your data connects</h2>
+        {issues.length === 0 ? <Badge tone="success">All records linked</Badge> : <Badge tone="warning">{issues.length} to review</Badge>}
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {nodes.map((n) => (
+          <Link
+            key={n.label}
+            href={n.href}
+            className="group rounded-xl border border-border bg-surface p-4 transition-colors hover:border-emerald"
+          >
+            <p className="text-xs text-muted">{n.label}</p>
+            <p className="mt-1 text-2xl font-semibold text-ink">{n.count.toLocaleString()}</p>
+          </Link>
+        ))}
+      </div>
+
+      <Card className="p-0">
+        <ul className="divide-y divide-border">
+          {relations.map((r) => {
+            const pct = r.total > 0 ? Math.round((r.value / r.total) * 100) : 0;
+            return (
+              <li key={`${r.from}-${r.verb}-${r.to}`}>
+                <Link href={r.href} className="flex flex-col gap-2 px-5 py-3 hover:bg-canvas sm:flex-row sm:items-center sm:gap-4">
+                  <span className="flex min-w-0 items-center gap-2 text-sm text-ink sm:w-80">
+                    <span className="font-medium">{r.from}</span>
+                    <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden />
+                    <span className="text-muted">{r.verb}</span>
+                    <span className="font-medium">{r.to}</span>
+                  </span>
+                  <span
+                    className="h-1.5 flex-1 overflow-hidden rounded-full bg-canvas"
+                    role="progressbar"
+                    aria-valuenow={pct}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label={`${r.from} ${r.verb} ${r.to}`}
+                  >
+                    <span className="block h-full rounded-full bg-emerald" style={{ width: `${pct}%` }} />
+                  </span>
+                  <span className="text-sm text-muted sm:w-40 sm:text-right">
+                    {r.value.toLocaleString()} of {r.total.toLocaleString()} · {pct}%
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
+
+      {issues.length > 0 && (
+        <ul className="flex flex-col gap-2">
+          {issues.map((i) => (
+            <li key={i.text}>
+              <Link
+                href={i.href}
+                className="flex items-center justify-between gap-3 rounded-xl border border-amber/30 bg-amber/5 px-4 py-3 text-sm text-ink hover:bg-amber/10"
+              >
+                <span>{i.text}</span>
+                <span className="inline-flex items-center gap-1 text-amber">Review <ArrowRight className="h-3.5 w-3.5" aria-hidden /></span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function EntityCard({
   title,
-  endpoint,
+  exportPath,
+  importEndpoint,
   hint,
+  footer,
 }: {
   title: string;
-  endpoint: string;
-  hint: React.ReactNode;
+  exportPath: string;
+  importEndpoint?: string;
+  hint?: React.ReactNode;
+  footer?: React.ReactNode;
 }) {
   const [file, setFile] = useState<File | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -192,42 +314,53 @@ function CsvImportCard({
 
   const importCsv = useMutation({
     mutationFn: () => {
-      if (!file) throw new Error("Choose a CSV file first");
-      return api.upload<ImportResult>(endpoint, file);
+      if (!file || !importEndpoint) throw new Error("Choose a CSV file first");
+      return api.upload<ImportResult>(importEndpoint, file);
     },
     onSuccess: setResult,
     onError: (err) => setError(err instanceof ApiError ? err.message : "Import failed"),
   });
 
   return (
-    <Card>
-      <h2 className="mb-4 text-sm font-medium text-ink">{title}</h2>
-      <p className="mb-3 text-xs text-muted">{hint}</p>
-      {error && <div className="mb-3"><ErrorState message={error} /></div>}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          setError(null);
-          setResult(null);
-          importCsv.mutate();
-        }}
-        className="flex flex-col items-start gap-3"
-      >
-        <FileInput value={file} onChange={setFile} accept=".csv,text/csv" label="Choose CSV file" required />
-        <Button type="submit" disabled={!file || importCsv.isPending}>
-          {importCsv.isPending ? "Importing..." : "Import"}
-        </Button>
-      </form>
+    <Card className="flex flex-col gap-4">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-ink">{title}</h3>
+        <a href={exportPath} download>
+          <Button variant="secondary" type="button">
+            <Download className="h-4 w-4" aria-hidden /> Export CSV
+          </Button>
+        </a>
+      </div>
+      {importEndpoint ? (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            setError(null);
+            setResult(null);
+            importCsv.mutate();
+          }}
+          className="flex flex-col items-start gap-3 border-t border-border pt-4"
+        >
+          {hint && <p className="text-xs text-muted">{hint}</p>}
+          {error && <div className="w-full"><ErrorState message={error} /></div>}
+          <FileInput value={file} onChange={setFile} accept=".csv,text/csv" label="Choose CSV file" required />
+          <Button type="submit" disabled={!file || importCsv.isPending}>
+            {importCsv.isPending ? "Importing…" : "Import"}
+          </Button>
+        </form>
+      ) : (
+        <p className="border-t border-border pt-4 text-xs text-muted">Export only. Assignments are created in the app.</p>
+      )}
       {result && (
-        <div className="mt-4 text-sm">
+        <div className="text-sm" aria-live="polite">
           <p className="font-medium text-ink">
             {result.createdCount} created, {result.errorCount} errors
           </p>
           {result.errors.length > 0 && (
             <>
               <ul className="mt-2 flex flex-col gap-1 text-xs text-coral">
-                {result.errors.map((e, i) => (
-                  <li key={i}>Row {e.row}: {e.message}</li>
+                {result.errors.map((er, i) => (
+                  <li key={i}>Row {er.row}: {er.message}</li>
                 ))}
               </ul>
               {result.detectedHeaders && (
@@ -239,6 +372,7 @@ function CsvImportCard({
           )}
         </div>
       )}
+      {footer && <p className="text-xs">{footer}</p>}
     </Card>
   );
 }

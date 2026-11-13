@@ -132,7 +132,7 @@ export default function AssignmentsPage() {
               onChange={(e) => setForm({ ...form, title: e.target.value })}
               required
             />
-            <Select value={form.ownerId} onChange={(e) => setForm({ ...form, ownerId: e.target.value })}>
+            <Select aria-label="Assign to" value={form.ownerId} onChange={(e) => setForm({ ...form, ownerId: e.target.value })}>
               <option value="">Unassigned</option>
               {employees?.map((emp) => (
                 <option key={emp.id} value={emp.id}>
@@ -140,7 +140,7 @@ export default function AssignmentsPage() {
                 </option>
               ))}
             </Select>
-            <Select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
+            <Select aria-label="Priority" value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
               <option value="low">Low</option>
               <option value="normal">Normal</option>
               <option value="high">High</option>
@@ -148,6 +148,7 @@ export default function AssignmentsPage() {
             </Select>
             <Input
               type="date"
+              aria-label="Due date (optional)"
               value={form.dueAt}
               onChange={(e) => setForm({ ...form, dueAt: e.target.value })}
             />

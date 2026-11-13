@@ -243,7 +243,7 @@ function TeamPerformancePanel({ range }: { range: string }) {
       <Card>
         <h2 className="mb-4 text-sm font-medium text-ink">Per-telecaller performance</h2>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="stack-table w-full text-sm">
             <thead>
               <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted">
                 <th scope="col" className="pb-2 font-medium">Telecaller</th>
@@ -262,24 +262,24 @@ function TeamPerformancePanel({ range }: { range: string }) {
             <tbody>
               {data.perEmployee.map((row) => (
                 <tr key={row.employeeId} className="border-b border-border last:border-0 hover:bg-canvas/40">
-                  <td className="py-2 text-ink">
+                  <td data-label="Telecaller" className="py-2 text-ink">
                     <Link href={`/reports/${row.employeeId}`} className="hover:text-emerald-dark hover:underline">
                       {row.fullName}
                     </Link>
                     <span className="block text-xs text-muted">{row.employeeNumber}</span>
                   </td>
-                  <td className="py-2 text-muted">{row.calls}</td>
-                  <td className="py-2 text-muted">{row.connectRate}%</td>
-                  <td className="py-2 text-muted">{row.leadsHandled}</td>
-                  <td className="py-2 text-muted">{row.leadsQualified}</td>
-                  <td className="py-2 text-muted">{row.meetingsBooked}</td>
-                  <td className="py-2 text-muted">{row.followUpsCompleted}</td>
-                  <td className={row.followUpsOverdue > 0 ? "py-2 font-medium text-coral" : "py-2 text-muted"}>
+                  <td data-label="Calls" className="py-2 text-muted">{row.calls}</td>
+                  <td data-label="Connect rate" className="py-2 text-muted">{row.connectRate}%</td>
+                  <td data-label="Leads" className="py-2 text-muted">{row.leadsHandled}</td>
+                  <td data-label="Qualified" className="py-2 text-muted">{row.leadsQualified}</td>
+                  <td data-label="Meetings" className="py-2 text-muted">{row.meetingsBooked}</td>
+                  <td data-label="Follow-ups done" className="py-2 text-muted">{row.followUpsCompleted}</td>
+                  <td data-label="Overdue" className={row.followUpsOverdue > 0 ? "py-2 font-medium text-coral" : "py-2 text-muted"}>
                     {row.followUpsOverdue}
                   </td>
-                  <td className="py-2 text-muted">{row.dealsWon}</td>
-                  <td className="py-2 font-medium text-emerald-dark">{formatAmount(row.revenueMinor)}</td>
-                  <td className="py-2 text-muted">{row.conversionRate}%</td>
+                  <td data-label="Won" className="py-2 text-muted">{row.dealsWon}</td>
+                  <td data-label="Revenue" className="py-2 font-medium text-emerald-dark">{formatAmount(row.revenueMinor)}</td>
+                  <td data-label="Conversion" className="py-2 text-muted">{row.conversionRate}%</td>
                 </tr>
               ))}
             </tbody>

@@ -16,7 +16,7 @@ import type {
   PipelineStageSummary,
 } from "@zulivio/types";
 import { api, ApiError } from "@/lib/api";
-import { Badge, Button, Dialog, Input, useToast } from "./ui";
+import { Badge, Button, Dialog, Input, useConfirm, useToast } from "./ui";
 
 // ---------------------------------------------------------------------
 // Formatting
@@ -212,7 +212,7 @@ function QuickActions({ phone }: { phone: string }) {
         href={`tel:${phone}`}
         aria-label={`Call ${phone}`}
         title="Call"
-        className="flex h-7 w-7 items-center justify-center rounded-md text-emerald-dark transition hover:bg-emerald/10"
+        className="flex h-11 w-11 items-center justify-center rounded-md text-emerald-dark transition hover:bg-emerald/10 sm:h-7 sm:w-7"
       >
         <Phone size={14} aria-hidden />
       </a>
@@ -222,7 +222,7 @@ function QuickActions({ phone }: { phone: string }) {
         rel="noreferrer noopener"
         aria-label={`WhatsApp ${phone}`}
         title="WhatsApp"
-        className="flex h-7 w-7 items-center justify-center rounded-md text-emerald-dark transition hover:bg-emerald/10"
+        className="flex h-11 w-11 items-center justify-center rounded-md text-emerald-dark transition hover:bg-emerald/10 sm:h-7 sm:w-7"
       >
         <MessageCircle size={14} aria-hidden />
       </a>
@@ -238,7 +238,7 @@ function QuickActions({ phone }: { phone: string }) {
         }}
         aria-label={`Copy ${phone}`}
         title="Copy number"
-        className="flex h-7 w-7 items-center justify-center rounded-md text-muted transition hover:bg-canvas hover:text-ink"
+        className="flex h-11 w-11 items-center justify-center rounded-md text-muted transition hover:bg-canvas hover:text-ink sm:h-7 sm:w-7"
       >
         <Copy size={14} aria-hidden />
       </button>
@@ -315,6 +315,7 @@ function NoteButton({ leadId }: { leadId: string }) {
 function DeleteButton({ leadId, leadName }: { leadId: string; leadName: string }) {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const ask = useConfirm();
 
   const deleteLead = useMutation({
     mutationFn: () => api.delete(`/api/v1/leads/${leadId}`),
@@ -328,14 +329,22 @@ function DeleteButton({ leadId, leadName }: { leadId: string; leadName: string }
   return (
     <button
       type="button"
-      onClick={(e) => {
+      onClick={async (e) => {
         e.stopPropagation();
-        if (confirm(`Delete ${leadName}? This can't be undone.`)) deleteLead.mutate();
+        if (
+          await ask({
+            title: `Delete ${leadName}?`,
+            message: "The lead is deleted together with its calls, notes and follow-ups. This can't be undone.",
+            confirmLabel: "Delete lead",
+          })
+        )
+          deleteLead.mutate();
       }}
       disabled={deleteLead.isPending}
       aria-label={`Delete ${leadName}`}
       title="Delete lead"
-      className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted transition hover:bg-coral/10 hover:text-coral"
+      // 44px hit area on touch screens, compact on desktop.
+      className="flex min-h-11 min-w-11 items-center justify-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted transition hover:bg-coral/10 hover:text-coral sm:min-h-0 sm:min-w-0"
     >
       <Trash2 size={13} aria-hidden />
     </button>

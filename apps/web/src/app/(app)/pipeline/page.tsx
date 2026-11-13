@@ -113,7 +113,7 @@ export default function PipelinePage() {
             onChange={(e) => setForm({ ...form, amount: e.target.value })}
           />
           {managerView && employees ? (
-            <Select value={form.ownerId} onChange={(e) => setForm({ ...form, ownerId: e.target.value })}>
+            <Select aria-label="Deal owner" value={form.ownerId} onChange={(e) => setForm({ ...form, ownerId: e.target.value })}>
               <option value="">Me</option>
               {employees.map((emp) => (
                 <option key={emp.id} value={emp.id}>
@@ -132,7 +132,7 @@ export default function PipelinePage() {
         </form>
       </Card>
 
-      <div className="overflow-x-auto pb-2">
+      <div className="overflow-x-auto pb-2" tabIndex={0} role="region" aria-label="Pipeline board, scrollable">
         <div className="flex gap-4" style={{ minWidth: `${pipeline.stages.length * 260}px` }}>
           {pipeline.stages.map((stage) => {
             const cards = openOpportunities.filter((o) => o.stageId === stage.id);
@@ -171,6 +171,7 @@ export default function PipelinePage() {
                       </Link>
                     )}
                     <Select
+                      aria-label={`Move ${opp.title} to another stage`}
                       className="mt-2 py-1 text-xs"
                       defaultValue=""
                       onChange={(e) => {

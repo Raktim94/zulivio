@@ -20,6 +20,15 @@ android {
     }
 
     buildTypes {
+        // A debug-signed, debuggable build that runs the same R8 shrinking/obfuscation as release, so the minified code
+        // can be exercised against a local HTTP server. Not shipped.
+        create("minifiedDebug") {
+            initWith(getByName("debug"))
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            matchingFallbacks += "debug"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -35,6 +44,7 @@ android {
         compose = true
         buildConfig = true
     }
+    sourceSets.getByName("minifiedDebug").res.srcDir("src/debug/res")
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
     testOptions { unitTests.isReturnDefaultValues = true }
 }

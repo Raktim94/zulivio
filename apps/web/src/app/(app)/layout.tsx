@@ -26,10 +26,11 @@ import {
   Contact,
   UserCog,
   Database,
+  Plug,
   Settings as SettingsIcon,
   type LucideIcon,
 } from "lucide-react";
-import { useCurrentEmployee, isManagerOrAbove, isMasterOwner, isSalesHeadOrAbove } from "@/lib/use-current-employee";
+import { useCurrentEmployee, isAdminOrAbove, isManagerOrAbove, isMasterOwner, isSalesHeadOrAbove } from "@/lib/use-current-employee";
 import { useQueryClient } from "@tanstack/react-query";
 import { Spinner, Dialog, Card } from "@/components/ui";
 import { Logo } from "@/components/logo";
@@ -45,6 +46,7 @@ interface NavItem {
   managerOnly?: boolean;
   salesHeadOnly?: boolean;
   masterOwnerOnly?: boolean;
+  adminOnly?: boolean;
 }
 
 const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
@@ -88,6 +90,7 @@ const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { href: "/employees", label: "Employees", icon: UserCog, managerOnly: true },
       { href: "/data-hub", label: "Data Hub", icon: Database, managerOnly: true },
+      { href: "/integrations", label: "Integrations & API", icon: Plug, adminOnly: true },
     ],
   },
   {
@@ -103,6 +106,7 @@ function NavLinks({
   isManager,
   isSalesHead,
   isOwner,
+  isAdmin,
   collapsed,
   onNavigate,
 }: {
@@ -110,6 +114,7 @@ function NavLinks({
   isManager: boolean;
   isSalesHead: boolean;
   isOwner: boolean;
+  isAdmin: boolean;
   collapsed?: boolean;
   onNavigate?: () => void;
 }) {
@@ -120,7 +125,8 @@ function NavLinks({
           (item) =>
             (!item.managerOnly || isManager) &&
             (!item.salesHeadOnly || isSalesHead) &&
-            (!item.masterOwnerOnly || isOwner),
+            (!item.masterOwnerOnly || isOwner) &&
+            (!item.adminOnly || isAdmin),
         );
         if (items.length === 0) return null;
         return (
@@ -128,7 +134,7 @@ function NavLinks({
             {collapsed ? (
               <p className="sr-only">{group.label}</p>
             ) : (
-              <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-widest text-white/45">
+              <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-widest text-white/60">
                 {group.label}
               </p>
             )}
@@ -217,8 +223,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isManager = isManagerOrAbove(employee.role);
   const isSalesHead = isSalesHeadOrAbove(employee.role);
   const isOwner = isMasterOwner(employee.role);
+  const isAdmin = isAdminOrAbove(employee.role);
   const allItems = NAV_GROUPS.flatMap((g) => g.items);
-  const pageTitle = allItems.find((item) => item.href === pathname)?.label ?? "Zulivio";
+  // Exact match first, then the longest parent route, so /leads/<id> is titled "Leads" rather than the app name.
+  const pageTitle =
+    allItems.find((item) => item.href === pathname)?.label ??
+    [...allItems]
+      .filter((item) => item.href !== "/" && pathname.startsWith(`${item.href}/`))
+      .sort((x, y) => y.href.length - x.href.length)[0]?.label ??
+    "Zulivio";
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -246,6 +259,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             isManager={isManager}
             isSalesHead={isSalesHead}
             isOwner={isOwner}
+            isAdmin={isAdmin}
             collapsed={collapsed}
           />
         </div>
@@ -263,6 +277,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             isManager={isManager}
             isSalesHead={isSalesHead}
             isOwner={isOwner}
+            isAdmin={isAdmin}
             onNavigate={() => setMobileNavOpen(false)}
           />
           <div className="border-t border-white/10 pt-4">

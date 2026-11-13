@@ -18,8 +18,8 @@
   --color-emerald: #0b7a5a;
   --color-emerald-dark: #096249;
   --color-coral: #b91c1c;
-  --color-amber: #b45309;
-  --color-indigo: #5b5bd6;
+  --color-amber: #9a4507;
+  --color-indigo: #4b4bc2;
   --color-ink: #14212a;
   --color-muted: #43535e;
   --color-border: #e3e7ea;
@@ -82,4 +82,48 @@ body {
 
 * {
   box-sizing: border-box;
+}
+
+/* Dense tables become stacked cards under 720px (DESIGN.md §4): each cell shows its column name via data-label. */
+@media (max-width: 719px) {
+  table.stack-table,
+  table.stack-table tbody,
+  table.stack-table tr,
+  table.stack-table td {
+    display: block;
+    width: 100%;
+  }
+  table.stack-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  table.stack-table tr {
+    border: 1px solid var(--color-border);
+    border-radius: 0.75rem;
+    margin-bottom: 0.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+  table.stack-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.35rem 0;
+    border: 0;
+    text-align: right;
+  }
+  table.stack-table td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    text-align: left;
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-muted);
+  }
+  table.stack-table td[data-label="Actions"]::before { content: none; }
+  table.stack-table td[data-label="Actions"] { justify-content: flex-end; }
 }

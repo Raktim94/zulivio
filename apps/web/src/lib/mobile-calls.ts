@@ -39,6 +39,10 @@ export interface MobileDevice {
   status: "ACTIVE" | "DISABLED";
   employee: { id: string; fullName: string; employeeNumber: string };
   tokenLastFour: string;
+  /** ADMIN = static-token device (MacroDroid etc.); APP = a phone signed in through the Zulivio Android app. */
+  enrollment?: "ADMIN" | "APP";
+  platform?: string | null;
+  appVersion?: string | null;
   createdAt: string;
   lastSeenAt: string | null;
   lastTestAt: string | null;

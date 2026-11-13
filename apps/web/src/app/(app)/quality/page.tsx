@@ -273,6 +273,7 @@ function ReviewerPanel() {
           </Select>
           <Input
             type="number"
+            aria-label="Overall score (0 to 10)"
             min={0}
             max={10}
             value={form.overallScore}

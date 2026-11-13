@@ -33,3 +33,8 @@ export function isSalesHeadOrAbove(role: CurrentEmployee["role"] | undefined): b
   if (!role) return false;
   return RANK[role] >= RANK.SALES_HEAD;
 }
+
+export function isAdminOrAbove(role: CurrentEmployee["role"] | undefined): boolean {
+  if (!role) return false;
+  return RANK[role] >= RANK.COMPANY_ADMIN;
+}

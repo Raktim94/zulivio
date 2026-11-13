@@ -13,7 +13,7 @@ import type {
   PipelineStageSummary,
 } from "@zulivio/types";
 import { api, ApiError } from "@/lib/api";
-import { Badge, Button, Card, EmptyState, ErrorState, Input, Select, Spinner, useToast } from "@/components/ui";
+import { Badge, Button, Card, EmptyState, ErrorState, Input, Select, Spinner, useConfirm, useToast } from "@/components/ui";
 import { LOSS_REASON_LABEL, PriorityBadge, ScoreBadge, bandFor, formatWhen } from "@/components/crm";
 
 const LOSS_REASONS: LeadLossReason[] = [
@@ -83,6 +83,7 @@ export function LeadList({
 }) {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const ask = useConfirm();
 
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [page, setPage] = useState(1);
@@ -298,12 +299,14 @@ export function LeadList({
               <Button
                 variant="danger"
                 disabled={deleteAll.isPending || !data?.total}
-                onClick={() => {
+                onClick={async () => {
                   const total = data?.total ?? 0;
                   if (
-                    confirm(
-                      `Permanently delete all ${total} lead${total === 1 ? "" : "s"} matching your filters? This can't be undone.`,
-                    )
+                    await ask({
+                      title: "Delete all matching leads?",
+                      message: `All ${total} lead${total === 1 ? "" : "s"} matching your filters are permanently deleted with their history. This can't be undone.`,
+                      confirmLabel: "Delete all matching",
+                    })
                   ) {
                     deleteAll.mutate();
                   }
@@ -403,8 +406,8 @@ export function LeadList({
             <Button
               variant="danger"
               disabled={bulk.isPending}
-              onClick={() => {
-                if (confirm(`Permanently delete ${selected.size} lead${selected.size === 1 ? "" : "s"}? This can't be undone.`)) {
+              onClick={async () => {
+                if (await ask({ title: "Delete leads?", message: `${selected.size} lead${selected.size === 1 ? " is" : "s are"} permanently deleted with their history. This can't be undone.`, confirmLabel: "Delete permanently" })) {
                   bulk.mutate({ path: "delete", body: {} });
                 }
               }}

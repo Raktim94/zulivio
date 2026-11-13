@@ -23,7 +23,7 @@ import type {
   PurchaseIntent,
 } from "@zulivio/types";
 import { api, ApiError } from "@/lib/api";
-import { Badge, Button, Card, Dialog, ErrorState, Input, Select, Spinner, useToast } from "@/components/ui";
+import { Badge, Button, Card, Dialog, ErrorState, Input, Select, Spinner, useConfirm, useToast } from "@/components/ui";
 import { DispositionDialog, FollowUpDialog } from "@/components/lead-dialogs";
 import { LeadCalls } from "@/components/lead-calls";
 import {
@@ -59,13 +59,14 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
   const queryClient = useQueryClient();
   const toast = useToast();
   const router = useRouter();
+  const ask = useConfirm();
 
   const [dispositionOpen, setDispositionOpen] = useState(false);
   const [followUpOpen, setFollowUpOpen] = useState(false);
   const [lossFor, setLossFor] = useState<PipelineStageSummary | null>(null);
   const [note, setNote] = useState("");
 
-  const { data, isLoading, error } = useQuery<LeadDetailData>({
+  const { data, isLoading, error, refetch } = useQuery<LeadDetailData>({
     queryKey: ["leads", id, "detail"],
     queryFn: () => api.get<LeadDetailData>(`/api/v1/leads/${id}/detail`),
   });
@@ -116,7 +117,7 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
   });
 
   if (isLoading) return <Spinner />;
-  if (error || !data) return <ErrorState message="Could not load this lead." />;
+  if (error || !data) return <LeadLoadError error={error} onRetry={() => void refetch()} />;
 
   const { lead } = data;
   const nextFollowUp = data.followUps.find((f) => f.status === "PENDING");
@@ -158,7 +159,7 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
                     }}
                     aria-label={`Copy ${lead.phone}`}
                     title="Copy number"
-                    className="flex h-6 w-6 items-center justify-center rounded-md text-muted transition hover:bg-canvas hover:text-ink"
+                    className="flex h-11 w-11 items-center justify-center rounded-md text-muted transition hover:bg-canvas hover:text-ink sm:h-6 sm:w-6"
                   >
                     <Copy size={13} aria-hidden />
                   </button>
@@ -210,10 +211,19 @@ export default function LeadWorkspacePage({ params }: { params: Promise<{ id: st
             <Button variant="secondary" onClick={() => setDispositionOpen(true)} disabled={!lead.phone}>
               Log outcome
             </Button>
+            {/* Destructive and rarely wanted: kept visually apart from the call actions, outlined rather than filled, and confirmed. */}
             <Button
-              variant="danger"
-              onClick={() => {
-                if (confirm(`Delete ${lead.fullName}? This can't be undone.`)) deleteLead.mutate();
+              variant="secondary"
+              className="border-coral/40 text-coral"
+              onClick={async () => {
+                if (
+                  await ask({
+                    title: `Delete ${lead.fullName}?`,
+                    message: "The lead is deleted together with its calls, notes and follow-ups. This can't be undone.",
+                    confirmLabel: "Delete lead",
+                  })
+                )
+                  deleteLead.mutate();
               }}
               disabled={deleteLead.isPending}
             >
@@ -579,5 +589,32 @@ function LossDialog({
         </div>
       </form>
     </Dialog>
+  );
+}
+
+/** A lead that can't be shown says why, and what to do — never an endless spinner or a bare "could not load". */
+function LeadLoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  const status = error instanceof ApiError ? error.status : 0;
+  const content =
+    status === 403
+      ? { title: "You don't have access to this lead", body: "It belongs to someone outside your team. If you think you should see it, ask your manager or an administrator." }
+      : status === 404
+        ? { title: "This lead no longer exists", body: "It may have been deleted or merged." }
+        : { title: "Couldn't load this lead", body: error instanceof ApiError ? error.message : "Check your connection and try again." };
+  return (
+    <div className="flex flex-col items-start gap-3" role="alert">
+      <Link href="/leads" className="text-xs text-muted hover:text-ink">
+        ← Back to leads
+      </Link>
+      <Card className="w-full max-w-xl">
+        <h1 className="text-base font-semibold text-ink">{content.title}</h1>
+        <p className="mt-1 text-sm text-muted">{content.body}</p>
+        {status !== 403 && status !== 404 && (
+          <Button className="mt-4" variant="secondary" onClick={onRetry}>
+            Try again
+          </Button>
+        )}
+      </Card>
+    </div>
   );
 }

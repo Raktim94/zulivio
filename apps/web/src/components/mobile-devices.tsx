@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { EmployeeSummary } from "@zulivio/types";
 import { api, ApiError } from "@/lib/api";
-import { Badge, Button, Card, ErrorState, Input, Select, Spinner, useToast } from "@/components/ui";
+import { Badge, Button, Card, ErrorState, Input, Select, Spinner, useConfirm, useToast } from "@/components/ui";
 import {
   IMPORT_BATCH_SIZE,
   MAX_IMPORT_FILE_BYTES,
@@ -30,6 +30,7 @@ function when(iso: string | null) {
 export function MobileDevicesPanel() {
   const queryClient = useQueryClient();
   const { push } = useToast();
+  const ask = useConfirm();
 
   const { data: employees } = useQuery<EmployeeSummary[]>({
     queryKey: ["employees"],
@@ -41,7 +42,7 @@ export function MobileDevicesPanel() {
     // While the setup wizard waits for the first test event.
     refetchInterval: (q) => (q.state.data?.some((d) => !d.lastSeenAt) ? 5000 : false),
   });
-  const { data: settings } = useQuery<{ callRetentionDays: number | null }>({
+  const { data: settings } = useQuery<{ callRetentionDays: number | null; contactRetentionDays: number | null }>({
     queryKey: ["mobile-settings"],
     queryFn: () => api.get("/api/v1/mobile/settings"),
   });
@@ -54,6 +55,7 @@ export function MobileDevicesPanel() {
   // The raw token lives only in this component's memory, never in the cache or storage.
   const [revealed, setRevealed] = useState<MobileDevice | null>(null);
   const [retention, setRetention] = useState("");
+  const [contactRetention, setContactRetention] = useState("");
 
   const refresh = () => queryClient.invalidateQueries({ queryKey: ["mobile-devices"] });
   const onError = (err: unknown) => push(err instanceof ApiError ? err.message : "That didn't work.", "error");
@@ -105,6 +107,14 @@ export function MobileDevicesPanel() {
       push("Call history deleted.", "success");
       refresh();
       queryClient.invalidateQueries({ queryKey: ["mobile-calls"] });
+    },
+    onError,
+  });
+  const saveContactRetention = useMutation({
+    mutationFn: (days: number | null) => api.patch("/api/v1/mobile/settings", { contactRetentionDays: days }),
+    onSuccess: () => {
+      push("Contact retention updated.", "success");
+      queryClient.invalidateQueries({ queryKey: ["mobile-settings"] });
     },
     onError,
   });
@@ -212,15 +222,15 @@ export function MobileDevicesPanel() {
                 key={d.id}
                 device={d}
                 busy={regenerate.isPending || setStatus.isPending || remove.isPending || clearCalls.isPending}
-                onRegenerate={() => {
-                  if (window.confirm(`Regenerate the token for "${d.name}"? The phone stops syncing until it is updated.`)) regenerate.mutate(d.id);
+                onRegenerate={async () => {
+                  if (await ask({ title: "Regenerate token?", message: `The phone "${d.name}" stops syncing until it is updated with the new token.`, confirmLabel: "Regenerate" })) regenerate.mutate(d.id);
                 }}
                 onToggle={() => setStatus.mutate({ id: d.id, status: d.status === "ACTIVE" ? "DISABLED" : "ACTIVE" })}
-                onClear={() => {
-                  if (window.confirm(`Delete ALL call history synced from "${d.name}"? This cannot be undone.`)) clearCalls.mutate(d.id);
+                onClear={async () => {
+                  if (await ask({ title: "Delete call history?", message: `All call history synced from "${d.name}" is deleted. This cannot be undone.`, confirmLabel: "Delete call history" })) clearCalls.mutate(d.id);
                 }}
-                onRemove={() => {
-                  if (window.confirm(`Remove "${d.name}" and delete its call history? This cannot be undone.`)) remove.mutate(d.id);
+                onRemove={async () => {
+                  if (await ask({ title: "Remove device?", message: `"${d.name}" is removed and its call history is deleted. This cannot be undone.`, confirmLabel: "Remove device" })) remove.mutate(d.id);
                 }}
               />
             ))}
@@ -237,6 +247,21 @@ export function MobileDevicesPanel() {
         <div className="flex flex-wrap gap-2">
           <Input aria-label="Retention days" type="number" min={30} max={3650} placeholder="Days" value={retention} onChange={(e) => setRetention(e.target.value)} className="max-w-[8rem]" />
           <Button disabled={saveRetention.isPending || (retention !== "" && Number(retention) < 30)} onClick={() => saveRetention.mutate(retention === "" ? null : Number(retention))}>
+            Save
+          </Button>
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="mb-1 text-sm font-medium text-ink">Imported phone contact retention</h2>
+        <p className="mb-3 text-sm text-muted">
+          Contacts that employees upload from the Android app are deleted this many days after they were last synced (minimum 30). Leave empty to keep them until the employee
+          or an administrator removes them. Leads created from contacts are ordinary leads and are not affected.{" "}
+          {settings?.contactRetentionDays ? `Currently ${settings.contactRetentionDays} days.` : "Currently kept until removed."}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <Input aria-label="Contact retention days" type="number" min={30} max={3650} placeholder="Days" value={contactRetention} onChange={(e) => setContactRetention(e.target.value)} className="max-w-[8rem]" />
+          <Button disabled={saveContactRetention.isPending || (contactRetention !== "" && Number(contactRetention) < 30)} onClick={() => saveContactRetention.mutate(contactRetention === "" ? null : Number(contactRetention))}>
             Save
           </Button>
         </div>
@@ -281,10 +306,10 @@ function DeviceRow({
 }: {
   device: MobileDevice;
   busy: boolean;
-  onRegenerate: () => void;
+  onRegenerate: () => void | Promise<void>;
   onToggle: () => void;
-  onClear: () => void;
-  onRemove: () => void;
+  onClear: () => void | Promise<void>;
+  onRemove: () => void | Promise<void>;
 }) {
   const connected = !!d.lastSeenAt;
   return (
@@ -292,7 +317,12 @@ function DeviceRow({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-ink">
-            {d.name} <span className="text-muted">({d.deviceId} · ····{d.tokenLastFour})</span>
+            {d.name}{" "}
+            {d.enrollment === "APP" ? (
+              <span className="text-muted">(Zulivio Android app{d.appVersion ? ` v${d.appVersion}` : ""})</span>
+            ) : (
+              <span className="text-muted">({d.deviceId} · ····{d.tokenLastFour})</span>
+            )}
           </p>
           <p className="text-xs text-muted">
             {d.employee.fullName} ({d.employee.employeeNumber}){d.phoneNumber && ` · ${d.phoneNumber}`} · {(d.callCount ?? 0).toLocaleString()} calls
@@ -307,9 +337,11 @@ function DeviceRow({
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <ImportHistory device={d} />
-        <Button variant="secondary" className="px-3 py-1.5 text-xs" disabled={busy} onClick={onRegenerate}>
-          Regenerate token
-        </Button>
+        {d.enrollment !== "APP" && (
+          <Button variant="secondary" className="px-3 py-1.5 text-xs" disabled={busy} onClick={onRegenerate}>
+            Regenerate token
+          </Button>
+        )}
         <Button variant="secondary" className="px-3 py-1.5 text-xs" disabled={busy} onClick={onToggle}>
           {d.status === "ACTIVE" ? "Revoke / disable" : "Enable"}
         </Button>

@@ -114,6 +114,7 @@ export function FileInput({
         ref={inputRef}
         id={id}
         type="file"
+        aria-label={label}
         accept={accept}
         required={required}
         className="sr-only"
@@ -281,7 +282,7 @@ export function Tabs({
   }
 
   return (
-    <div role="tablist" className="flex gap-1 overflow-x-auto border-b border-border">
+    <div role="tablist" className="flex flex-wrap gap-x-1 border-b border-border">
       {tabs.map((tab, i) => {
         const selected = tab.id === active;
         return (
@@ -366,6 +367,87 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/**
+ * An accessible confirmation step for destructive or sensitive actions (replaces window.confirm, which cannot be
+ * styled, described or announced properly). Usage: `const ask = useConfirm(); if (await ask({ message, confirmLabel })) ...`.
+ */
+export interface ConfirmOptions {
+  title?: string;
+  message: ReactNode;
+  confirmLabel?: string;
+  /** Defaults to a danger-styled confirm button. */
+  danger?: boolean;
+}
+
+const ConfirmContext = createContext<((options: ConfirmOptions) => Promise<boolean>) | null>(null);
+
+export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const [pending, setPending] = useState<{ options: ConfirmOptions; resolve: (ok: boolean) => void } | null>(null);
+  const ask = useCallback((options: ConfirmOptions) => new Promise<boolean>((resolve) => setPending({ options, resolve })), []);
+  const close = (ok: boolean) => {
+    pending?.resolve(ok);
+    setPending(null);
+  };
+  return (
+    <ConfirmContext.Provider value={ask}>
+      {children}
+      <ConfirmDialog
+        open={pending !== null}
+        title={pending?.options.title ?? "Are you sure?"}
+        confirmLabel={pending?.options.confirmLabel ?? "Confirm"}
+        danger={pending?.options.danger ?? true}
+        onConfirm={() => close(true)}
+        onClose={() => close(false)}
+      >
+        {pending?.options.message}
+      </ConfirmDialog>
+    </ConfirmContext.Provider>
+  );
+}
+
+export function useConfirm() {
+  const ctx = useContext(ConfirmContext);
+  if (!ctx) throw new Error("useConfirm must be used within a ConfirmProvider");
+  return ctx;
+}
+
+export function ConfirmDialog({
+  open,
+  title,
+  children,
+  confirmLabel,
+  pending,
+  danger = true,
+  onConfirm,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  children: ReactNode;
+  confirmLabel: string;
+  pending?: boolean;
+  danger?: boolean;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog open={open} onClose={onClose} title={title}>
+      <div className="flex flex-col gap-4 text-sm text-ink">
+        <div className="text-muted">{children}</div>
+        <p className="text-xs text-muted">This action is recorded in the audit log.</p>
+        <div className="flex justify-end gap-2">
+          <Button variant="secondary" onClick={onClose} disabled={pending}>
+            Cancel
+          </Button>
+          <Button variant={danger ? "danger" : "primary"} onClick={onConfirm} disabled={pending}>
+            {pending ? "Working…" : confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
 export function useToast() {
   const ctx = useContext(ToastContext);
   if (!ctx) throw new Error("useToast must be used within a ToastProvider");
@@ -434,8 +516,8 @@ export function Table<T extends { id: string }>({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="overflow-x-auto rounded-xl border border-border">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-xl border border-border" tabIndex={0} role="region" aria-label="Table, scrollable">
+        <table className="stack-table w-full text-sm">
           <thead>
             <tr className="border-b border-border bg-canvas/60">
               {columns.map((col) => (
@@ -486,7 +568,7 @@ export function Table<T extends { id: string }>({
                 )}
               >
                 {columns.map((col) => (
-                  <td key={col.key} className="px-4 py-2.5 text-ink">
+                  <td key={col.key} data-label={col.header} className="px-4 py-2.5 text-ink">
                     {col.render(row)}
                   </td>
                 ))}

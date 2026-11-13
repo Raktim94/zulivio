@@ -25,6 +25,11 @@ import type { AuthenticatedEmployee } from "../common/guards/auth.guard";
 export class ImportExportController {
   constructor(private readonly importExportService: ImportExportService) {}
 
+  @Get("data/overview")
+  relationsOverview(@CurrentEmployee() actor: AuthenticatedEmployee) {
+    return this.importExportService.getRelationsOverview(actor);
+  }
+
   @Get("exports/employees.csv")
   @Header("Content-Type", "text/csv")
   async exportEmployees(@CurrentEmployee() actor: AuthenticatedEmployee, @Res() res: Response) {

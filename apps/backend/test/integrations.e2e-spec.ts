@@ -660,6 +660,28 @@ describe("Integrations & API (e2e)", () => {
     });
   });
 
+  describe("destructive lead actions are audited", () => {
+    it("single delete, bulk delete and delete-all each leave an audit event naming the actor", async () => {
+      const one = await mkLead(a, "Audit One", undefined, a.emp.id);
+      await admin(a.admin).del(`/api/v1/leads/${one.id}`).expect(200);
+      expect(await prisma.auditEvent.count({ where: { organizationId: a.id, action: "lead.deleted", targetId: one.id, actorId: a.admin.id } })).toBe(1);
+
+      const two = await mkLead(a, "Audit Two");
+      const three = await mkLead(a, "Audit Three");
+      await admin(a.admin).post("/api/v1/leads/bulk/delete").send({ leadIds: [two.id, three.id] }).expect(201);
+      const bulk = await prisma.auditEvent.findFirstOrThrow({ where: { organizationId: a.id, action: "lead.bulk_deleted" } });
+      expect(bulk.actorId).toBe(a.admin.id);
+      expect((bulk.metadata as { count: number }).count).toBe(2);
+
+      await mkLead(a, "Audit Four");
+      const bLead = await mkLead(b, "Org B survivor");
+      await admin(a.admin).post("/api/v1/leads/bulk/delete-all").send({ acknowledge: true }).expect(201);
+      expect(await prisma.auditEvent.count({ where: { organizationId: a.id, action: "lead.delete_all_matching" } })).toBe(1);
+      // another organization's data was untouched
+      expect(await prisma.lead.findUnique({ where: { id: bLead.id } })).not.toBeNull();
+    });
+  });
+
   describe("directory", () => {
     it("lists only connectors that are implemented, with honest status", async () => {
       const res = await admin(a.admin).get("/api/v1/integrations/directory").expect(200);
