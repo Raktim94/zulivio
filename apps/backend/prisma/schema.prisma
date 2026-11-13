@@ -71,6 +71,8 @@ model Organization {
   mobileCalls             MobileCall[]
   // Null = keep mobile call history forever.
   callRetentionDays       Int?
+  // Null = keep imported phone contacts until the user or an admin removes them.
+  contactRetentionDays    Int?
 
   @@map("organizations")
 }
@@ -537,6 +539,7 @@ model Lead {
   followUps      LeadFollowUp[]
   assignments    Assignment[]
   mobileCalls    MobileCall[]
+  mobileContacts MobileContact[]
 
   @@index([organizationId, status])
   @@index([organizationId, ownerId])
@@ -992,10 +995,19 @@ model MobileDevice {
   // androidCallId of the newest call this device has synced, so a native
   // app can resume incremental syncs without re-sending everything.
   lastExternalCallId String?
+  // ADMIN = provisioned by an admin with a static zlm_ token (MacroDroid and
+  // similar). APP = enrolled by the Zulivio Android app signing in as the
+  // employee; it holds no static token (tokenHash is an unguessable
+  // placeholder) and authenticates with rotating MobileAuthToken rows.
+  enrollment         String             @default("ADMIN")
+  platform           String?
+  appVersion         String?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
 
-  calls MobileCall[]
+  calls      MobileCall[]
+  authTokens MobileAuthToken[]
+  contacts   MobileContact[]
 
   @@unique([organizationId, deviceKey])
   @@index([organizationId, employeeId])
@@ -1047,4 +1059,68 @@ model MobileCall {
   @@index([organizationId, callType, startedAt])
   @@index([organizationId, leadId, startedAt])
   @@map("mobile_calls")
+}
+
+enum MobileAuthTokenKind {
+  ACCESS
+  REFRESH
+}
+
+// Short-lived access (15 min) and rotating refresh (30 day) credentials for an
+// enrolled app installation. Opaque random values; only the SHA-256 hash is
+// stored. Refresh tokens are single-use: presenting a used one is treated as
+// theft and revokes the whole family (every token minted from the same login).
+model MobileAuthToken {
+  id         String              @id @default(uuid())
+  deviceId   String
+  device     MobileDevice        @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  employeeId String
+  kind       MobileAuthTokenKind
+  tokenHash  String              @unique
+  familyId   String
+  expiresAt  DateTime
+  usedAt     DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime            @default(now())
+
+  @@index([deviceId])
+  @@index([employeeId])
+  @@index([familyId])
+  @@map("mobile_auth_tokens")
+}
+
+enum MobileContactStatus {
+  IMPORTED
+  LINKED
+  SKIPPED
+}
+
+// A phone contact the employee chose to share. Only the fields they enabled
+// are stored. The device's own contact id is never stored: sourceKeyHash is
+// sha256(deviceId:rawId), enough to recognise the same contact on re-sync.
+// contentHash lets a re-sync skip contacts that have not changed.
+model MobileContact {
+  id             String              @id @default(uuid())
+  organizationId String
+  employeeId     String
+  deviceId       String
+  device         MobileDevice        @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  sourceKeyHash  String
+  displayName    String
+  company        String?
+  emails         String[]            @default([])
+  phones         Json                @default("[]")
+  phoneLast10    String[]            @default([])
+  contentHash    String
+  status         MobileContactStatus
+  leadId         String?
+  lead           Lead?               @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  lastSyncedAt   DateTime            @default(now())
+
+  @@unique([organizationId, deviceId, sourceKeyHash])
+  @@index([organizationId, employeeId])
+  @@index([organizationId, phoneLast10])
+  @@map("mobile_contacts")
 }

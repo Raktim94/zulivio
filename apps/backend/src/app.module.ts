@@ -31,6 +31,8 @@ import { ApiKeysModule } from "./api-keys/api-keys.module";
 import { McpModule } from "./mcp/mcp.module";
 import { MissedCallsModule } from "./missed-calls/missed-calls.module";
 import { MobileCallsModule } from "./mobile-calls/mobile-calls.module";
+import { MobileContactsModule } from "./mobile-contacts/mobile-contacts.module";
+import { MobileAuthModule } from "./mobile-auth/mobile-auth.module";
 
 @Module({
   imports: [
@@ -64,6 +66,8 @@ import { MobileCallsModule } from "./mobile-calls/mobile-calls.module";
     McpModule,
     MissedCallsModule,
     MobileCallsModule,
+    MobileAuthModule,
+    MobileContactsModule,
   ],
   providers: [
     // Global safety net: every route requires an authenticated session

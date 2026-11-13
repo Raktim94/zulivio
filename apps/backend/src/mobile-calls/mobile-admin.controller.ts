@@ -113,7 +113,7 @@ export class MobileAdminController {
   @Roles(Role.COMPANY_ADMIN)
   @Patch("settings")
   async setSettings(@CurrentEmployee() actor: AuthenticatedEmployee, @Body() dto: RetentionDto) {
-    return this.query.setRetention(actor, dto.callRetentionDays ?? null);
+    return this.query.setRetention(actor, dto);
   }
 
   // ---- devices ----

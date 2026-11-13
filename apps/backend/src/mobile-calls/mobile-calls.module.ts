@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { MobileContactsModule } from "../mobile-contacts/mobile-contacts.module";
 import { LeadsModule } from "../leads/leads.module";
 import { PipelinesModule } from "../pipelines/pipelines.module";
 import { MobileAdminController } from "./mobile-admin.controller";
@@ -10,7 +11,7 @@ import { MobileIngestController } from "./mobile-ingest.controller";
 import { MobileRetentionService } from "./mobile-retention.service";
 
 @Module({
-  imports: [LeadsModule, PipelinesModule],
+  imports: [LeadsModule, PipelinesModule, MobileContactsModule],
   controllers: [MobileIngestController, MobileAdminController],
   providers: [MobileCallsService, MobileCallsQueryService, MobileDevicesService, MobileDeviceGuard, MobileRetentionService],
 })

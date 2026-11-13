@@ -1,6 +1,7 @@
 import {
   CanActivate,
   ExecutionContext,
+  ForbiddenException,
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
@@ -8,8 +9,10 @@ import { Reflector } from "@nestjs/core";
 import { createHash } from "node:crypto";
 import type { Request } from "express";
 import { PrismaService } from "../../prisma/prisma.service";
-import { EmploymentStatus, Role } from "@prisma/client";
+import { EmploymentStatus, MobileAuthTokenKind, MobileDeviceStatus, Role } from "@prisma/client";
 import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
+import { MOBILE_ACCESS_PREFIX, hashMobileToken } from "../mobile-token";
+import { isMobileRouteAllowed } from "../mobile-scope";
 
 export interface AuthenticatedEmployee {
   id: string;
@@ -42,6 +45,9 @@ export class AuthGuard implements CanActivate {
     const request: Request = context.switchToHttp().getRequest();
 
     const bearerToken = this.extractBearerToken(request);
+    if (bearerToken?.startsWith(MOBILE_ACCESS_PREFIX)) {
+      return this.authenticateMobile(request, bearerToken);
+    }
     if (bearerToken) {
       return this.authenticateApiKey(request, bearerToken);
     }
@@ -111,6 +117,44 @@ export class AuthGuard implements CanActivate {
       .update({ where: { id: apiKey.id }, data: { lastUsedAt: new Date() } })
       .catch(() => undefined);
 
+    return true;
+  }
+
+  /**
+   * Access token of a signed-in Android app installation. Resolves to the
+   * owning employee exactly like a browser session (all role / ownership
+   * checks downstream apply), but is additionally confined to the mobile
+   * route allowlist and dies the moment the token, device, or employee is
+   * revoked/disabled — it is looked up on every request.
+   */
+  private async authenticateMobile(request: Request, rawToken: string): Promise<boolean> {
+    const token = await this.prisma.mobileAuthToken.findUnique({
+      where: { tokenHash: hashMobileToken(rawToken) },
+      include: { device: { include: { employee: true } } },
+    });
+    if (
+      !token ||
+      token.kind !== MobileAuthTokenKind.ACCESS ||
+      token.revokedAt ||
+      token.expiresAt.getTime() < Date.now()
+    ) {
+      throw new UnauthorizedException("Session expired or invalid");
+    }
+    const { device } = token;
+    if (device.status !== MobileDeviceStatus.ACTIVE) {
+      throw new UnauthorizedException("This device has been disabled");
+    }
+    if (
+      device.employee.employmentStatus !== EmploymentStatus.ACTIVE ||
+      device.employee.organizationId !== device.organizationId
+    ) {
+      throw new UnauthorizedException("Employee is not active");
+    }
+    if (!isMobileRouteAllowed(request.method, request.path)) {
+      throw new ForbiddenException("This endpoint is not available to the mobile app");
+    }
+    request.employee = this.toAuthenticatedEmployee(device.employee);
+    request.mobileAuth = { deviceId: device.id, tokenId: token.id, familyId: token.familyId };
     return true;
   }
 

@@ -53,11 +53,11 @@ export class AuthService {
     return this.dummyHashPromise;
   }
 
-  async login(
-    email: string,
-    password: string,
-    context: { userAgent?: string; ipAddress?: string },
-  ) {
+  /**
+   * Shared by the browser login and the mobile app login so both get the
+   * same throttling, constant-cost verification and error text.
+   */
+  async verifyCredentials(email: string, password: string) {
     const key = email.toLowerCase();
     this.loginLimiter.assert(key);
 
@@ -81,6 +81,15 @@ export class AuthService {
     }
 
     this.loginLimiter.clear(key);
+    return employee;
+  }
+
+  async login(
+    email: string,
+    password: string,
+    context: { userAgent?: string; ipAddress?: string },
+  ) {
+    const employee = await this.verifyCredentials(email, password);
 
     const rawToken = randomBytes(32).toString("base64url");
     const tokenHash = createHash("sha256").update(rawToken).digest("hex");
@@ -142,6 +151,11 @@ export class AuthService {
     // Revoke all other sessions so a compromised session can't survive a
     // deliberate password change.
     await this.prisma.session.updateMany({
+      where: { employeeId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    // Same for signed-in phones: a password change signs the app out everywhere.
+    await this.prisma.mobileAuthToken.updateMany({
       where: { employeeId, revokedAt: null },
       data: { revokedAt: new Date() },
     });

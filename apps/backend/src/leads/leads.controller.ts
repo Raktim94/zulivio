@@ -228,6 +228,16 @@ export class LeadsController {
     return this.leadsService.startCall(actor, id);
   }
 
+  /**
+   * The phone app launched the dialer for this lead. Records only that the
+   * user *initiated* a call, labelled app_observed — never an outcome or a
+   * duration, which Android does not let an ordinary app learn.
+   */
+  @Post(":id/call-initiated")
+  async callInitiated(@CurrentEmployee() actor: AuthenticatedEmployee, @Param("id") id: string) {
+    return this.leadsService.recordCallInitiated(actor, id);
+  }
+
   /** Records the call's outcome + disposition, and anything it implies. */
   @Post(":id/calls/disposition")
   async logCall(

@@ -78,6 +78,13 @@ export class RetentionDto {
   @Min(30)
   @Max(3650)
   callRetentionDays?: number | null;
+
+  // null = keep imported phone contacts until removed.
+  @IsOptional()
+  @IsInt()
+  @Min(30)
+  @Max(3650)
+  contactRetentionDays?: number | null;
 }
 
 /** Admin file import: same records the phone would send, authenticated by the admin session. */

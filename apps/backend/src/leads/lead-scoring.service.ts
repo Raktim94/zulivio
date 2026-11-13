@@ -43,13 +43,19 @@ export class LeadScoringService {
     const existing = await this.prisma.leadScoreConfig.findUnique({ where: { organizationId } });
     if (existing) return existing;
 
-    // upsert rather than create: two concurrent first-time reads would
-    // otherwise race on the @unique(organizationId) constraint.
-    return this.prisma.leadScoreConfig.upsert({
-      where: { organizationId },
-      create: { organizationId },
-      update: {},
-    });
+    // Prisma's upsert is not atomic: two concurrent first-time reads (a page
+    // firing several requests at once) both miss the find, both insert, and
+    // one hits the @unique(organizationId) constraint -> a 500 on the first
+    // load of /my-day. Treat that unique violation as "someone else just
+    // created it" and read their row.
+    try {
+      return await this.prisma.leadScoreConfig.create({ data: { organizationId } });
+    } catch (err) {
+      if ((err as { code?: string }).code === "P2002") {
+        return this.prisma.leadScoreConfig.findUniqueOrThrow({ where: { organizationId } });
+      }
+      throw err;
+    }
   }
 
   async updateConfig(actor: AuthenticatedEmployee, dto: UpdateLeadScoreConfigDto) {

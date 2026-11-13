@@ -278,6 +278,10 @@ export class EmployeesService {
         where: { employeeId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
+      await tx.mobileAuthToken.updateMany({
+        where: { employeeId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
 
       await tx.auditEvent.create({
         data: {
@@ -314,6 +318,10 @@ export class EmployeesService {
       });
 
       await tx.session.updateMany({
+        where: { employeeId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await tx.mobileAuthToken.updateMany({
         where: { employeeId, revokedAt: null },
         data: { revokedAt: new Date() },
       });

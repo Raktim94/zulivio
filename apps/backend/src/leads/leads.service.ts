@@ -650,6 +650,24 @@ export class LeadsService {
   }
 
   /**
+   * "The user tapped Call." Distinct from a completed call: no outcome, no
+   * duration, and it does not touch callCount / lastContactedAt.
+   */
+  async recordCallInitiated(actor: AuthenticatedEmployee, id: string) {
+    const lead = await this.access.findScopedLead(actor, id);
+    if (!lead.phone) throw new BadRequestException("Lead has no phone number");
+    const activity = await this.activity.record({
+      organizationId: actor.organizationId,
+      leadId: id,
+      actorId: actor.id,
+      type: LeadActivityType.CALL,
+      body: "Call initiated from the mobile app (outcome not yet recorded)",
+      metadata: { source: "app_observed", event: "call_initiated" },
+    });
+    return { id: activity.id, source: "app_observed", event: "call_initiated" };
+  }
+
+  /**
    * Records the outcome of a call: the timeline entry, the lead's contact
    * counters, an optional follow-up, and any stage movement the
    * disposition implies — one round trip, so the telecaller taps once and
@@ -690,7 +708,7 @@ export class LeadsService {
           callOutcome: dto.outcome,
           callDisposition: dto.disposition,
           callDurationSeconds: dto.durationSeconds ?? null,
-          metadata: { provider: this.callProvider.name },
+          metadata: { provider: this.callProvider.name, source: "user_entered" },
         },
         tx,
       );

@@ -1,7 +1,8 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable, UnauthorizedException } from "@nestjs/common";
 import { createHash } from "node:crypto";
 import type { Request } from "express";
-import { EmploymentStatus, MobileDeviceStatus } from "@prisma/client";
+import { EmploymentStatus, MobileAuthTokenKind, MobileDeviceStatus } from "@prisma/client";
+import { MOBILE_ACCESS_PREFIX, hashMobileToken } from "../common/mobile-token";
 import { PrismaService } from "../prisma/prisma.service";
 import { InMemoryRateLimiter } from "../common/rate-limiter";
 
@@ -22,6 +23,8 @@ export interface AuthenticatedDevice {
   organizationId: string;
   employeeId: string;
   employeeName: string;
+  /** Set when the caller used an app access token (zla_), absent for static admin-issued zlm_ tokens. */
+  tokenFamilyId?: string;
 }
 
 export function hashDeviceToken(raw: string): string {
@@ -47,12 +50,32 @@ export class MobileDeviceGuard implements CanActivate {
       FAILED_AUTH_LIMIT.assert(request.ip ?? "unknown");
       throw new UnauthorizedException("Missing or invalid device token");
     };
-    if (!raw || !raw.startsWith(DEVICE_TOKEN_PREFIX) || raw.length > 128) return reject();
+    const isAccess = raw.startsWith(MOBILE_ACCESS_PREFIX);
+    if (!raw || (!isAccess && !raw.startsWith(DEVICE_TOKEN_PREFIX)) || raw.length > 128) return reject();
 
-    const device = await this.prisma.mobileDevice.findUnique({
-      where: { tokenHash: hashDeviceToken(raw) },
-      include: { employee: true },
-    });
+    let tokenFamilyId: string | undefined;
+    let device;
+    if (isAccess) {
+      const token = await this.prisma.mobileAuthToken.findUnique({
+        where: { tokenHash: hashMobileToken(raw) },
+        include: { device: { include: { employee: true } } },
+      });
+      if (
+        !token ||
+        token.kind !== MobileAuthTokenKind.ACCESS ||
+        token.revokedAt ||
+        token.expiresAt.getTime() < Date.now()
+      ) {
+        return reject();
+      }
+      device = token.device;
+      tokenFamilyId = token.familyId;
+    } else {
+      device = await this.prisma.mobileDevice.findUnique({
+        where: { tokenHash: hashDeviceToken(raw) },
+        include: { employee: true },
+      });
+    }
     if (!device) return reject();
 
     if (device.status !== MobileDeviceStatus.ACTIVE) {
@@ -72,6 +95,7 @@ export class MobileDeviceGuard implements CanActivate {
       organizationId: device.organizationId,
       employeeId: device.employeeId,
       employeeName: device.employee.fullName,
+      tokenFamilyId,
     };
     return true;
   }

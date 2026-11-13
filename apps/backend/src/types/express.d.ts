@@ -11,6 +11,8 @@ declare module "express" {
     sessionId?: string;
     apiKeyId?: string;
     mobileDevice?: AuthenticatedDevice;
+    mobileAuth?: { deviceId: string; tokenId: string; familyId: string };
+    integrationCredential?: { id: string; organizationId: string; scopes: string[] };
   }
 }
 

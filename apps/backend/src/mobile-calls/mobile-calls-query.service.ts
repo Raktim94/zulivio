@@ -212,16 +212,24 @@ export class MobileCallsQueryService {
   }
 
   async getSettings(actor: AuthenticatedEmployee) {
-    const org = await this.prisma.organization.findUnique({ where: { id: actor.organizationId }, select: { callRetentionDays: true } });
-    return { callRetentionDays: org?.callRetentionDays ?? null };
+    const org = await this.prisma.organization.findUnique({ where: { id: actor.organizationId }, select: { callRetentionDays: true, contactRetentionDays: true } });
+    return { callRetentionDays: org?.callRetentionDays ?? null, contactRetentionDays: org?.contactRetentionDays ?? null };
   }
 
-  async setRetention(actor: AuthenticatedEmployee, days: number | null) {
-    await this.prisma.organization.update({ where: { id: actor.organizationId }, data: { callRetentionDays: days } });
-    await this.prisma.auditEvent.create({
-      data: { organizationId: actor.organizationId, actorId: actor.id, action: "mobile_calls.retention_changed", targetType: "Organization", targetId: actor.organizationId, metadata: { days } },
+  /** Only the keys present in the request change; an explicit null means "keep forever". */
+  async setRetention(actor: AuthenticatedEmployee, dto: { callRetentionDays?: number | null; contactRetentionDays?: number | null }) {
+    const data: { callRetentionDays?: number | null; contactRetentionDays?: number | null } = {};
+    if (dto.callRetentionDays !== undefined) data.callRetentionDays = dto.callRetentionDays;
+    if (dto.contactRetentionDays !== undefined) data.contactRetentionDays = dto.contactRetentionDays;
+    const org = await this.prisma.organization.update({
+      where: { id: actor.organizationId },
+      data,
+      select: { callRetentionDays: true, contactRetentionDays: true },
     });
-    return { callRetentionDays: days };
+    await this.prisma.auditEvent.create({
+      data: { organizationId: actor.organizationId, actorId: actor.id, action: "mobile_calls.retention_changed", targetType: "Organization", targetId: actor.organizationId, metadata: data },
+    });
+    return org;
   }
 
   /** Daily retention sweep (see MobileRetentionService). */
