@@ -66,6 +66,7 @@ describe("Mobile app auth + contacts (e2e)", () => {
 
   // Same convention as the other suites: leave an empty database behind.
   afterAll(async () => {
+    await prisma.idempotencyRecord.deleteMany({});
     await prisma.mobileContact.deleteMany({});
     await prisma.mobileAuthToken.deleteMany({});
     await prisma.mobileCall.deleteMany({});
@@ -354,6 +355,71 @@ describe("Mobile app auth + contacts (e2e)", () => {
     it("rejects oversized batches", async () => {
       const many = Array.from({ length: 201 }, (_, i) => c(String(i), `N${i}`, ["9870000000"]));
       await post(t, "/preview", { contacts: many }).expect(400);
+    });
+  });
+
+  describe("idempotent writes (Idempotency-Key)", () => {
+    let tok: string;
+    let leadId: string;
+    beforeAll(async () => {
+      tok = (await login(a.emp.email, INSTALL("idem")).expect(200)).body.accessToken;
+      leadId = (await prisma.lead.create({ data: { organizationId: a.id, fullName: "Idem Lead", phone: "919800000001", ownerId: a.emp.id, createdById: a.emp.id } })).id;
+    });
+    const note = (key: string | null, body: string, token = tok) => {
+      const r = request(server()).post(`/api/v1/leads/${leadId}/notes`).set(auth(token));
+      if (key) r.set("Idempotency-Key", key);
+      return r.send({ body });
+    };
+
+    it("replays the stored response and does not run the handler twice", async () => {
+      const key = `note-${stamp}-1`;
+      const first = await note(key, "called back").expect(201);
+      const second = await note(key, "called back").expect(201);
+      expect(second.headers["idempotent-replayed"]).toBe("true");
+      expect(second.body.id).toBe(first.body.id);
+      expect(await prisma.leadActivity.count({ where: { leadId, type: "NOTE", body: "called back" } })).toBe(1);
+    });
+
+    it("without a key, writes are not deduplicated (behaviour unchanged)", async () => {
+      await note(null, "plain").expect(201);
+      await note(null, "plain").expect(201);
+      expect(await prisma.leadActivity.count({ where: { leadId, type: "NOTE", body: "plain" } })).toBe(2);
+    });
+
+    it("rejects reusing a key with a different request body", async () => {
+      const key = `note-${stamp}-2`;
+      await note(key, "one").expect(201);
+      const res = await note(key, "two").expect(422);
+      expect(res.body.error.message).toMatch(/different request/);
+    });
+
+    it("keys are namespaced per device: another phone cannot replay this one's response", async () => {
+      const key = `note-${stamp}-3`;
+      await note(key, "mine").expect(201);
+      const other = (await login(a.emp.email, INSTALL("idem-other")).expect(200)).body.accessToken as string;
+      const res = await note(key, "mine", other).expect(201);
+      expect(res.headers["idempotent-replayed"]).toBeUndefined();
+    });
+
+    it("releases the key when the handler fails, so the retry can succeed", async () => {
+      const key = `note-${stamp}-4`;
+      const res = await request(server()).post(`/api/v1/leads/${leadId}/notes`).set(auth(tok)).set("Idempotency-Key", key).send({ body: "" });
+      expect(res.status).toBeGreaterThanOrEqual(400);
+      await note(key, "").catch(() => undefined);
+      expect(await prisma.idempotencyRecord.count({ where: { key, statusCode: 0 } })).toBe(0);
+    });
+
+    it("rejects a malformed key", async () => {
+      await note("x", "bad key").expect(400);
+    });
+
+    it("applies to dispositions too: one retry does not double-count the call", async () => {
+      const key = `disp-${stamp}-1`;
+      const send = () => request(server()).post(`/api/v1/leads/${leadId}/calls/disposition`).set(auth(tok)).set("Idempotency-Key", key).send({ outcome: "NOT_CONNECTED", disposition: "BUSY" });
+      await send().expect(201);
+      await send().expect(201);
+      const lead = await prisma.lead.findUniqueOrThrow({ where: { id: leadId } });
+      expect(lead.callCount).toBe(1);
     });
   });
 

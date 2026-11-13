@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
+import { IdempotencyInterceptor } from "./common/idempotency.interceptor";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
 import { AuthGuard } from "./common/guards/auth.guard";
@@ -75,6 +76,8 @@ import { MobileAuthModule } from "./mobile-auth/mobile-auth.module";
     // applied per-controller, so a new controller that forgot @UseGuards
     // was silently unprotected — see SECURITY_AUDIT_REPORT.md.
     { provide: APP_GUARD, useClass: AuthGuard },
+    // Safe retries for authenticated mobile / integration writes (Idempotency-Key header).
+    { provide: APP_INTERCEPTOR, useClass: IdempotencyInterceptor },
   ],
 })
 export class AppModule {}

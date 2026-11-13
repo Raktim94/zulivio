@@ -1124,3 +1124,25 @@ model MobileContact {
   @@index([organizationId, phoneLast10])
   @@map("mobile_contacts")
 }
+
+// Replay protection for retried writes. A client (the Android app, an
+// integration credential) sends `Idempotency-Key`; the first request with a
+// given key under a scope runs and its response body is stored, later requests
+// with the same key and the same body get that response back instead of
+// running again. statusCode 0 marks a request still in flight. Rows are
+// purged after 48 hours.
+model IdempotencyRecord {
+  id           String   @id @default(uuid())
+  scopeKey     String
+  key          String
+  requestHash  String
+  method       String
+  path         String
+  statusCode   Int      @default(0)
+  responseBody Json?
+  createdAt    DateTime @default(now())
+
+  @@unique([scopeKey, key])
+  @@index([createdAt])
+  @@map("idempotency_records")
+}
