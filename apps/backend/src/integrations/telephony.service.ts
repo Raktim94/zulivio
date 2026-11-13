@@ -253,7 +253,9 @@ export class TelephonyService {
     let verdict: "ok" | "missing" | "stale" | "bad";
     if (settings.auth === "token") {
       const given = header("x-zulivio-token") ?? "";
-      verdict = given.length === secret.length && timingSafeEqual(Buffer.from(given), Buffer.from(secret)) ? "ok" : given ? "bad" : "missing";
+      const givenBuf = Buffer.from(given);
+      const secretBuf = Buffer.from(secret);
+      verdict = givenBuf.length === secretBuf.length && timingSafeEqual(givenBuf, secretBuf) ? "ok" : given ? "bad" : "missing";
     } else {
       if (!rawBody) throw fail(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Body must be JSON.");
       verdict = verifyHmac(secret, header("x-zulivio-signature"), rawBody);
