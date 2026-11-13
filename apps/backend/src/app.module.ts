@@ -33,6 +33,8 @@ import { McpModule } from "./mcp/mcp.module";
 import { MissedCallsModule } from "./missed-calls/missed-calls.module";
 import { MobileCallsModule } from "./mobile-calls/mobile-calls.module";
 import { MobileContactsModule } from "./mobile-contacts/mobile-contacts.module";
+import { IntegrationsModule } from "./integrations/integrations.module";
+import { WebhooksCoreModule } from "./integrations/webhooks-core.module";
 import { MobileAuthModule } from "./mobile-auth/mobile-auth.module";
 
 @Module({
@@ -69,6 +71,8 @@ import { MobileAuthModule } from "./mobile-auth/mobile-auth.module";
     MobileCallsModule,
     MobileAuthModule,
     MobileContactsModule,
+    WebhooksCoreModule,
+    IntegrationsModule,
   ],
   providers: [
     // Global safety net: every route requires an authenticated session

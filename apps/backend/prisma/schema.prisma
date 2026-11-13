@@ -1146,3 +1146,154 @@ model IdempotencyRecord {
   @@index([createdAt])
   @@map("idempotency_records")
 }
+
+// ---------------------------------------------------------------------------
+// Integrations & API
+// ---------------------------------------------------------------------------
+
+// Machine-to-machine credential for the versioned /api/v1/ext API. Deliberately
+// separate from Session (human employees), ApiKey (a personal token that acts
+// as one employee, used by MCP) and MobileAuthToken (a phone): it belongs to the
+// organization, carries explicit scopes, and can reach nothing but /api/v1/ext.
+// Only the SHA-256 of the secret is stored; it is shown once at creation.
+model IntegrationCredential {
+  id             String    @id @default(uuid())
+  organizationId String
+  name           String
+  // The employee who created it: accountable owner and the author recorded on
+  // records the credential creates.
+  createdById    String
+  tokenHash      String    @unique
+  lastFour       String
+  scopes         String[]
+  expiresAt      DateTime?
+  lastUsedAt     DateTime?
+  revokedAt      DateTime?
+  revokedById    String?
+  createdAt      DateTime  @default(now())
+
+  @@index([organizationId])
+  @@map("integration_credentials")
+}
+
+enum WebhookStatus {
+  ACTIVE
+  PAUSED
+  REVOKED
+}
+
+// An HTTPS endpoint registered to receive signed event deliveries. The signing
+// secret is encrypted at rest (it must be recoverable to sign) and shown once.
+model WebhookEndpoint {
+  id                  String        @id @default(uuid())
+  organizationId      String
+  name                String
+  url                 String
+  secretEnc           String
+  secretLastFour      String
+  secretRotatedAt     DateTime      @default(now())
+  events              String[]
+  status              WebhookStatus @default(ACTIVE)
+  consecutiveFailures Int           @default(0)
+  lastDeliveryAt      DateTime?
+  lastSuccessAt       DateTime?
+  createdById         String
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  deliveries WebhookDelivery[]
+
+  @@index([organizationId])
+  @@map("webhook_endpoints")
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+// One event addressed to one endpoint. eventId is stable across retries and
+// across endpoints, so a receiver can de-duplicate. PENDING covers "retry
+// scheduled" (see attempts / nextAttemptAt).
+model WebhookDelivery {
+  id             String                @id @default(uuid())
+  endpointId     String
+  endpoint       WebhookEndpoint       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+  organizationId String
+  eventId        String
+  eventType      String
+  payload        Json
+  status         WebhookDeliveryStatus @default(PENDING)
+  attempts       Int                   @default(0)
+  nextAttemptAt  DateTime              @default(now())
+  lastAttemptAt  DateTime?
+  lastStatusCode Int?
+  lastError      String?
+  deliveredAt    DateTime?
+  isTest         Boolean               @default(false)
+  createdAt      DateTime              @default(now())
+
+  @@unique([endpointId, eventId])
+  @@index([status, nextAttemptAt])
+  @@index([endpointId, createdAt])
+  @@map("webhook_deliveries")
+}
+
+// A business-telephony / PBX provider that pushes call events to
+// /api/v1/integrations/telephony/:id/events. Secrets stay server-side
+// (encrypted); the field map says where each fact lives in the provider's JSON.
+model TelephonyProvider {
+  id             String    @id @default(uuid())
+  organizationId String
+  kind           String
+  name           String
+  secretEnc      String
+  secretLastFour String
+  enabled        Boolean   @default(true)
+  fieldMap       Json
+  statusMap      Json
+  eventsReceived Int       @default(0)
+  eventsRejected Int       @default(0)
+  lastEventAt    DateTime?
+  lastErrorAt    DateTime?
+  lastError      String?
+  lastTestAt     DateTime?
+  createdById    String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  events ProviderCallEvent[]
+
+  @@index([organizationId])
+  @@map("telephony_providers")
+}
+
+// A call fact received from a provider (or from an integration credential via
+// /ext/calls). dedupKey makes replays and provider retries idempotent.
+model ProviderCallEvent {
+  id              String             @id @default(uuid())
+  organizationId  String
+  providerId      String?
+  provider        TelephonyProvider? @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  source          String
+  providerCallId  String
+  dedupKey        String
+  eventType       String
+  direction       String
+  phoneOriginal   String
+  phoneNormalized String
+  phoneLast10     String
+  startedAt       DateTime?
+  answeredAt      DateTime?
+  endedAt         DateTime?
+  durationSeconds Int?
+  employeeId      String?
+  leadId          String?
+  receivedAt      DateTime           @default(now())
+
+  @@unique([organizationId, dedupKey])
+  @@index([organizationId, receivedAt])
+  @@index([providerId, receivedAt])
+  @@map("provider_call_events")
+}

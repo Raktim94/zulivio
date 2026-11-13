@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { WebhookDispatcher } from "../integrations/webhook-dispatcher.service";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import {
@@ -56,7 +57,10 @@ const LEAD_MATCH_CHUNK = 100;
 export class MobileCallsService {
   private readonly logger = new Logger(MobileCallsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly hooks: WebhookDispatcher,
+  ) {}
 
   async ingest(device: IngestDevice, rawCalls: unknown[], defaultSource: string, fallbackStart?: Date): Promise<IngestSummary> {
     const results: IngestItemResult[] = rawCalls.map((_, index) => ({ index, status: "created" }));
@@ -171,6 +175,13 @@ export class MobileCallsService {
         const lost = chunk.length - count;
         chunk.forEach((item, n) => {
           results[item.index] = { index: item.index, status: n < lost ? "duplicate" : "created" };
+          if (n >= lost) {
+            void this.hooks.emit(device.organizationId, "call.recorded", {
+              source: item.call.source === "app_manual" ? "user_entered" : "device_imported", employeeId: device.employeeId, direction: item.call.callType.toLowerCase(),
+              phone: item.call.phoneNumberNormalized, durationSeconds: item.call.durationSeconds, startedAt: item.call.startedAt.toISOString(),
+              leadId: item.call.phoneReliable ? (leadByLast10.get(item.call.phoneLast10) ?? null) : null,
+            });
+          }
         });
       } catch (err) {
         // Never surface DB internals to the phone; log server-side only.

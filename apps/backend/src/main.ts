@@ -51,7 +51,13 @@ async function bootstrap() {
   app.use(hstsEnabled ? helmet() : helmet({ hsts: false }));
   // Bulk call-history uploads (POST /api/v1/mobile/calls/bulk) carry up to a
   // few hundred records; Express's 100kb default is too small for that.
-  app.useBodyParser("json", { limit: "1mb" });
+  // Keep the exact bytes of each JSON body: telephony-provider webhooks are authenticated by an HMAC over them.
+  app.useBodyParser("json", {
+    limit: "1mb",
+    verify: (req: { rawBody?: Buffer }, _res: unknown, buf: Buffer) => {
+      req.rawBody = buf;
+    },
+  });
   app.use(cookieParser());
   app.use(createCsrfOriginCheck(allowedOrigins()));
   app.enableCors({

@@ -37,9 +37,14 @@ function originFromReferer(referer: string | undefined): string | undefined {
  * that never read or set a cookie, so there is no ambient browser authority for
  * a forged cross-site request to ride on:
  *  - the Android app's sign-in and token refresh (a native app sends no Origin)
+ *  - telephony-provider webhooks, which are authenticated by an HMAC signature (or a static token)
+ *    over the request itself and are sent by a server, never a browser
  * Keep this list tiny and only add routes whose handlers ignore cookies.
  */
-const COOKIE_FREE_PATHS = [/^\/api\/v1\/mobile\/auth\/(login|refresh)\/?$/];
+const COOKIE_FREE_PATHS = [
+  /^\/api\/v1\/mobile\/auth\/(login|refresh)\/?$/,
+  /^\/api\/v1\/integrations\/telephony\/[0-9a-f-]{36}\/events\/?$/i,
+];
 
 export function createCsrfOriginCheck(allowedOrigins: string[]): RequestHandler {
   const allowed = new Set(allowedOrigins);

@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from "@nestjs/common";
+import { WebhookDispatcher } from "../integrations/webhook-dispatcher.service";
 import { createHash } from "node:crypto";
 import { MobileContactStatus, type Prisma } from "@prisma/client";
 import type { AuthenticatedEmployee } from "../common/guards/auth.guard";
@@ -54,6 +55,7 @@ export class MobileContactsService {
     private readonly prisma: PrismaService,
     private readonly leadAccess: LeadAccessService,
     private readonly leads: LeadsService,
+    private readonly hooks: WebhookDispatcher,
   ) {}
 
   /** The authenticated actor is rebuilt from the database row the device token resolves to, never from the request. */
@@ -274,6 +276,8 @@ export class MobileContactsService {
           linked++;
         }
         out.push({ sourceId: item.sourceId, status: item.decision === "LINK" ? "linked" : existing ? "updated" : "created", leadId: leadId ?? undefined });
+        // Only identifiers and the decision leave in the event; the contact's details are already on the lead.
+        void this.hooks.emit(device.organizationId, existing ? "contact.updated" : "contact.created", { contactId: row.id, leadId: leadId ?? null, employeeId: device.employeeId, decision: item.decision });
       } catch (err) {
         if (err instanceof Error && "getStatus" in err) throw err;
         rejected++;

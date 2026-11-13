@@ -31,6 +31,8 @@ import { UpdateQualificationDto } from "./dto/update-qualification.dto";
 import { LogCallDto } from "./dto/log-call.dto";
 import { CreateLeadNoteDto } from "./dto/create-lead-note.dto";
 import { BulkAssignLeadsDto, BulkDeleteLeadsDto, BulkStageLeadsDto, BulkTagLeadsDto } from "./dto/bulk-lead-action.dto";
+import { WebhookDispatcher } from "../integrations/webhook-dispatcher.service";
+import { leadPayload } from "../integrations/events";
 import { LeadAccessService } from "./lead-access.service";
 import { LeadActivityService, DISPOSITIONS_BY_OUTCOME } from "./lead-activity.service";
 import { LeadScoringService } from "./lead-scoring.service";
@@ -89,6 +91,7 @@ export class LeadsService {
     private readonly scoring: LeadScoringService,
     private readonly followUps: LeadFollowUpsService,
     @Inject(CALL_PROVIDER) private readonly callProvider: CallProvider,
+    private readonly hooks: WebhookDispatcher,
   ) {}
 
   // ---------------------------------------------------------------------
@@ -149,6 +152,7 @@ export class LeadsService {
       },
     });
 
+    void this.hooks.emit(actor.organizationId, "lead.created", leadPayload(lead));
     return lead;
   }
 
@@ -247,6 +251,7 @@ export class LeadsService {
       });
     }
 
+    void this.hooks.emit(actor.organizationId, "lead.updated", leadPayload(updated));
     return updated;
   }
 
@@ -586,6 +591,7 @@ export class LeadsService {
       return result;
     });
 
+    void this.hooks.emit(actor.organizationId, "lead.stage_changed", { ...leadPayload(updated), fromStageId: lead.stageId, toStageId: stage.id, toStageName: stage.name });
     return updated;
   }
 
@@ -712,6 +718,11 @@ export class LeadsService {
         },
         tx,
       );
+    });
+
+    void this.hooks.emit(actor.organizationId, "call.recorded", {
+      source: "user_entered", leadId: id, employeeId: actor.id, outcome: dto.outcome, disposition: dto.disposition,
+      durationSeconds: dto.durationSeconds ?? null, recordedAt: now.toISOString(),
     });
 
     // Stage movement runs outside the transaction above because it is its

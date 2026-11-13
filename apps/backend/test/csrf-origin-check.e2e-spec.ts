@@ -57,6 +57,15 @@ describe("createCsrfOriginCheck", () => {
     expect(run({}, "POST", "/api/v1/mobile/auth/refresh").nextCalled).toBe(true);
   });
 
+  it("lets a telephony provider post signed events without an Origin, but only to the events endpoint", () => {
+    const id = "123e4567-e89b-42d3-a456-426614174000";
+    expect(run({}, "POST", `/api/v1/integrations/telephony/${id}/events`).nextCalled).toBe(true);
+    expect(run({}, "POST", `/api/v1/integrations/telephony/${id}`).nextCalled).toBe(false);
+    expect(run({}, "POST", `/api/v1/integrations/telephony/${id}/test`).nextCalled).toBe(false);
+    expect(run({}, "POST", "/api/v1/integrations/webhooks").nextCalled).toBe(false);
+    expect(run({}, "POST", "/api/v1/integrations/credentials").nextCalled).toBe(false);
+  });
+
   it("does not extend that exemption to any other route, including browser sign-in and mobile logout without a token", () => {
     expect(run({}, "POST", "/api/v1/auth/sessions").nextCalled).toBe(false);
     expect(run({}, "POST", "/api/v1/mobile/auth/logout").nextCalled).toBe(false);

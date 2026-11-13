@@ -4,6 +4,7 @@ import { FollowUpStatus, LeadActivityType, Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
 import { EmployeeScopeService } from "../common/scope.service";
+import { WebhookDispatcher } from "../integrations/webhook-dispatcher.service";
 import { LeadAccessService } from "./lead-access.service";
 import { LeadActivityService } from "./lead-activity.service";
 import { CompleteFollowUpDto, CreateFollowUpDto, RescheduleFollowUpDto } from "./dto/follow-up.dto";
@@ -44,6 +45,7 @@ export class LeadFollowUpsService {
     private readonly access: LeadAccessService,
     private readonly activity: LeadActivityService,
     private readonly scope: EmployeeScopeService,
+    private readonly hooks: WebhookDispatcher,
   ) {}
 
   private parseDueAt(value: string): Date {
@@ -82,7 +84,7 @@ export class LeadFollowUpsService {
     const dueAt = this.parseDueAt(dto.dueAt);
     const assigneeId = await this.resolveAssignee(actor, dto.assigneeId, lead.ownerId);
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       const followUp = await tx.leadFollowUp.create({
         data: {
           organizationId: actor.organizationId,
@@ -111,6 +113,8 @@ export class LeadFollowUpsService {
 
       return followUp;
     });
+    void this.hooks.emit(actor.organizationId, "follow_up.created", { id: created.id, leadId: created.leadId, assigneeId: created.assigneeId, dueAt: created.dueAt.toISOString(), note: created.note ?? null });
+    return created;
   }
 
   /**
@@ -144,7 +148,7 @@ export class LeadFollowUpsService {
       throw new BadRequestException("Only a pending follow-up can be completed");
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const completed = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.leadFollowUp.update({
         where: { id },
         data: { status: FollowUpStatus.COMPLETED, completedAt: new Date(), outcome: dto.outcome },
@@ -167,6 +171,8 @@ export class LeadFollowUpsService {
 
       return updated;
     });
+    void this.hooks.emit(actor.organizationId, "follow_up.completed", { id, leadId: followUp.leadId, completedAt: completed.completedAt?.toISOString() ?? null, outcome: dto.outcome ?? null });
+    return completed;
   }
 
   async reschedule(actor: AuthenticatedEmployee, id: string, dto: RescheduleFollowUpDto) {

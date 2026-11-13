@@ -1,4 +1,5 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
+import { WebhookDispatcher } from "../integrations/webhook-dispatcher.service";
 import { OpportunityStatus } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AuthenticatedEmployee } from "../common/guards/auth.guard";
@@ -14,6 +15,7 @@ export class OpportunitiesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly pipelines: PipelinesService,
+    private readonly hooks: WebhookDispatcher,
   ) {}
 
 
@@ -111,7 +113,7 @@ export class OpportunitiesService {
       throw new BadRequestException("lossReason is required when moving to a lost stage");
     }
 
-    return this.prisma.$transaction(async (tx) => {
+    const moved = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.opportunity.update({
         where: { id },
         data: {
@@ -138,6 +140,8 @@ export class OpportunitiesService {
 
       return updated;
     });
+    void this.hooks.emit(actor.organizationId, "deal.updated", { id, change: "stage_moved", fromStageId: opportunity.stageId, toStageId: targetStage.id, status: moved.status });
+    return moved;
   }
 
   /** Manager+ override of the automatic forecast rollup, with a full audit trail. */
@@ -151,7 +155,7 @@ export class OpportunitiesService {
     });
     if (!opportunity) throw new NotFoundException("Opportunity not found");
 
-    return this.prisma.$transaction(async (tx) => {
+    const adjusted = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.opportunity.update({
         where: { id },
         data: { forecastCategory: dto.category },
@@ -172,5 +176,7 @@ export class OpportunitiesService {
 
       return updated;
     });
+    void this.hooks.emit(actor.organizationId, "deal.updated", { id, change: "forecast_changed", forecastCategory: dto.category });
+    return adjusted;
   }
 }
