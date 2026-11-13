@@ -1,4 +1,4 @@
-import { Body, Controller, HttpCode, HttpStatus, Post, Req, Res, UseFilters, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query, Req, Res, UseFilters, UseGuards } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { Public } from "../common/decorators/public.decorator";
 import { InMemoryRateLimiter } from "../common/rate-limiter";
@@ -7,6 +7,7 @@ import { MAX_BULK_CALLS } from "./mobile-call.validation";
 import { MobileApiExceptionFilter, mobileError } from "./mobile-api-error.filter";
 import { MobileDeviceGuard, type AuthenticatedDevice } from "./mobile-device.guard";
 import { MobileCallsService } from "./mobile-calls.service";
+import { MobileActivityService } from "./mobile-activity.service";
 
 // Per authenticated device (not per IP: a phone's carrier-NAT address is shared).
 const SINGLE_LIMIT = new InMemoryRateLimiter(120, 60_000, "Rate limit exceeded. Retry in a minute.");
@@ -32,6 +33,7 @@ export class MobileIngestController {
   constructor(
     private readonly calls: MobileCallsService,
     private readonly prisma: PrismaService,
+    private readonly activity: MobileActivityService,
   ) {}
 
   private assertDeviceId(device: AuthenticatedDevice, supplied: unknown) {
@@ -49,6 +51,15 @@ export class MobileIngestController {
       throw mobileError(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Request body must be a JSON object.");
     }
     return raw as Record<string, unknown>;
+  }
+
+  /** The signed-in employee's own call activity, newest first, each item labelled by where it came from. */
+  @Get("activity")
+  async myActivity(@Req() req: DeviceRequest, @Query("before") before?: string, @Query("limit") limit?: string) {
+    SINGLE_LIMIT.assert(req.mobileDevice.id);
+    const t = before ? new Date(before) : undefined;
+    const n = Math.min(Math.max(Number.parseInt(limit ?? "50", 10) || 50, 1), 100);
+    return this.activity.mine(req.mobileDevice, t && !Number.isNaN(t.getTime()) ? t : undefined, n);
   }
 
   @Post("calls")

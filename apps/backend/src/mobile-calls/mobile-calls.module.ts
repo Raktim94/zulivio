@@ -3,6 +3,7 @@ import { MobileContactsModule } from "../mobile-contacts/mobile-contacts.module"
 import { LeadsModule } from "../leads/leads.module";
 import { PipelinesModule } from "../pipelines/pipelines.module";
 import { MobileAdminController } from "./mobile-admin.controller";
+import { MobileActivityService } from "./mobile-activity.service";
 import { MobileCallsQueryService } from "./mobile-calls-query.service";
 import { MobileCallsService } from "./mobile-calls.service";
 import { MobileDeviceGuard } from "./mobile-device.guard";
@@ -13,6 +14,6 @@ import { MobileRetentionService } from "./mobile-retention.service";
 @Module({
   imports: [LeadsModule, PipelinesModule, MobileContactsModule],
   controllers: [MobileIngestController, MobileAdminController],
-  providers: [MobileCallsService, MobileCallsQueryService, MobileDevicesService, MobileDeviceGuard, MobileRetentionService],
+  providers: [MobileActivityService, MobileCallsService, MobileCallsQueryService, MobileDevicesService, MobileDeviceGuard, MobileRetentionService],
 })
 export class MobileCallsModule {}

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DEBUG BUILDS ONLY: allows plain HTTP so a developer can reach a Zulivio server on a local network
+     or the emulator host (http://10.0.2.2:4100). The app still refuses HTTP unless the user ticks
+     "Allow insecure local connection" and shows a persistent warning while connected that way. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors><certificates src="system" /></trust-anchors>
+    </base-config>
+</network-security-config>

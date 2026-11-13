@@ -6,6 +6,7 @@ import * as argon2 from "argon2";
 import cookieParser from "cookie-parser";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
+import { createCsrfOriginCheck } from "../src/common/csrf-origin-check";
 import { AllExceptionsFilter } from "../src/common/filters/all-exceptions.filter";
 import { PrismaService } from "../src/prisma/prisma.service";
 
@@ -55,6 +56,8 @@ describe("Mobile app auth + contacts (e2e)", () => {
     const mod = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = mod.createNestApplication();
     app.use(cookieParser());
+    // main.ts installs this in production; the app must work through it exactly as a real phone does (no Origin header).
+    app.use(createCsrfOriginCheck(["https://app.example.com"]));
     app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }));
     app.useGlobalFilters(new AllExceptionsFilter());
     await app.init();

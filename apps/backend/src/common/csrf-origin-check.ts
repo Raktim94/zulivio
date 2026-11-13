@@ -32,11 +32,24 @@ function originFromReferer(referer: string | undefined): string | undefined {
  * unreachable for every real external client (Claude, ChatGPT, curl, none
  * of which send an Origin header matching this app's own front-end).
  */
+/**
+ * Endpoints that are called by native clients with credentials in the body and
+ * that never read or set a cookie, so there is no ambient browser authority for
+ * a forged cross-site request to ride on:
+ *  - the Android app's sign-in and token refresh (a native app sends no Origin)
+ * Keep this list tiny and only add routes whose handlers ignore cookies.
+ */
+const COOKIE_FREE_PATHS = [/^\/api\/v1\/mobile\/auth\/(login|refresh)\/?$/];
+
 export function createCsrfOriginCheck(allowedOrigins: string[]): RequestHandler {
   const allowed = new Set(allowedOrigins);
 
   return (req: Request, res: Response, next: NextFunction) => {
-    if (SAFE_METHODS.has(req.method) || req.headers.authorization?.startsWith("Bearer ")) {
+    if (
+      SAFE_METHODS.has(req.method) ||
+      req.headers.authorization?.startsWith("Bearer ") ||
+      COOKIE_FREE_PATHS.some((re) => re.test(req.path ?? ""))
+    ) {
       next();
       return;
     }

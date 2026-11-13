@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- Requested at the moment the user starts an import, after an in-app explanation. Never at launch. -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- Android 13+: only asked for when the user turns on follow-up reminders. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!--
+      Deliberately NOT declared: READ_CALL_LOG, READ_PHONE_STATE, CALL_PHONE, PROCESS_OUTGOING_CALLS,
+      accessibility or notification-listener services. Calls are started with the system dialer
+      (ACTION_DIAL), so the user places the call themselves and no telephony permission is needed.
+    -->
+
+    <application
+        android:name=".ZulivioApp"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="false"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Zulivio">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -13,9 +13,9 @@ import { createCsrfOriginCheck } from "../src/common/csrf-origin-check";
 describe("createCsrfOriginCheck", () => {
   const ALLOWED = ["https://app.example.com"];
 
-  function run(headers: Record<string, string | undefined>, method = "POST") {
+  function run(headers: Record<string, string | undefined>, method = "POST", path = "/api/v1/leads") {
     const middleware = createCsrfOriginCheck(ALLOWED);
-    const req = { method, headers } as unknown as Request;
+    const req = { method, headers, path } as unknown as Request;
     let statusCode: number | undefined;
     let body: unknown;
     const res = {
@@ -50,6 +50,18 @@ describe("createCsrfOriginCheck", () => {
     const result = run({});
     expect(result.nextCalled).toBe(false);
     expect(result.statusCode).toBe(403);
+  });
+
+  it("lets the Android app sign in and refresh without an Origin (credentials in the body, no cookie involved)", () => {
+    expect(run({}, "POST", "/api/v1/mobile/auth/login").nextCalled).toBe(true);
+    expect(run({}, "POST", "/api/v1/mobile/auth/refresh").nextCalled).toBe(true);
+  });
+
+  it("does not extend that exemption to any other route, including browser sign-in and mobile logout without a token", () => {
+    expect(run({}, "POST", "/api/v1/auth/sessions").nextCalled).toBe(false);
+    expect(run({}, "POST", "/api/v1/mobile/auth/logout").nextCalled).toBe(false);
+    expect(run({}, "POST", "/api/v1/mobile/auth/login/extra").nextCalled).toBe(false);
+    expect(run({}, "POST", "/api/v1/mobile/contacts/import").nextCalled).toBe(false);
   });
 
   it("blocks a state-changing request with a non-matching Origin", () => {
