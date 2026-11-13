@@ -95,6 +95,7 @@ class OnboardingVM(private val c: AppContainer) : ViewModel() {
     fun resume(acc: Account, notice: String) = _ui.update {
         it.copy(url = acc.serverUrl, allowInsecure = acc.allowInsecure, email = acc.email, checkedUrl = acc.serverUrl, notice = notice, loginError = null)
     }
+    fun clearNotice() = _ui.update { it.copy(notice = null) }
 
     fun check(onOk: () -> Unit) {
         val cur = _ui.value

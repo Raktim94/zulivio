@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -71,6 +73,7 @@ import com.nodedr.zulivio.ui.components.PrimaryButton
 import com.nodedr.zulivio.ui.components.ScreenBar
 import com.nodedr.zulivio.ui.components.SecondaryButton
 import com.nodedr.zulivio.ui.components.SectionTitle
+import com.nodedr.zulivio.ui.components.SelectChip
 import com.nodedr.zulivio.ui.components.Tone
 import com.nodedr.zulivio.ui.containerViewModel
 import kotlinx.coroutines.launch
@@ -107,6 +110,8 @@ fun ContactsHomeScreen(c: AppContainer, nav: NavHostController) {
     var denied by remember { mutableStateOf(false) }
     var pendingMode by remember { mutableStateOf<FlowMode?>(null) }
 
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) { granted = flow.hasPermission(); if (granted) denied = false }
+
     fun proceed(mode: FlowMode) {
         flow.loadDevice()
         when (mode) {
@@ -133,7 +138,7 @@ fun ContactsHomeScreen(c: AppContainer, nav: NavHostController) {
                             Text("Contacts access", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
                             Chip(if (granted) "Allowed" else "Not allowed", if (granted) Tone.Ok else Tone.Neutral)
                         }
-                        Text(if (granted) "Zulivio can read your contacts only while you're choosing what to import." else "Zulivio hasn't asked for your contacts yet. It only asks when you start an import.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
+                        Text(if (granted) "Zulivio can read your contacts only while you're choosing what to import." else if (denied) "Zulivio doesn't have access to your contacts." else "Zulivio hasn't asked for your contacts yet. It only asks when you start an import.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
                         if (denied) Text("Permission was denied. You can allow it in Android settings if you change your mind.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 4.dp))
                         if (granted || denied) TextButton(onClick = { Intents.appSettings(ctx) }) { Text(if (granted) "Revoke in Android settings" else "Open Android settings") }
                     }
@@ -213,9 +218,12 @@ fun ContactsHomeScreen(c: AppContainer, nav: NavHostController) {
 
 @Composable
 private fun ToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(top = 4.dp).semantics(mergeDescendants = true) { contentDescription = "$label, ${if (checked) "on" else "off"}" }, verticalAlignment = Alignment.CenterVertically) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).toggleable(value = checked, role = Role.Switch, onValueChange = onChange),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
         Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        Switch(checked = checked, onCheckedChange = onChange)
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 
@@ -281,10 +289,10 @@ fun ContactReviewScreen(c: AppContainer, nav: NavHostController) {
             }
             r.items.isEmpty() -> EmptyState("Nothing to import", if (r.mode == FlowMode.RESYNC) "Everything you uploaded is already up to date." else "These contacts are already uploaded, have no usable number, or were left out.")
             else -> {
-                Text("Nothing has been uploaded yet. Choose what happens to each contact.", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (r.mode == FlowMode.RESYNC) "These contacts changed since you last uploaded them. Nothing is sent until you confirm." else "Nothing has been uploaded yet. Choose what happens to each contact.", Modifier.padding(horizontal = 16.dp, vertical = 8.dp), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 r.error?.let { Text("Upload interrupted: ${it.message} Tap Import to continue — contacts already sent won't be duplicated.", Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
                 FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = { flow.setAll(Decision.IMPORT) }) { Text("Import all new") }
+                    if (r.mode != FlowMode.RESYNC) TextButton(onClick = { flow.setAll(Decision.IMPORT) }) { Text("Import all new") }
                     TextButton(onClick = { flow.setAll(Decision.SKIP) }) { Text("Skip all") }
                 }
                 LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -326,9 +334,7 @@ private fun ReviewCard(ri: ReviewItem, onDecide: (Decision) -> Unit) {
             if (ri.preview.normalizationUnreliable) Text("This number's format is unusual, so duplicate checks may miss it.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
             FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ri.options.forEach { d ->
-                    FilterChip(selected = ri.decision == d, onClick = { onDecide(d) }, label = {
-                        Text(when (d) { Decision.IMPORT -> "Add as lead"; Decision.LINK -> "Link to existing lead"; Decision.UPDATE -> "Update"; Decision.SKIP -> "Skip" })
-                    })
+                    SelectChip(selected = ri.decision == d, onClick = { onDecide(d) }, label = when (d) { Decision.IMPORT -> "Add as lead"; Decision.LINK -> "Link to existing lead"; Decision.UPDATE -> "Update"; Decision.SKIP -> "Skip" })
                 }
             }
         }

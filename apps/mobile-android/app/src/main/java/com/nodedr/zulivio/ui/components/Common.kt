@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Lock
@@ -227,4 +228,28 @@ fun SecondaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modi
         if (icon != null) { Icon(icon, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)) }
         Text(text)
     }
+}
+
+/** Icon-over-label tile for secondary contact actions; stays readable at 320dp wide and keeps a 56dp touch target. */
+@Composable
+fun ActionTile(text: String, icon: ImageVector, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    OutlinedButton(
+        onClick = onClick, modifier = modifier.heightIn(min = 64.dp), contentPadding = PaddingValues(horizontal = 4.dp, vertical = 8.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)),
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, null, Modifier.size(22.dp))
+            Text(text, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false)
+        }
+    }
+}
+
+/** A toggle chip that shows a check mark when selected, so state is never conveyed by colour alone. */
+@Composable
+fun SelectChip(selected: Boolean, onClick: () -> Unit, label: String, modifier: Modifier = Modifier) {
+    androidx.compose.material3.FilterChip(
+        selected = selected, onClick = onClick, modifier = modifier,
+        label = { Text(label) },
+        leadingIcon = if (selected) ({ Icon(androidx.compose.material.icons.Icons.Filled.Check, null, Modifier.size(18.dp)) }) else null,
+    )
 }

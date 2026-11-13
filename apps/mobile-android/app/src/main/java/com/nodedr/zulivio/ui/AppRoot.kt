@@ -1,7 +1,11 @@
 package com.nodedr.zulivio.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -99,16 +103,19 @@ fun AppRoot(c: AppContainer) {
     val signedIn = active != null && !active.needsLogin
     val onboarding: OnboardingVM = containerViewModel(c) { OnboardingVM(it) }
 
-    // Signed out (logout, revoked device, expired refresh token) -> back to onboarding; expired accounts keep their server + email pre-filled.
+    // Signed out (logout, revoked device, expired refresh token). An account whose session ended keeps its server + email,
+    // so the user lands on a pre-filled sign-in with an explanation; with no accounts at all they start at "Connect".
     LaunchedEffect(signedIn, active?.id) {
+        if (signedIn) return@LaunchedEffect
         val route = nav.currentBackStackEntry?.destination?.route
-        val onOnboarding = route == Routes.CONNECT || route == Routes.LOGIN
-        if (!signedIn && !onOnboarding) {
-            val expired = snap.accounts.firstOrNull { it.needsLogin }
-            if (expired != null) {
-                onboarding.resume(expired, "Your session has ended. Please sign in again.")
+        val expired = snap.accounts.firstOrNull { it.needsLogin }
+        if (expired != null) {
+            if (route != Routes.LOGIN) {
+                onboarding.resume(expired, onboarding.ui.value.notice ?: "Your session has ended. Please sign in again.")
                 nav.navigate(Routes.LOGIN) { popUpTo(0) }
-            } else nav.navigate(Routes.CONNECT) { popUpTo(0) }
+            }
+        } else if (route != Routes.CONNECT && route != Routes.LOGIN) {
+            nav.navigate(Routes.CONNECT) { popUpTo(0) }
         }
     }
     LaunchedEffect(Unit) {
@@ -156,7 +163,9 @@ fun AppRoot(c: AppContainer) {
             }
         },
     ) { pad ->
-        Column(Modifier.padding(pad)) {
+        // On tablets and large phones in landscape, keep content at a readable width instead of stretching a phone layout edge to edge.
+        Box(Modifier.padding(pad).consumeWindowInsets(pad).fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        Column(Modifier.widthIn(max = 640.dp).fillMaxSize()) {
             if (signedIn) StatusStrip(c, onOpenSync = { nav.navigate(Routes.SYNC) })
             NavHost(nav, startDestination = if (signedIn) Routes.HOME else Routes.CONNECT, modifier = Modifier.weight(1f)) {
                 composable(Routes.CONNECT) {
@@ -187,6 +196,7 @@ fun AppRoot(c: AppContainer) {
                 composable(Routes.SYNC) { SyncScreen(c, onBack = { nav.popBackStack() }) }
                 composable(Routes.ACCOUNTS) { AccountsScreen(c, nav, onAdd = { onboarding.setUrl(""); nav.navigate(Routes.CONNECT) }) }
             }
+        }
         }
     }
 

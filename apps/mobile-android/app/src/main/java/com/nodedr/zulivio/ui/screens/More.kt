@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -122,13 +123,14 @@ fun PermissionCenterScreen(c: AppContainer, nav: NavHostController) {
         }
         PermCard("Follow-up reminders", if (reminders) "On" else "Off", if (reminders) Tone.Ok else Tone.Neutral,
             "Shows a notification when a follow-up is due. Zulivio checks with your own server every ~15 minutes; no third-party push service is used.") {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            val toggle = { on: Boolean ->
+                if (!on) { reminders = false; c.session.putBool("reminders_on", false); ReminderWorker.disable(ctx) }
+                else if (Build.VERSION.SDK_INT >= 33 && !ReminderWorker.canNotify(ctx)) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                else { reminders = true; c.session.putBool("reminders_on", true); ReminderWorker.enable(ctx) }
+            }
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).toggleable(value = reminders, role = Role.Switch, onValueChange = toggle), verticalAlignment = Alignment.CenterVertically) {
                 Text(if (reminders) "Reminders enabled" else "Enable reminders", Modifier.weight(1f))
-                Switch(checked = reminders, onCheckedChange = { on ->
-                    if (!on) { reminders = false; c.session.putBool("reminders_on", false); ReminderWorker.disable(ctx) }
-                    else if (Build.VERSION.SDK_INT >= 33 && !ReminderWorker.canNotify(ctx)) notifLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    else { reminders = true; c.session.putBool("reminders_on", true); ReminderWorker.enable(ctx) }
-                })
+                Switch(checked = reminders, onCheckedChange = null)
             }
         }
         PermCard("Phone calls & call history", "Not requested", Tone.Neutral,

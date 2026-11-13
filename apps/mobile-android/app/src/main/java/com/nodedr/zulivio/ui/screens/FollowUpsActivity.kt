@@ -9,10 +9,14 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -64,6 +68,7 @@ import com.nodedr.zulivio.ui.components.PrimaryButton
 import com.nodedr.zulivio.ui.components.ScreenBar
 import com.nodedr.zulivio.ui.components.SecondaryButton
 import com.nodedr.zulivio.ui.components.SectionTitle
+import com.nodedr.zulivio.ui.components.SelectChip
 import com.nodedr.zulivio.ui.components.Tone
 import com.nodedr.zulivio.ui.containerViewModel
 import kotlinx.coroutines.launch
@@ -108,7 +113,8 @@ private fun FollowUpList(c: AppContainer, vm: FollowUpsVM, d: FollowUpDashboard,
                             Text(f.lead?.fullName ?: "Lead", style = MaterialTheme.typography.titleMedium)
                             Text(listOfNotNull(f.lead?.company, Fmt.whenText(f.dueAt)).joinToString(" · "), style = MaterialTheme.typography.bodyMedium, color = if (Fmt.isPast(f.dueAt)) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant)
                             f.note?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp)) }
-                            Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            @OptIn(ExperimentalLayoutApi::class)
+                            FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                 f.lead?.phone?.takeIf { it.isNotBlank() }?.let { _ ->
                                     SecondaryButton("Call", onClick = {
                                         val lead = com.nodedr.zulivio.data.Lead(id = f.leadId, fullName = f.lead.fullName, phone = f.lead.phone)
@@ -116,7 +122,7 @@ private fun FollowUpList(c: AppContainer, vm: FollowUpsVM, d: FollowUpDashboard,
                                     }, icon = Icons.Filled.Call)
                                 }
                                 SecondaryButton("Done", onClick = { vm.complete(f) }, icon = Icons.Filled.CheckCircle)
-                                TextButton(onClick = { moving = f }) { Icon(Icons.Filled.Schedule, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Reschedule") }
+                                TextButton(onClick = { moving = f }, modifier = Modifier.heightIn(min = 48.dp)) { Icon(Icons.Filled.Schedule, null, Modifier.size(18.dp)); Spacer(Modifier.width(4.dp)); Text("Reschedule", maxLines = 1, softWrap = false) }
                             }
                         }
                     }
@@ -211,13 +217,13 @@ private fun LogCallSheet(missed: Boolean, onDismiss: () -> Unit, onSave: (String
     var minutes by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).imePadding().padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(if (missed) "Log a missed call" else "Log a call", style = MaterialTheme.typography.titleLarge)
             Text("This is recorded as entered by you. If the number matches a lead, it's linked to it automatically.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedTextField(phone, { phone = it.filter { ch -> ch.isDigit() || ch in "+ -()" }.take(32) }, label = { Text("Phone number") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth())
             OutlinedTextField(name, { name = it.take(120) }, label = { Text("Name (optional)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                listOf("missed" to "Missed", "incoming" to "Incoming", "outgoing" to "Outgoing").forEach { (v, l) -> FilterChip(selected = type == v, onClick = { type = v }, label = { Text(l) }) }
+                listOf("missed" to "Missed", "incoming" to "Incoming", "outgoing" to "Outgoing").forEach { (v, l) -> SelectChip(selected = type == v, onClick = { type = v }, label = l) }
             }
             if (type != "missed") OutlinedTextField(minutes, { minutes = it.filter(Char::isDigit).take(3) }, label = { Text("Length in minutes (optional)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
             OutlinedTextField(note, { note = it.take(180) }, label = { Text("Note (optional)") }, minLines = 2, modifier = Modifier.fillMaxWidth())

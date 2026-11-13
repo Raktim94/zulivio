@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -70,6 +73,7 @@ import com.nodedr.zulivio.data.LeadDetail
 import com.nodedr.zulivio.data.OutboxItem
 import com.nodedr.zulivio.data.OutboxState
 import com.nodedr.zulivio.data.Stage
+import com.nodedr.zulivio.ui.components.ActionTile
 import com.nodedr.zulivio.ui.components.AppCard
 import com.nodedr.zulivio.ui.components.Chip
 import com.nodedr.zulivio.ui.components.DateTimeDialog
@@ -82,6 +86,7 @@ import com.nodedr.zulivio.ui.components.PrimaryButton
 import com.nodedr.zulivio.ui.components.ScreenBar
 import com.nodedr.zulivio.ui.components.SecondaryButton
 import com.nodedr.zulivio.ui.components.SectionTitle
+import com.nodedr.zulivio.ui.components.SelectChip
 import com.nodedr.zulivio.ui.components.Tone
 import com.nodedr.zulivio.ui.containerViewModel
 import kotlinx.coroutines.flow.Flow
@@ -173,9 +178,9 @@ private fun DetailContent(c: AppContainer, vm: LeadDetailVM, d: LeadDetail, pend
                 if (!lead.phone.isNullOrBlank()) {
                     PrimaryButton("Call ${Fmt.phone(lead.phone)}", onClick = { LeadActions.call(c, ctx, lead) }, icon = Icons.Filled.Call, modifier = Modifier.fillMaxWidth())
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SecondaryButton("SMS", onClick = { Intents.sms(ctx, lead.phone) }, icon = Icons.Filled.Sms, modifier = Modifier.weight(1f))
-                        SecondaryButton("WhatsApp", onClick = { Intents.whatsapp(ctx, lead.phone) }, icon = Icons.Filled.Message, modifier = Modifier.weight(1f))
-                        if (!lead.email.isNullOrBlank()) SecondaryButton("Email", onClick = { Intents.email(ctx, lead.email) }, icon = Icons.Filled.Email, modifier = Modifier.weight(1f))
+                        ActionTile("SMS", Icons.Filled.Sms, onClick = { Intents.sms(ctx, lead.phone) }, modifier = Modifier.weight(1f))
+                        ActionTile("WhatsApp", Icons.Filled.Message, onClick = { Intents.whatsapp(ctx, lead.phone) }, modifier = Modifier.weight(1f))
+                        if (!lead.email.isNullOrBlank()) ActionTile("Email", Icons.Filled.Email, onClick = { Intents.email(ctx, lead.email) }, modifier = Modifier.weight(1f))
                     }
                 } else if (!lead.email.isNullOrBlank()) {
                     SecondaryButton("Email ${lead.email}", onClick = { Intents.email(ctx, lead.email) }, icon = Icons.Filled.Email, modifier = Modifier.fillMaxWidth())
@@ -208,10 +213,10 @@ private fun DetailContent(c: AppContainer, vm: LeadDetailVM, d: LeadDetail, pend
                 SectionTitle("Pipeline stage")
                 FlowRow(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     d.stages.sortedBy { it.sortOrder }.forEach { s ->
-                        FilterChip(
+                        SelectChip(
                             selected = s.id == lead.stageId,
                             onClick = { if (s.id != lead.stageId) { if (s.isLost) lossFor = s else vm.stage(lead, s, null) } },
-                            label = { Text(s.name) },
+                            label = s.name,
                         )
                     }
                 }
@@ -360,37 +365,42 @@ private fun DispositionSheet(leadName: String, onDismiss: () -> Unit, onSave: (D
     val options = if (connected) Dispositions.connected else Dispositions.notConnected
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
-        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Call with $leadName", style = MaterialTheme.typography.titleLarge)
-            SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-                SegmentedButton(selected = connected, onClick = { connected = true; disposition = null }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("Connected") }
-                SegmentedButton(selected = !connected, onClick = { connected = false; disposition = null }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("Not connected") }
-            }
-            Text("Result", style = MaterialTheme.typography.titleSmall)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                options.forEach { o -> FilterChip(selected = disposition == o, onClick = { disposition = o; if (o == "CALLBACK" && callback == null) pickCallback = true }, label = { Text(Dispositions.label(o)) }) }
-            }
-            if (connected) {
-                Text("Call length (optional)", style = MaterialTheme.typography.titleSmall)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(minutes, { minutes = it.filter(Char::isDigit).take(3) }, label = { Text("Min") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
-                    OutlinedTextField(seconds, { seconds = it.filter(Char::isDigit).take(2) }, label = { Text("Sec") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+        // Scrollable body + pinned Save button, so the action is always reachable on a small phone.
+        Column(Modifier.fillMaxSize()) {
+            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Call with $leadName", style = MaterialTheme.typography.titleLarge)
+                SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                    SegmentedButton(selected = connected, onClick = { connected = true; disposition = null }, shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text("Connected") }
+                    SegmentedButton(selected = !connected, onClick = { connected = false; disposition = null }, shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text("Not connected") }
                 }
-                Text("Leave blank if you're not sure — Zulivio never guesses a duration.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            OutlinedTextField(notes, { notes = it }, label = { Text("Notes (optional)") }, minLines = 2, maxLines = 4, modifier = Modifier.fillMaxWidth())
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text("Call back later", style = MaterialTheme.typography.titleSmall)
-                    Text(callback?.let { Fmt.whenText(it.toString()) } ?: "No callback set", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Result", style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    options.forEach { o -> SelectChip(selected = disposition == o, onClick = { disposition = o; if (o == "CALLBACK" && callback == null) pickCallback = true }, label = Dispositions.label(o)) }
                 }
-                TextButton(onClick = { pickCallback = true }) { Text(if (callback == null) "Set time" else "Change") }
-                if (callback != null) TextButton(onClick = { callback = null }) { Text("Clear") }
+                if (connected) {
+                    Text("Call length (optional)", style = MaterialTheme.typography.titleSmall)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(minutes, { minutes = it.filter(Char::isDigit).take(3) }, label = { Text("Min") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                        OutlinedTextField(seconds, { seconds = it.filter(Char::isDigit).take(2) }, label = { Text("Sec") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.weight(1f))
+                    }
+                    Text("Leave blank if you're not sure — Zulivio never guesses a duration.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                OutlinedTextField(notes, { notes = it }, label = { Text("Notes (optional)") }, minLines = 2, maxLines = 4, modifier = Modifier.fillMaxWidth())
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Call back later", style = MaterialTheme.typography.titleSmall)
+                        Text(callback?.let { Fmt.whenText(it.toString()) } ?: "No callback set", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    TextButton(onClick = { pickCallback = true }) { Text(if (callback == null) "Set time" else "Change") }
+                    if (callback != null) TextButton(onClick = { callback = null }) { Text("Clear") }
+                }
             }
-            PrimaryButton("Save result", enabled = disposition != null, modifier = Modifier.fillMaxWidth(), onClick = {
-                val dur = if (connected && (minutes.isNotEmpty() || seconds.isNotEmpty())) (minutes.toIntOrNull() ?: 0) * 60 + (seconds.toIntOrNull() ?: 0) else null
-                onSave(DispositionBody(outcome = if (connected) "CONNECTED" else "NOT_CONNECTED", disposition = disposition!!, durationSeconds = dur, notes = notes.takeIf { it.isNotBlank() }, followUpAt = callback?.toString(), followUpNote = if (callback != null) "Call back" else null))
-            })
+            Surface(tonalElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
+                PrimaryButton("Save result", enabled = disposition != null, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), onClick = {
+                    val dur = if (connected && (minutes.isNotEmpty() || seconds.isNotEmpty())) (minutes.toIntOrNull() ?: 0) * 60 + (seconds.toIntOrNull() ?: 0) else null
+                    onSave(DispositionBody(outcome = if (connected) "CONNECTED" else "NOT_CONNECTED", disposition = disposition!!, durationSeconds = dur, notes = notes.takeIf { it.isNotBlank() }, followUpAt = callback?.toString(), followUpNote = if (callback != null) "Call back" else null))
+                })
+            }
         }
     }
     if (pickCallback) DateTimeDialog("Call back on", onConfirm = { callback = it; pickCallback = false }, onDismiss = { pickCallback = false })
