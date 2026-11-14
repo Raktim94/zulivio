@@ -34,6 +34,8 @@ A route without a declared scope is refused. Organization, author and owner come
 
 Limits: 600 req/min per credential (`429` + `Retry-After: 60`), 1 MB bodies. Send `Idempotency-Key` (8–128 chars of `A-Za-z0-9_.:-`) on every POST; same key + same body replays (`Idempotent-Replayed: true`), different body `422 IDEMPOTENCY_KEY_REUSED`, in-flight `409 IDEMPOTENCY_IN_PROGRESS`.
 
+Tested live (local build, 2026-11-14): create lead `201`; same `Idempotency-Key` + same body replays with `Idempotent-Replayed: true`; same key + different body `422 IDEMPOTENCY_KEY_REUSED`; existing phone `409 DUPLICATE_LEAD`; body with `organizationId` `400`; list returns `{data, nextCursor}`; a `leads:*` client calling `/calls` gets `403 INSUFFICIENT_SCOPE`; bad or missing key `401`. Phone numbers are normalised (`+91 98765 43210` is stored as `+919876543210`). The personal key (`zlv_`) and API client key (`zlk_`) are not interchangeable (each is refused with `401` on the other's endpoint). MCP listed exactly the 9 tools above with correct `readOnlyHint` (read tools `true`, `start_attendance`, `end_attendance`, `update_task_status`, `create_lead` `false`). Browser-style session calls (bootstrap, login, creating credentials) need an `Origin` header matching `CORS_ORIGIN`, otherwise `403 Cross-origin request blocked`; integration calls with a Bearer key do not. Not verified: webhook delivery and signatures, calls endpoints, mobile routes.
+
 ## Credentials in your app
 ```env
 # server only
