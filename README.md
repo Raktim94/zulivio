@@ -40,6 +40,10 @@ The sales CRM adds leads, call logs, follow-ups, lead scoring and assignment
 rules alongside these workforce workflows. Read [Scope and limitations](#scope-and-limitations)
 for deployment requirements and the capabilities outside the current release.
 
+## Integrate with AI Coding Agents
+
+Use [`prompts/AI_INTEGRATION_PROMPT.md`](prompts/AI_INTEGRATION_PROMPT.md) to have a coding agent push website leads or call events into Zulivio (scoped API client, idempotent POSTs, signed webhooks, MCP). See [`AGENTS.md`](AGENTS.md) and [`llms.txt`](llms.txt).
+
 ## Get Zulivio
 
 Two ways to install, both built from the same code and pointed at the same

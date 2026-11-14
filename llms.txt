@@ -1,0 +1,12 @@
+# Zulivio
+
+> Self-hosted sales CRM and workforce operations by NodeDR: leads, call logs, follow-ups, scoring, deals, employee records, attendance and task assignment. A scoped REST API (leads and calls), signed webhooks and an MCP server (per-employee keys) are available. Requires the business to run its own instance.
+
+## Integrate
+- [AI integration prompt](https://github.com/Raktim94/zulivio/blob/main/prompts/AI_INTEGRATION_PROMPT.md)
+- [Integrations and API reference](https://github.com/Raktim94/zulivio/blob/main/docs/integrations/api.md)
+
+## Product
+- [Product site](https://zulivio.nodedr.com/)
+- [Repository](https://github.com/Raktim94/zulivio)
+- [NodeDR AI integration catalog](https://www.nodedr.com/ai-integrations)
