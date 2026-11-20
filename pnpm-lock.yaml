@@ -51,8 +51,8 @@ importers:
         specifier: ^11.2.1
         version: 11.2.1(@nestjs/common@11.2.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.1)
       '@nestjs/schedule':
-        specifier: ^6.1.3
-        version: 6.1.3(@nestjs/common@11.2.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.1)
+        specifier: ^12.0.2
+        version: 12.0.2(@nestjs/common@11.2.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.1)
       '@nestjs/swagger':
         specifier: ^11.4.7
         version: 11.4.7(@nestjs/common@11.2.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.1)(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)
@@ -1073,11 +1073,12 @@ packages:
       '@nestjs/common': ^11.0.0
       '@nestjs/core': ^11.0.0
 
-  '@nestjs/schedule@6.1.3':
-    resolution: {integrity: sha512-RflMFOpR16Dwd1jAUbeB4mfGTCh65fvEdL4mSjQPJChpkRGRjIXjb+6YQcK2faQrVT60c9DmLmoVR7/ONCtuYQ==}
+  '@nestjs/schedule@12.0.2':
+    resolution: {integrity: sha512-5iAvJEtk0njbfTrG4JQr+SXw8ZrqgDM1wJH9nUs6tVLCX5pWGd1LJ0a8b089UT1FDeDWaThRRfSLixFz9zztcA==}
+    engines: {node: '>=20.19.0'}
     peerDependencies:
-      '@nestjs/common': ^10.0.0 || ^11.0.0
-      '@nestjs/core': ^10.0.0 || ^11.0.0
+      '@nestjs/common': ^11.0.0 || ^12.0.0
+      '@nestjs/core': ^11.0.0 || ^12.0.0
 
   '@nestjs/schematics@11.1.0':
     resolution: {integrity: sha512-lVxGZ46tcdItFMoXr6vyKWlnOsm1SZm/GUqAEDvy2RL4Q4O+3bkziAhrO7Y8JLssFUUvNFEGqAizI52WAxhjDw==}
@@ -1533,8 +1534,8 @@ packages:
   '@types/json5@0.0.29':
     resolution: {integrity: sha512-dRLjCWHYg4oaA77cxO64oO+7JwCwnIzkZPdrrC71jQmQtlhM556pwKo5bUzqvZndkVbeFLIIi+9TC40JNF5hNQ==}
 
-  '@types/luxon@3.7.4':
-    resolution: {integrity: sha512-V536ZAd6ZJztrrBlLcDFaaZrXNAL2E5uGmssWf/dpSiLkmkLScXUYhUBnWPmtW+cIqnNHzf6//TCMpIc9SCRRQ==}
+  '@types/luxon@3.7.6':
+    resolution: {integrity: sha512-6KSjliQAXK8ZLgFQO4B7iE4Rpf/B3rItzCFuXezBY/XIAGxOdLd7vRNK9/StRPwiS/yJsVbB7HKpW46B8tcEuQ==}
 
   '@types/methods@1.1.4':
     resolution: {integrity: sha512-ymXWVrDiCxTBE3+RIrrP533E70eA+9qu7zdWoHuOmGujkYtzf4HQF96b8nwHLqhuf4ykX61IGRIB38CC6/sImQ==}
@@ -2017,8 +2018,8 @@ packages:
   base64-js@1.5.1:
     resolution: {integrity: sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA==}
 
-  baseline-browser-mapping@2.11.35:
-    resolution: {integrity: sha512-GNk8KX52CHqeNKGk8+7tZnQab/2k1t/BgrUHPKNdijzpEhF1saPQZHVKb6m5loSAxB39gyrTYw34Qf9CQ3u1qQ==}
+  baseline-browser-mapping@2.11.34:
+    resolution: {integrity: sha512-Aqr8mA1kIvyJ3UY5YAY7ib8LSo1DmDMbMnVqGPtsKW1LxaFQFwn9Eb3yvq2fUKJsRvaXjnAV7R5osqETapzNiA==}
     engines: {node: '>=6.0.0'}
     hasBin: true
 
@@ -5879,7 +5880,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@nestjs/schedule@6.1.3(@nestjs/common@11.2.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.1)':
+  '@nestjs/schedule@12.0.2(@nestjs/common@11.2.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.1)':
     dependencies:
       '@nestjs/common': 11.2.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
       '@nestjs/core': 11.2.1(@nestjs/common@11.2.1(class-transformer@0.5.1)(class-validator@0.15.1)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.2.1)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -6297,7 +6298,7 @@ snapshots:
 
   '@types/json5@0.0.29': {}
 
-  '@types/luxon@3.7.4': {}
+  '@types/luxon@3.7.6': {}
 
   '@types/methods@1.1.4': {}
 
@@ -6837,7 +6838,7 @@ snapshots:
 
   base64-js@1.5.1: {}
 
-  baseline-browser-mapping@2.11.35: {}
+  baseline-browser-mapping@2.11.34: {}
 
   bignumber.js@9.3.1: {}
 
@@ -6878,7 +6879,7 @@ snapshots:
 
   browserslist@4.28.8:
     dependencies:
-      baseline-browser-mapping: 2.11.35
+      baseline-browser-mapping: 2.11.34
       caniuse-lite: 1.0.30001820
       electron-to-chromium: 1.5.404
       node-releases: 2.0.53
@@ -7093,7 +7094,7 @@ snapshots:
 
   cron@4.4.0:
     dependencies:
-      '@types/luxon': 3.7.4
+      '@types/luxon': 3.7.6
       luxon: 3.7.2
 
   cross-env@10.1.0:
